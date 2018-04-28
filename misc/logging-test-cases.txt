@@ -1,0 +1,50 @@
+* App with configured hslogger
+    * file and stdout handler set
+        * INSTANA_LOG_LEVEL:                            DEBUG
+        * INSTANA_LOG_LEVEL_STDOUT:                     ""
+        * INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER: ""
+        => logs Instana messages to Instana file, depending on app root log level they might be emitted by the root handler, too
+    * file handler set but not stdout
+        * INSTANA_LOG_LEVEL:                            DEBUG
+        * INSTANA_LOG_LEVEL_STDOUT:                     ""
+        * INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER: ""
+        => logs Instana messages to stdout, depending on app root log level they might be emitted by the root handler, too
+        => possible problems:
+            - When the
+                updateGlobalLogger rootLoggerName $ setHandlers [...]
+              was not called at all on the rootLoggerName, then Instana log messages
+              down to debug appear on stdout, unformatted (because no handler is
+              present)
+            - If instead the same handler (for example the file handler is set on
+              the app logger level and on the root logger level, like:
+                updateGlobalLogger appLogger $
+                  setHandlers [ formattedAppFileHandler ]
+                updateGlobalLogger rootLoggerName $
+                  setHandlers [ formattedAppFileHandler ]
+              the app's log messages will be duplicated (because each message is
+              emitted by two handlers set).
+            - !! Correct behaviour: App needs to make sure that a handler is set on
+              rootLoggerName, for example
+                 updateGlobalLogger rootLoggerName $ setHandlers [ appFileHandler ]
+    * stdout handler set, but not file (assuming stdout handler is set on
+      rootLloggerName)
+        * INSTANA_LOG_LEVEL:                      DEBUG
+        * INSTANA_LOG_LEVEL_STDOUT:               ""
+        * INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER: ""
+
+* App without configured hslogger
+   * INSTANA_LOG_LEVEL:                      DEBUG
+   * INSTANA_LOG_LEVEL_STDOUT:               ""
+   * INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER: TRUE
+   => logs instana log file, no output on sdtout √
+
+   * INSTANA_LOG_LEVEL:                      ""
+   * INSTANA_LOG_LEVEL_STDOUT:               DEBUG
+   * INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER: TRUE
+   => logs to stdout, no log file √
+
+   * INSTANA_LOG_LEVEL:                      DEBUG
+   * INSTANA_LOG_LEVEL_STDOUT:               DEBUG
+   * INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER: TRUE
+   => logs to instana log file and stdout √
+
