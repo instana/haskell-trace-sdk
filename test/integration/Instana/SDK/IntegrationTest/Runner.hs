@@ -32,7 +32,7 @@ runTestsIgnoringHandles suiteGenerator _ _ _ _ =
 
 runTests :: SuiteGenerator -> IO Counts
 runTests suiteGenerator = do
-  putStrFlush "⏱k waiting for agent stub to come up"
+  putStrFlush "⏱ waiting for agent stub to come up"
   _ <- HttpHelper.retryRequestRecovering TestHelper.pingAgentStub
   putStrLn "\n✅ agent stub is up"
   let

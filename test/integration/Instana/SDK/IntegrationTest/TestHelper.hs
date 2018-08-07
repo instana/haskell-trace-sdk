@@ -82,7 +82,7 @@ waitForDiscoveryWithMyPid = do
 
 waitForDiscoveryWithPid :: String -> IO (Either String DiscoveryRequest)
 waitForDiscoveryWithPid pidStr = do
-  putStrFlush $ "⏱  waiting for discovery request for pid " ++ pidStr
+  putStrFlush $ "⏱ waiting for discovery request for pid " ++ pidStr
   discoveries <-
     HttpHelper.retryRequest (containsDiscoveryWithPid pidStr) getDiscoveries
   case discoveries of
@@ -120,7 +120,7 @@ waitForAgentReadyWithMyPid = do
 
 waitForAgentReadyWithPid :: String -> IO (Either String ())
 waitForAgentReadyWithPid pidStr = do
-  putStrFlush $ "⏱k waiting for agent ready request for pid " ++ pidStr
+  putStrFlush $ "⏱ waiting for agent ready request for pid " ++ pidStr
   agentReadyPids <-
     HttpHelper.retryRequest
       (containsAgentReadyWithPid pidStr)
@@ -154,7 +154,7 @@ containsAgentReadyWithPid pid pidsFromResponse =
 
 waitForSpansMatching :: [Text] -> IO (Either String [Span])
 waitForSpansMatching expectedNames = do
-  putStrFlush "⏱k waiting for spans to be processed"
+  putStrFlush "⏱ waiting for spans to be processed"
   spans <- HttpHelper.retryRequest (hasMatchingSpans expectedNames) getSpans
   putStrLn "\n✅ spans have been processed"
   return spans
