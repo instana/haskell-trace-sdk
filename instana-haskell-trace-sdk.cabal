@@ -137,6 +137,7 @@ executable instana-haskell-agent-stub
     , text
     , time
     , transformers
+    , unix
     , wai
     , warp
   other-modules:

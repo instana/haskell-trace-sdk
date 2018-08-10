@@ -43,8 +43,20 @@ runTests suiteGenerator = do
         , InstanaSDK.agentPort = Just HttpHelper.agentStubPort
         , InstanaSDK.agentName = Suite.customAgentName opts
         }
-  InstanaSDK.withConfiguredInstana config $
+  results <- InstanaSDK.withConfiguredInstana config $
     waitForAgentConnectionAndRun suiteGenerator
+  -- The withProcess call that starts the agent stub should also terminate it
+  -- when the test suite is done or when an error occurs while running the test
+  -- suite. On MacOS, this works. On Linux, the agent stub does not get
+  -- terminated, for the following reasons: The agent stub is started via
+  -- "/bin/sh -c \"stack exec ...\"" and Process.createWith will send a TERM
+  -- signal to terminate the started process. On Linux, this results only in the
+  -- "bin/sh" process to be terminated, but the "stack exec" not. Thus, the
+  -- first started agent stub instance would never be shut down. To make sure
+  -- the agent stub instance gets shut down, we send an extra HTTP request to
+  -- ask the agent stub to terminate itself.
+  _ <- TestHelper.shutdownAgentStub
+  return results
 
 
 waitForAgentConnectionAndRun :: SuiteGenerator -> InstanaContext -> IO Counts

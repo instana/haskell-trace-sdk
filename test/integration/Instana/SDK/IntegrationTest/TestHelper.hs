@@ -1,9 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Instana.SDK.IntegrationTest.TestHelper
   ( getSpanByName
   , pingAgentStub
   , resetDiscoveries
   , resetSpans
+  , shutdownAgentStub
   , waitForAgentConnection
   , waitForDiscoveryWithMyPid
   , waitForDiscoveryWithPid
@@ -14,6 +16,7 @@ module Instana.SDK.IntegrationTest.TestHelper
   ) where
 
 
+import           Control.Exception                      (catch)
 import qualified Data.ByteString.Lazy                   as LBS
 import           Data.Either                            (Either)
 import qualified Data.List                              as List
@@ -43,6 +46,19 @@ withSpanCreation createSpanAction expectedSpans = do
 pingAgentStub :: IO (HTTP.Response LBS.ByteString)
 pingAgentStub = do
   HttpHelper.doRequest "stub/ping" "GET"
+
+
+shutdownAgentStub :: IO ()
+shutdownAgentStub = do
+  catch
+    ( HttpHelper.doRequest "stub/shutdown" "POST"
+      >> return ()
+    )
+    -- Ignore all exceptions for the shutdown request. Either the agent stub has
+    -- already been shut down (so the request results in a network error) or, if
+    -- it is successfull, it results in an HTTP 500 because the agent stub
+    -- process terminates before responding.
+    (\ (_ :: HTTP.HttpException) -> return ())
 
 
 waitForAgentConnection :: Bool -> IO (Either String DiscoveryRequest)

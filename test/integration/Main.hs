@@ -7,6 +7,6 @@ import qualified Instana.SDK.IntegrationTest.TestSuites as TestSuites
 
 
 main :: IO Counts
-main = do
+main =
   TestSuites.allTests
 

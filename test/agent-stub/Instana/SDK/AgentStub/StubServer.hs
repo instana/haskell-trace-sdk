@@ -7,7 +7,9 @@ import           Data.STRef                             (modifySTRef, readSTRef)
 import           Servant                                ((:<|>) (..),
                                                          NoContent (NoContent))
 import qualified Servant
-import           System.Log.Logger                      (debugM)
+import qualified System.Exit                            as Exit
+import           System.Log.Logger                      (debugM, infoM)
+import qualified System.Posix.Process                   as Posix
 
 import           Instana.SDK.AgentStub.DiscoveryRequest (DiscoveryRequest)
 import           Instana.SDK.AgentStub.Logging          (agentStubLogger)
@@ -24,6 +26,7 @@ stubServer recorders =
  :<|> getRecordedDiscoveries recorders
  :<|> getRecordedAgentReadyRequests recorders
  :<|> getRecordedSpans recorders
+ :<|> postShutdown
  :<|> resetServer recorders
 
 
@@ -51,6 +54,13 @@ getRecordedSpans :: Recorders -> Servant.Handler [Span]
 getRecordedSpans recorders = do
   recordedSpans <- stToServant $ readSTRef $ Recorders.spanRecorder recorders
   return recordedSpans
+
+
+postShutdown :: Servant.Handler NoContent
+postShutdown = do
+  liftIO $ infoM agentStubLogger $ "AgentStub shutdown requested"
+  _ <-liftIO $ Posix.exitImmediately Exit.ExitSuccess
+  return NoContent
 
 
 resetServer ::

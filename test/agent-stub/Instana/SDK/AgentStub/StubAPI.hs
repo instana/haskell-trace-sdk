@@ -22,9 +22,12 @@ type StubAPI =
        -- GET /stub/agentReady
   :<|> "agentReady"
        :> Get '[JSON] [String]
-       -- GET /stub/traces
+       -- GET /stub/spans
   :<|> "spans"
        :> Get '[JSON] [Span]
+       -- POST /stub/shutdown
+  :<|> "shutdown"
+       :> PostNoContent '[JSON] NoContent
   :<|> "reset"
        :> ResetAPI
 
