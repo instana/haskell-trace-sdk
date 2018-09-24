@@ -1,7 +1,17 @@
-Instana Haskell SDK
-===================
+Instana Haskell Trace SDK
+=========================
 
-Monitor your Haskell application with Instana.
+Monitor your Haskell application with Instana! 🎉
+
+Disclaimer
+----------
+
+The Instana Haskell Trace SDK is a labor of love from some of our engineers and work on it is done in their spare time. Haskell is currently not a platform that we officialy support. The experience may differ from other programming languages and platforms that Instana actively supports (such as Java, .NET, Node.js, Python, Ruby, Go, PHP, ...). That said, the SDK is a fully functional piece of software, so don't let this disclaimer discourage you from using it. If you use Instana or consider using it and Haskell support is crucial for you, make sure to give us a ping and let's talk about it.
+
+What The Haskell Trace SDK Is And What It Is Not
+------------------------------------------------
+
+The Instana Haskell Trace SDK does not support automatic instrumentation/tracing in the way we support it in most other languages. Instead, the SDK enables you to create spans manually, much like the [Instana Trace SDK for Java](https://docs.instana.io/core_concepts/tracing/java_trace_sdk/) does. Besides offering a convenient API to create spans, the Haskell Trace SDK also takes care of establishing a connection to the Instana Agent and sending spans to the agent in an efficient way, that does not impede the performance of your production code.
 
 Usage
 -----
@@ -69,5 +79,4 @@ or
 * `INSTANA_LOG_LEVEL_STDOUT=DEBUG`
 * `INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER=true`
 
-depending on whether the application already uses and configures hslogger. The application `sample-app` that is contained in the Instana Haskell SDK's repo confiugures hslogger, so simply using `INSTANA_LOG_LEVEL_STDOUT=DEBUG` is correct.
-
+depending on whether the application already uses and configures hslogger. The application `sample-app` that is contained in the Instana Haskell SDK's repo configures hslogger, so simply using `INSTANA_LOG_LEVEL_STDOUT=DEBUG` is correct.
