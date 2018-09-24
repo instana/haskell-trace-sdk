@@ -3,11 +3,11 @@ version:             0.1.0.0
 github:              "instana/haskell-trace-sdk"
 license:             BSD3
 author:              "Bastian Krol"
-maintainer:          "bastian.krol@web.de"
+maintainer:          "bastian.krol@instana.com"
 copyright:           "Bastian Krol 2018"
 
 extra-source-files:
-- readme.markdown
+- README.md
 - ChangeLog.md
 
 # Metadata used when publishing your package

@@ -15,7 +15,7 @@ cabal-version:  >= 1.10
 
 extra-source-files:
     ChangeLog.md
-    readme.markdown
+    README.md
 
 source-repository head
   type: git
