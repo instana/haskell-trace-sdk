@@ -199,3 +199,9 @@ or
 * `INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER=true`
 
 depending on whether the application already uses and configures hslogger. The application `sample-app` that is contained in the Instana Haskell SDK's repo configures hslogger, so simply using `INSTANA_LOG_LEVEL_STDOUT=DEBUG` is correct.
+
+Contributing
+------------
+
+See [CONTRIBUTING.md](https://github.com/instana/haskell-trace-sdk/blob/master/CONTRIBUTING.md).
+
