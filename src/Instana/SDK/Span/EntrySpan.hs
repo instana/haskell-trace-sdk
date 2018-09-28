@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Span.EntrySpan
+Description : An entry span
+-}
 module Instana.SDK.Span.EntrySpan
   ( EntrySpan(..)
   , traceId

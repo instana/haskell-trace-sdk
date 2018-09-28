@@ -1,6 +1,10 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE InstanceSigs        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-|
+Module      : Instana.SDK.Internal.Id
+Description : A module for working with trace IDs and span IDs
+-}
 module Instana.SDK.Internal.Id
    ( Id
    , generate

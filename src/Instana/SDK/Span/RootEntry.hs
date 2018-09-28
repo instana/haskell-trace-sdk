@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Span.RootEntry
+Description : A root entry span
+-}
 module Instana.SDK.Span.RootEntry
   ( RootEntry(..)
   , spanId

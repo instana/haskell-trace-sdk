@@ -1,6 +1,10 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE InstanceSigs      #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-|
+Module      : Instana.SDK.Internal.Context
+Description : An internal representation of a span with all values set
+-}
 module Instana.SDK.Internal.FullSpan
   ( FullSpan(..)
   , SpanKind(..)

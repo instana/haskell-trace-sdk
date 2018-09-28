@@ -1,3 +1,7 @@
+{-|
+Module      : Instana.SDK.Internal.AgentConnection.Json.Util
+Description : A utility for JSON encoding/decoding.
+-}
 module Instana.SDK.Internal.AgentConnection.Json.Util where
 
 

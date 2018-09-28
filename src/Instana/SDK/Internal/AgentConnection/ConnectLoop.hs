@@ -1,3 +1,7 @@
+{-|
+Module      : Instana.SDK.Internal.AgentConnection.ConnectLoop
+Description : Establishes a connection to the agent.
+-}
 module Instana.SDK.Internal.AgentConnection.ConnectLoop
     ( initConnectLoop
     ) where
@@ -40,17 +44,17 @@ initConnectLoop context = do
         }
 
   -- connection loop works as follows:
-  -- * try to connect to an an agent at either the agent host/port received via
+  -- - try to connect to an an agent at either the agent host/port received via
   -- configuration, environment variables, default (127.0.0.1:42699) or default
   -- gateway
-  -- * establishAgentConnection tries to connect to the agent by issuing
+  -- - establishAgentConnection tries to connect to the agent by issuing
   --   a POST to /com.instana.plugin.haskell.discovery
-  -- * establishAgentConnection only ever terminates if it has been successful,
+  -- - establishAgentConnection only ever terminates if it has been successful,
   --   then we have switched to announced state.
-  -- * after that, establishAgentConnection is called every 5 seconds,
-  -- * if the connection is still up, establishAgentConnection does nothing and
+  -- - after that, establishAgentConnection is called every 5 seconds,
+  -- - if the connection is still up, establishAgentConnection does nothing and
   --   returns immediately,
-  -- * should the connection have been lost, the cycle starts again, that is,
+  -- - should the connection have been lost, the cycle starts again, that is,
   --   establishAgentConnection will retry the POST forever and only terminate
   --   after success.
   forever $ do

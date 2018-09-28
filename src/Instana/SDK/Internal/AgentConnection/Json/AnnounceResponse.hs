@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse
+Description : Aeson type for the agent's announce response
+-}
 module Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse
     ( AnnounceResponse(..)
     ) where

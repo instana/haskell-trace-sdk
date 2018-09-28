@@ -11,16 +11,22 @@ category:       Monitoring
 license:        MIT
 license-file:   LICENSE
 build-type:     Simple
+stability:      experimental
 cabal-version:  >= 1.10
 
 extra-source-files:
-    ChangeLog.md
-    README.md
+  ChangeLog.md
+  README.md
+  CONTRIBUTING.md
 
 source-repository head
   type: git
   location: https://github.com/instana/haskell-trace-sdk
 
+Flag dev
+  Description: development mode - warnings let compilation fail
+  Default: False
+  Manual: True
 
 library
   hs-source-dirs:
@@ -45,8 +51,12 @@ library
     , text
     , time
     , unix
-  ghc-options:
+  if flag(dev)
+    ghc-options:
       -Wall -Werror
+  else
+    ghc-options:
+      -Wall
   exposed-modules:
       Instana.SDK.Config
       Instana.SDK.SDK
@@ -79,8 +89,12 @@ executable instana-haskell-sample-exe
   main-is: Main.hs
   hs-source-dirs:
       sample-app
-  ghc-options:
+  if flag(dev)
+    ghc-options:
       -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+  else
+    ghc-options:
+      -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , hslogger
@@ -89,18 +103,22 @@ executable instana-haskell-sample-exe
 
 
 test-suite instana-haskell-trace-sdk-unit-tests
-  -- We are not listing instana-haskell-trace-sdk as a dependency herebut
+  -- We are not listing instana-haskell-trace-sdk as a dependency here but
   -- instead list src as an additional hs-source-dir. This has the advantage
   -- that we can test internal modules at the expense of needing to duplicate
-  -- some all modules we want to test in other-modules and all dependencies
+  -- all modules we want to test in other-modules and all dependencies
   -- required for these modules in build-depends. Also, this modules will be
-  -- compile twice (once for the library build and once for the test build).
+  -- compiled twice (once for the library build and once for the test build).
   type: exitcode-stdio-1.0
   main-is: Main.hs
   hs-source-dirs:
       test/unit, src
-  ghc-options:
+  if flag(dev)
+    ghc-options:
       -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -Wno-missing-home-modules
+  else
+    ghc-options:
+      -Wall -threaded -rtsopts -with-rtsopts=-N -Wno-missing-home-modules
   build-depends:
       base >=4.7 && <5
     , bytestring
@@ -126,8 +144,12 @@ executable instana-haskell-agent-stub
   main-is: Main.hs
   hs-source-dirs:
       test/agent-stub, test/shared
-  ghc-options:
+  if flag(dev)
+    ghc-options:
       -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+  else
+    ghc-options:
+      -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , aeson
@@ -161,8 +183,12 @@ test-suite instana-haskell-trace-sdk-integration-tests
   main-is: Main.hs
   hs-source-dirs:
       test/integration, test/shared
-  ghc-options:
+  if flag(dev)
+    ghc-options:
       -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+  else
+    ghc-options:
+      -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , aeson

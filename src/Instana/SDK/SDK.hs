@@ -1,4 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-|
+Module      : Instana.SDK.SDK
+Description : The main API of the Instana Haskell Trace SDK.
+
+Instana.SDK.SDK is the main API of the Instana Haskell Trace SDK. Use one of
+initInstana, initConfiguredInstana, withInstana, or withConfiguredInstana to get
+an InstanaContext. Then use the context with any of the withRootEntry,
+withEntry, withExit functions for tracing.
+-}
 module Instana.SDK.SDK
     ( Config
     , InstanaContext

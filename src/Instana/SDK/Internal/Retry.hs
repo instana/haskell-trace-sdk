@@ -1,5 +1,9 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-|
+Module      : Instana.SDK.Internal.Retry
+Description : Handles retrying IO actions that might fail (mostly HTTP requests)
+-}
 module Instana.SDK.Internal.Retry
     ( acceptDataRetryPolicy
     , agentHostLookupRetryPolicy

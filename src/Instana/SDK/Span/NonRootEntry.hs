@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Span.NonRootEntry
+Description : An entry span that is not the root of a trace
+-}
 module Instana.SDK.Span.NonRootEntry (NonRootEntry(..)) where
 
 

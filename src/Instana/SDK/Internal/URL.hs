@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Internal.URL
+Description : Representation of an URL
+-}
 module Instana.SDK.Internal.URL
   ( URL
   , mkHttp

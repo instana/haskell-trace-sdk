@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Span.ExitSpan
+Description : An exit span
+-}
 module Instana.SDK.Span.ExitSpan (ExitSpan(..)) where
 
 

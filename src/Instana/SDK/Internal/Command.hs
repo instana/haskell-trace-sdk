@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Internal.Command
+Description : Commands that can be send to the worker
+-}
 module Instana.SDK.Internal.Command
   ( Command(..)
   ) where

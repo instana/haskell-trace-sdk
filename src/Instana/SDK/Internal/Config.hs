@@ -1,7 +1,11 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 
-{-| This internal module is not supposed to be used by client code. It's API can
+{-|
+Module      : Instana.SDK.Internal.Config
+Description : Internal representation of the configuration.
+
+This internal module is not supposed to be used by client code. It's API can
 change between releases, no guarantee for any kind of compatibility between
 releases exists for this module.
 -}

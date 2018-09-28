@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-|
+Module      : Instana.SDK.Internal.Context
+Description : The Instana context holds everything that the SDK needs in terms of state.
+-}
 module Instana.SDK.Internal.Context
   ( InternalContext(..)
   , ConnectionState(..)

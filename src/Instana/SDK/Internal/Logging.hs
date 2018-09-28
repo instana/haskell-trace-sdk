@@ -1,3 +1,7 @@
+{-|
+Module      : Instana.SDK.Internal.Logging
+Description : Handles logging
+-}
 module Instana.SDK.Internal.Logging
   ( initLogger
   , instanaLogger

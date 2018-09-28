@@ -2,6 +2,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-|
+Module      : Instana.SDK.Internal.Worker
+Description : Manages the SDKs background worker threads
+-}
 module Instana.SDK.Internal.Worker
     ( spawnWorker
     ) where
