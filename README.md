@@ -1,5 +1,4 @@
-Instana Haskell Trace SDK
-=========================
+# Instana Haskell Trace SDK &nbsp; [![Build Status](https://travis-ci.org/instana/haskell-trace-sdk.svg?branch=master)](https://travis-ci.org/instana/haskell-trace-sdk)
 
 Monitor your Haskell application with Instana! 🎉
 
@@ -175,7 +174,7 @@ import System.Log.Logger (rootLoggerName, setHandlers, updateGlobalLogger)
 updateGlobalLogger rootLoggerName $ setHandlers [...]
 ```
 
-If this is the case, you can simply use `INSTANA_LOG_LEVEL` (or `INSTANA_LOG_LEVEL_STDOUT`) without further configuration. If the app in question does not use hslogger, that is if no `setHandler` call on `rootLoggerName` is executed, you should also set
+If this is the case, you can simply use `INSTANA_LOG_LEVEL` (or `INSTANA_LOG_LEVEL_STDOUT`) without further configuration. If the app in question does not use hslogger, that is, if no `setHandler` call on `rootLoggerName` is executed, you should also set
 `INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER` to a non-empty string (for example, `INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER=true`).
 
 #### Troubleshooting Tracing In Production
