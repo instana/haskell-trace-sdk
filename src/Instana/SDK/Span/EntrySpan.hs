@@ -26,12 +26,14 @@ import           Instana.SDK.Span.RootEntry    (RootEntry)
 import qualified Instana.SDK.Span.RootEntry    as RootEntry
 
 
+-- |An entry span.
 data EntrySpan =
     RootEntrySpan RootEntry
   | NonRootEntrySpan NonRootEntry
   deriving (Eq, Generic, Show)
 
 
+-- |Accessor for the trace ID.
 traceId :: EntrySpan -> Id
 traceId entrySpan =
   case entrySpan of
@@ -39,12 +41,15 @@ traceId entrySpan =
     NonRootEntrySpan entry -> NonRootEntry.traceId entry
 
 
+-- |Accessor for the span ID.
 spanId :: EntrySpan -> Id
 spanId entrySpan =
   case entrySpan of
     RootEntrySpan    entry -> RootEntry.spanAndTraceId entry
     NonRootEntrySpan entry -> NonRootEntry.spanId entry
 
+
+-- |Parent span ID.
 parentId :: EntrySpan -> Maybe Id
 parentId entrySpan =
   case entrySpan of
@@ -52,6 +57,7 @@ parentId entrySpan =
     NonRootEntrySpan entry -> Just $ NonRootEntry.parentId entry
 
 
+-- |Type of span.
 spanType :: EntrySpan -> Text
 spanType entrySpan =
   case entrySpan of
@@ -59,6 +65,7 @@ spanType entrySpan =
     NonRootEntrySpan entry -> NonRootEntry.spanType entry
 
 
+-- |Start time.
 timestamp :: EntrySpan -> Int
 timestamp entrySpan =
   case entrySpan of
@@ -66,6 +73,7 @@ timestamp entrySpan =
     NonRootEntrySpan entry -> NonRootEntry.timestamp entry
 
 
+-- |Span label.
 label :: EntrySpan -> Text
 label entrySpan =
   case entrySpan of
@@ -73,6 +81,7 @@ label entrySpan =
     NonRootEntrySpan entry -> NonRootEntry.label entry
 
 
+-- |Optional additional span data.
 spanData :: EntrySpan -> Value
 spanData entrySpan =
   case entrySpan of

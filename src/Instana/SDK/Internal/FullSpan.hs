@@ -20,9 +20,14 @@ import           GHC.Generics
 import           Instana.SDK.Internal.Id (Id)
 
 
+-- |Direction of the call.
 data SpanKind =
+    -- |The monitored componenent receives a call.
     Entry
+    -- |The monitored componenent calls something else.
   | Exit
+    -- |An additional annotation that is added to the trace while a traced call
+    -- is being processed.
   | Intermediate
   deriving (Eq, Generic, Show)
 
@@ -49,6 +54,8 @@ instance ToJSON SpanKind where
       Intermediate -> Aeson.Number 3
 
 
+-- |A representation of the span with all its data. This will be send to the
+-- agent later.
 data FullSpan = FullSpan
   { traceId   :: Id
   , spanId    :: Id

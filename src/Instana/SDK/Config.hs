@@ -33,8 +33,17 @@ data Config = Config
     -- changed the Server name on the agent side, you can use parameter to
     -- provide the name to match that header against.
   , agentName                   :: Maybe String
+    -- | Spans are usually buffered before being transmitted to the agent. This
+    -- setting forces the transmission of all buffered spans after the given
+    -- amount of milliseconds. Default: 1000.
   , forceTransmissionAfter      :: Maybe Int
+    -- | This setting forces the transmission of all buffered spans when the
+    -- given number of spans has been buffered.
   , forceTransmissionStartingAt :: Maybe Int
+    -- | Limits the number of spans to buffer. When the limit is reached, spans
+    -- will be dropped. This setting is a safe guard against memory leaks from
+    -- buffering excessive amounts of spans. It must be larger than
+    -- forceTransmissionStartingAt.
   , maxBufferedSpans            :: Maybe Int
   } deriving (Eq, Generic)
 

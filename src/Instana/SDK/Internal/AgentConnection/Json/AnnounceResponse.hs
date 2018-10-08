@@ -13,6 +13,7 @@ import           Data.Text    (Text)
 import           GHC.Generics
 
 
+-- |Holds the agent's response to the announce request.
 data AnnounceResponse = AnnounceResponse
     { pid       :: Int
     , agentUuid :: Text

@@ -1,4 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-|
+Module      : Instana.SDK.Internal.AgentConnection.AgentReady
+Description : Handles the agent ready phase for establishing the connection to
+the agent.
+-}
 module Instana.SDK.Internal.AgentConnection.AgentReady
     ( waitUntilAgentIsReadyToAcceptTraces
     ) where
@@ -26,6 +31,8 @@ import qualified Instana.SDK.Internal.Retry                                 as R
 import qualified Instana.SDK.Internal.URL                                   as URL
 
 
+-- |Starts the connection establishment phase where we wait for the agent to
+-- signal that it is ready to accept data.
 waitUntilAgentIsReadyToAcceptTraces ::
   InternalContext
   -> String

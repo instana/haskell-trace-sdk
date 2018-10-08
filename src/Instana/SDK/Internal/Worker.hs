@@ -49,6 +49,7 @@ import           Instana.SDK.Span.ExitSpan                        (ExitSpan (..)
 import qualified Instana.SDK.Span.ExitSpan                        as ExitSpan
 
 
+-- |Spawns the SDK's worker. There should only be one worker at any time.
 spawnWorker :: InternalContext -> IO()
 spawnWorker context = do
   debugM instanaLogger "Spawning Instana Haskell SDK worker"

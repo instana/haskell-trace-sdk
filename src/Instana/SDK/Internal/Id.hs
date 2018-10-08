@@ -26,11 +26,12 @@ import           Numeric          (showHex)
 import qualified System.Random    as Random
 
 
+-- |Represents an ID (trace ID, span ID).
 data Id =
-    -- | a representation of a 128 bit ID with just enough Int components to
+    -- |a representation of a 128 bit ID with just enough Int components to
     -- reach 128 bits (used when generating new random IDs)
     IntComponents [Int]
-    -- | a representation of a 128 bit ID as a plain string (used when
+    -- |a representation of a 128 bit ID as a plain string (used when
     -- deserializing IDs, for example when reading HTTP headers)
   | IdString String
   deriving (Eq, Generic, Show)
@@ -75,6 +76,7 @@ leftPad digits s
   | otherwise         = s
 
 
+-- |Generates a new random ID.
 generate :: IO Id
 generate = do
   -- The number of bits used for an Haskell Int depends on the GHC
@@ -95,10 +97,12 @@ bitsPerInt =
   floor $ logBase (2 :: Double) $ fromIntegral (maxBound :: Int)
 
 
+-- |Converts a string into an ID.
 fromString :: String -> Id
 fromString = IdString
 
 
+-- |Only exposed for testing, do not use this.
 createFromIntsForTest :: [Int] -> Id
 createFromIntsForTest = IntComponents
 

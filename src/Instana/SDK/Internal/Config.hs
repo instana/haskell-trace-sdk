@@ -1,6 +1,4 @@
 {-# LANGUAGE DeriveGeneric #-}
-
-
 {-|
 Module      : Instana.SDK.Internal.Config
 Description : Internal representation of the configuration.
@@ -28,53 +26,68 @@ import           Instana.SDK.Config  (Config)
 import qualified Instana.SDK.Config  as Config
 
 
+-- |Environment variable for the agent host
 agentHostKey :: String
 agentHostKey = "INSTANA_AGENT_HOST"
 
 
+-- |Environment variable for the agent port
 agentPortKey :: String
 agentPortKey = "INSTANA_AGENT_PORT"
 
 
+-- |Environment variable for the agent name (server header)
 agentNameKey :: String
 agentNameKey = "INSTANA_AGENT_NAME"
 
 
+-- |Environment variable for the force-transmision-afeter setting
 forceTransmissionAfterKey :: String
 forceTransmissionAfterKey = "INSTANA_FORCE_TRANSMISSION_STARTING_AFTER"
 
 
+-- |Environment variable for the force-transmision-at setting
 forceTransmissionStartingAtKey :: String
 forceTransmissionStartingAtKey = "INSTANA_FORCE_TRANSMISSION_STARTING_AT"
 
 
+-- |Environment variable for the max-buffered-spans setting
 maxBufferedSpansKey :: String
 maxBufferedSpansKey = "INSTANA_MAX_BUFFERED_SPANS"
 
 
+-- |Default agent host/IP
 defaultAgentHost :: String
 defaultAgentHost = "127.0.0.1"
 
 
+-- |Default agent port
 defaultAgentPort :: Int
 defaultAgentPort = 42699
 
 
+-- |Default agent name
 defaultAgentName :: String
 defaultAgentName = "Instana Agent"
 
 
+-- |Default force-transmission-after setting
 defaultForceTransmissionAfter :: Int
 defaultForceTransmissionAfter = 1000
 
 
+-- |Default force-transmission-at setting
 defaultForceTransmissionStartingAt :: Int
 defaultForceTransmissionStartingAt = 500
 
+
+-- |Default max-buffered-spans setting
 defaultMaxBufferedSpans :: Int
 defaultMaxBufferedSpans = 1000
 
 
+-- |The config after evaluating and merging user provided config, environment
+-- variables and default values.
 data FinalConfig = FinalConfig
   { agentHost                   :: String
   , agentPort                   :: Int
@@ -85,6 +98,7 @@ data FinalConfig = FinalConfig
   } deriving (Eq, Generic, Show)
 
 
+-- |Creates the FinalConfig.
 mkFinalConfig ::
   String
   -> Int
@@ -110,6 +124,7 @@ mkFinalConfig
     }
 
 
+-- |Reads all provided config related environment variables.
 readConfigFromEnvironment :: IO Config
 readConfigFromEnvironment = do
   agentHostEnv <- lookupEnv agentHostKey
@@ -138,12 +153,15 @@ readConfigFromEnvironment = do
       }
 
 
+-- |Reads all provided config related environment variables and applies default
+-- values for absent settings.
 readConfigFromEnvironmentAndApplyDefaults :: IO FinalConfig
 readConfigFromEnvironmentAndApplyDefaults = do
   configFromEnv <- readConfigFromEnvironment
   return $ applyDefaults configFromEnv
 
 
+-- |Merges the user provided config with default values.
 applyDefaults :: Config -> FinalConfig
 applyDefaults config =
   FinalConfig
@@ -168,6 +186,7 @@ applyDefaults config =
    }
 
 
+-- |Merges two configs into a FinalConfig.
 mergeConfigs :: Config -> Config -> FinalConfig
 mergeConfigs userConfig configFromEnv =
   let

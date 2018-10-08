@@ -23,6 +23,7 @@ instance Show Protocol where
   show HTTPS = "https://"
 
 
+-- |Represents a URL.
 data URL = URL
   { protocol :: Protocol
   , host     :: String
@@ -39,6 +40,7 @@ instance Show URL where
     (path url)
 
 
+-- |Creates a URL.
 mkUrl ::
   Protocol
   -> String
@@ -54,6 +56,7 @@ mkUrl _protocol _host _port _path =
   }
 
 
+-- |Creates a HTTP URL.
 mkHttp ::
   String
   -> Int
@@ -62,6 +65,7 @@ mkHttp ::
 mkHttp = mkUrl HTTP
 
 
+-- |Creates a HTTPS URL.
 mkHttps ::
   String
   -> Int

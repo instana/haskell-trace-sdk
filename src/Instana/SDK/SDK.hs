@@ -168,6 +168,7 @@ initInstanaInternal conf = do
   return context
 
 
+-- |Wraps an IO action in 'startRootEntry' and 'completeEntry'.
 withRootEntrySimple ::
   InstanaContext
   -> Text
@@ -185,6 +186,7 @@ withRootEntrySimple context spanType label io =
     )
 
 
+-- |Wraps an IO action in 'startRootEntryWithData' and 'completeEntryWithData'.
 withRootEntry ::
   InstanaContext
   -> Text
@@ -199,6 +201,8 @@ withRootEntry context spanType label spanDataStart io = do
   return result
 
 
+-- |Creates a preliminary/incomplete root entry span, which should later be
+-- completed with 'completeEntry' or 'completeEntryWithData'.
 startRootEntry ::
   Text
   -> Text
@@ -207,6 +211,8 @@ startRootEntry spanType label =
   startRootEntryWithData spanType label emptyValue
 
 
+-- |Creates a preliminary/incomplete root entry span with additional data, which
+-- should later be completed with 'completeEntry' or 'completeEntryWithData'.
 startRootEntryWithData ::
   Text
   -> Text
@@ -226,6 +232,7 @@ startRootEntryWithData spanType label spanData = do
         }
 
 
+-- |Wraps an IO action in 'startEntry' and 'completeEntry'.
 withEntrySimple ::
   InstanaContext
   -> String
@@ -247,6 +254,7 @@ withEntrySimple context traceId parentId spanType label io =
     )
 
 
+-- |Wraps an IO action in 'startEntryWithData' and 'completeEntryWithData'.
 withEntry ::
   InstanaContext
   -> String
@@ -263,6 +271,8 @@ withEntry context traceId parentId spanType label spanDataStart io = do
   return result
 
 
+-- |Creates a preliminary/incomplete entry span, which should later be completed
+-- by calling 'completeEntry' or 'completeEntryWithData'.
 startEntry ::
   String
   -> String
@@ -273,6 +283,9 @@ startEntry traceId parentId spanType label =
   startEntryWithData traceId parentId spanType label emptyValue
 
 
+-- |Creates a preliminary/incomplete entry span with additional data, which
+-- should later be completed by calling 'completeEntry' or
+-- 'completeEntryWithData'.
 startEntryWithData ::
   String
   -> String
@@ -296,6 +309,8 @@ startEntryWithData traceId parentId spanType label spanData = do
         }
 
 
+-- |Completes an entry span, to be called at the last possible moment before the
+-- call has been processed completely.
 completeEntry ::
   InstanaContext
   -> EntrySpan
@@ -307,6 +322,8 @@ completeEntry context entrySpan spanError =
     (Command.CompleteEntry entrySpan spanError)
 
 
+-- |Completes an entry span with addtional data, to be called at the last
+-- possible moment before the call has been processed completely.
 completeEntryWithData ::
   InstanaContext
   -> EntrySpan
@@ -319,6 +336,7 @@ completeEntryWithData context entrySpan spanError spanData =
     (Command.CompleteEntryWithData entrySpan spanError spanData)
 
 
+-- |Wraps an IO action in 'startExit' and 'completeExit'.
 withExitSimple ::
   InstanaContext
   -> EntrySpan
@@ -336,6 +354,7 @@ withExitSimple context parent spanType label io =
       (io >>= (\result -> return (result, False, emptyValue)))
 
 
+-- |Wraps an IO action in 'startExitWithData' and 'completeExitWithData'.
 withExit ::
   InstanaContext
   -> EntrySpan
@@ -351,6 +370,8 @@ withExit context parent spanType label spanDataStart io = do
   return result
 
 
+-- |Creates a preliminary/incomplete exit span, which should later be completed
+-- with 'completeExit' or 'completeExitWithData'.
 startExit ::
   EntrySpan
   -> Text
@@ -360,6 +381,8 @@ startExit parent spanType label =
   startExitWithData parent spanType label emptyValue
 
 
+-- |Creates a preliminary/incomplete exit span with additional data, which
+-- should later be completed with 'completeExit' or 'completeExitWithData'.
 startExitWithData ::
   EntrySpan
   -> Text
@@ -378,6 +401,8 @@ startExitWithData parent spanType label spanData = do
       }
 
 
+-- |Completes an exit span, to be called as soon as the remote call has
+-- returned.
 completeExit ::
   InstanaContext
   -> ExitSpan
@@ -389,6 +414,8 @@ completeExit context exitSpan spanError =
     (Command.CompleteExit exitSpan spanError)
 
 
+-- |Completes an exit span with addtional data, to be called as soon as the
+-- remote call has returned.
 completeExitWithData ::
   InstanaContext
   -> ExitSpan

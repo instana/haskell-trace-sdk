@@ -1,4 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-|
+Module      : Instana.SDK.Internal.AgentConnection.Announce
+Description : Handles the announce phase for establishing the connection to the
+agent.
+-}
 module Instana.SDK.Internal.AgentConnection.Announce
     ( announce
     ) where
@@ -30,6 +35,7 @@ import qualified Instana.SDK.Internal.Retry                                 as R
 import qualified Instana.SDK.Internal.URL                                   as URL
 
 
+-- |Starts the announce phase.
 announce ::
   InternalContext
   -> ProcessInfo

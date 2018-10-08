@@ -80,10 +80,12 @@ overrideHsloggerRootHandlerKey :: String
 overrideHsloggerRootHandlerKey = "INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER"
 
 
+-- |The SDK's logger name.
 instanaLogger :: String
 instanaLogger = "Instana"
 
 
+-- |Initializes the SDK's logging.
 initLogger :: String -> IO ()
 initLogger pid = do
   logLevelFileStr <- lookupEnv logLevelKey
@@ -180,6 +182,7 @@ withFormatter handler = setFormatter handler formatter
     where formatter = simpleLogFormatter "[$time $loggername $prio] $msg"
 
 
+-- |Parses a string into a hslogger log level.
 parseLogLevel :: String -> Maybe Priority
 parseLogLevel logLevelStr =
   case logLevelStr of
@@ -194,6 +197,7 @@ parseLogLevel logLevelStr =
     _           -> Nothing
 
 
+-- |Calculates the minimum of two log levels.
 minimumLogLevel :: Maybe Priority -> Maybe Priority -> Maybe Priority
 minimumLogLevel (Just l1) (Just l2) = Just $ min l1 l2
 minimumLogLevel (Just l) Nothing    = Just l

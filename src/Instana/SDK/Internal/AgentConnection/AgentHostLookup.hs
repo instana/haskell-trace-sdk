@@ -1,5 +1,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-|
+Module      : Instana.SDK.Internal.AgentConnection.AgentHostLookup
+Description : Handles the agent host lookup phase for establishing the
+connection to the agent.
+-}
 module Instana.SDK.Internal.AgentConnection.AgentHostLookup
     ( lookupAgentHost
     ) where
@@ -31,6 +36,7 @@ import qualified Instana.SDK.Internal.URL                         as URL
 type SuccessfullHost = (String, Int)
 
 
+-- |Starts the agent host lookup phase.
 lookupAgentHost ::
   InternalContext
   -> ProcessInfo

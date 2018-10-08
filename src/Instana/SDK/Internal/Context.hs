@@ -29,23 +29,34 @@ import           Instana.SDK.Internal.Config                                (Fin
 import           Instana.SDK.Internal.FullSpan                              (FullSpan)
 
 
+-- |The current state of the connection to the agent.
 data ConnectionState =
+    -- |Connection handshake has not been started yet.
     Unconnected
+    -- |Phase agent host lookup has been initiated.
   | AgentHostLookup
+    -- |Agent host lookup is complete, the process has not been announced yet.
   | Unannounced (String, Int)
+    -- |Announce was successful, waiting for the agent to signal readyness.
   | Announced
+    -- |Agent has signaled that it is ready to accept data.
   | AgentReady AgentConnection
   deriving (Eq, Show, Generic)
 
 
+-- |Meta data about the connection to the agent.
 data AgentConnection =
   AgentConnection
-    { pid       :: String
+    {
+      -- |the PID of the monitored process
+      pid       :: String
+      -- |the agent's UUID
     , agentUuid :: Text
     }
   deriving (Eq, Show, Generic)
 
 
+-- |Creates a "ready" connection state from an AnnounceResponse.
 mkAgentReadyState :: AnnounceResponse -> ConnectionState
 mkAgentReadyState announceResponse =
   AgentReady $
@@ -81,6 +92,7 @@ isAgentConnectionEstablishedSTM context = do
       _            -> False
 
 
+-- |Checks if the connection to the agent has been established.
 isAgentConnectionEstablished :: InternalContext -> IO Bool
 isAgentConnectionEstablished context =
   STM.atomically $ isAgentConnectionEstablishedSTM context
@@ -92,6 +104,7 @@ readAgentUuidSTM context = do
   return $ mapConnectionState agentUuid state
 
 
+-- |accessor for the agent UUID
 readAgentUuid :: InternalContext -> IO (Maybe Text)
 readAgentUuid context =
   STM.atomically $ readAgentUuidSTM context
@@ -103,6 +116,7 @@ readPidSTM context = do
   return $ mapConnectionState pid state
 
 
+-- |accessor for the PID of the monitored process
 readPid :: InternalContext -> IO (Maybe String)
 readPid context =
   STM.atomically $ readPidSTM context
@@ -117,6 +131,8 @@ mapConnectionState fn state =
       Nothing
 
 
+-- |Executes an IO action only when the connection to the agent has been
+-- established. The action receives the PID and the agent UUID as parameters.
 whenConnected :: InternalContext -> (String -> Text -> IO ()) -> IO ()
 whenConnected context action = do
   state <- STM.atomically $ STM.readTVar $ connectionState context

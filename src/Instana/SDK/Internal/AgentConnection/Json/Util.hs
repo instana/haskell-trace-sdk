@@ -9,6 +9,7 @@ import           Data.ByteString.Lazy (ByteString)
 import qualified Network.HTTP.Client  as HTTP
 
 
+-- |Creates a decoder for HTTP responses without a body.
 emptyResponseDecoder :: HTTP.Response ByteString -> IO Bool
 emptyResponseDecoder _ =
   return True
