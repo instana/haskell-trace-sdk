@@ -42,6 +42,7 @@ module Instana.SDK.SDK
 
 
 import qualified Control.Concurrent.STM        as STM
+import           Control.Monad.IO.Class        (MonadIO, liftIO)
 import           Data.Aeson                    (Value)
 import qualified Data.Aeson                    as Aeson
 import qualified Data.Sequence                 as Seq
@@ -90,9 +91,9 @@ calls the given function with the established connection.
 
 The configuration is read from the environment, falling back to default values.
 -}
-withInstana :: (InstanaContext -> IO a) -> IO a
+withInstana :: MonadIO m => (InstanaContext -> m a) -> m a
 withInstana fn = do
-  conf <- InternalConfig.readConfigFromEnvironmentAndApplyDefaults
+  conf <- liftIO InternalConfig.readConfigFromEnvironmentAndApplyDefaults
   withInstanaInternal conf fn
 
 
@@ -116,17 +117,21 @@ Instana configuration.
 Configuration settings that have not been set in the given configuration are
 read from the environment, falling back to default values.
 -}
-withConfiguredInstana :: Config -> (InstanaContext -> IO a) -> IO a
+withConfiguredInstana :: MonadIO m => Config -> (InstanaContext -> m a) -> m a
 withConfiguredInstana conf fn = do
-  confFromEnv <- InternalConfig.readConfigFromEnvironment
+  confFromEnv <- liftIO $ InternalConfig.readConfigFromEnvironment
   let
      mergedConf = InternalConfig.mergeConfigs conf confFromEnv
   withInstanaInternal mergedConf fn
 
 
-withInstanaInternal :: FinalConfig -> (InstanaContext -> IO a) -> IO a
+withInstanaInternal ::
+  MonadIO m =>
+  FinalConfig
+  -> (InstanaContext -> m a)
+  -> m a
 withInstanaInternal conf fn = do
-  context <- initInstanaInternal conf
+  context <- liftIO $ initInstanaInternal conf
   fn context
 
 
@@ -168,13 +173,15 @@ initInstanaInternal conf = do
   return context
 
 
--- |Wraps an IO action in 'startRootEntry' and 'completeEntry'.
+-- |Wraps an IO action in 'startRootEntry' and 'completeEntry'. The wrapped
+-- action receives the entry span in case it wants to add child spans to it.
 withRootEntrySimple ::
+  MonadIO m =>
   InstanaContext
   -> Text
   -> Text
-  -> (EntrySpan -> IO a)
-  -> IO a
+  -> (EntrySpan -> m a)
+  -> m a
 withRootEntrySimple context spanType label io =
   withRootEntry
     context
@@ -187,17 +194,20 @@ withRootEntrySimple context spanType label io =
 
 
 -- |Wraps an IO action in 'startRootEntryWithData' and 'completeEntryWithData'.
+-- The wrapped action receives the entry span in case it wants to add child
+-- spans to it.
 withRootEntry ::
+  MonadIO m =>
   InstanaContext
   -> Text
   -> Text
   -> Value
-  -> (EntrySpan -> IO (a, Bool, Value))
-  -> IO a
+  -> (EntrySpan -> m (a, Bool, Value))
+  -> m a
 withRootEntry context spanType label spanDataStart io = do
-  entrySpan <- startRootEntryWithData spanType label spanDataStart
+  entrySpan <- liftIO $ startRootEntryWithData spanType label spanDataStart
   (result, spanError, spanDataEnd) <- io entrySpan
-  completeEntryWithData context entrySpan spanError spanDataEnd
+  liftIO $ completeEntryWithData context entrySpan spanError spanDataEnd
   return result
 
 
@@ -232,15 +242,17 @@ startRootEntryWithData spanType label spanData = do
         }
 
 
--- |Wraps an IO action in 'startEntry' and 'completeEntry'.
+-- |Wraps an IO action in 'startEntry' and 'completeEntry'. The wrapped action
+-- receives the entry span in case it wants to add child spans to it.
 withEntrySimple ::
+  MonadIO m =>
   InstanaContext
   -> String
   -> String
   -> Text
   -> Text
-  -> (EntrySpan -> IO a)
-  -> IO a
+  -> (EntrySpan -> m a)
+  -> m a
 withEntrySimple context traceId parentId spanType label io =
   withEntry
     context
@@ -254,20 +266,23 @@ withEntrySimple context traceId parentId spanType label io =
     )
 
 
--- |Wraps an IO action in 'startEntryWithData' and 'completeEntryWithData'.
+-- |Wraps an IO action in 'startEntryWithData' and 'completeEntryWithData'. The
+-- wrapped action receives the entry span in case it wants to add child spans to
+-- it.
 withEntry ::
+  MonadIO m =>
   InstanaContext
   -> String
   -> String
   -> Text
   -> Text
   -> Value
-  -> (EntrySpan -> IO (a, Bool, Value))
-  -> IO a
+  -> (EntrySpan -> m (a, Bool, Value))
+  -> m a
 withEntry context traceId parentId spanType label spanDataStart io = do
-  entrySpan <- startEntryWithData traceId parentId spanType label spanDataStart
+  entrySpan <- liftIO $ startEntryWithData traceId parentId spanType label spanDataStart
   (result, spanError, spanDataEnd) <- io entrySpan
-  completeEntryWithData context entrySpan spanError spanDataEnd
+  liftIO $ completeEntryWithData context entrySpan spanError spanDataEnd
   return result
 
 
@@ -338,12 +353,13 @@ completeEntryWithData context entrySpan spanError spanData =
 
 -- |Wraps an IO action in 'startExit' and 'completeExit'.
 withExitSimple ::
+  MonadIO m =>
   InstanaContext
   -> EntrySpan
   -> Text
   -> Text
-  -> IO a
-  -> IO a
+  -> m a
+  -> m a
 withExitSimple context parent spanType label io =
     withExit
       context
@@ -356,17 +372,18 @@ withExitSimple context parent spanType label io =
 
 -- |Wraps an IO action in 'startExitWithData' and 'completeExitWithData'.
 withExit ::
+  MonadIO m =>
   InstanaContext
   -> EntrySpan
   -> Text
   -> Text
   -> Value
-  -> IO (a, Bool, Value)
-  -> IO a
+  -> m (a, Bool, Value)
+  -> m a
 withExit context parent spanType label spanDataStart io = do
-  exitSpan <- startExitWithData parent spanType label spanDataStart
+  exitSpan <- liftIO $ startExitWithData parent spanType label spanDataStart
   (result, spanError, spanDataEnd) <- io
-  completeExitWithData context exitSpan spanError spanDataEnd
+  liftIO $ completeExitWithData context exitSpan spanError spanDataEnd
   return result
 
 
