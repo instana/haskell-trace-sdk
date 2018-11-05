@@ -34,14 +34,17 @@ initConnectLoop :: InternalContext -> IO ()
 initConnectLoop context = do
   pid <- PosixProcess.getProcessID
   progName <- Environment.getProgName
+  execPath <- Environment.getExecutablePath
   args <- Environment.getArgs
   let
     processInfo =
       ProcessInfo
         { ProcessInfo.pidString   = show pid
         , ProcessInfo.programName = progName
+        , ProcessInfo.executablePath = execPath
         , ProcessInfo.arguments   = args
         }
+  debugM instanaLogger $ "discovered process info " ++ show processInfo
 
   -- connection loop works as follows:
   -- - try to connect to an an agent at either the agent host/port received via

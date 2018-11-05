@@ -8,9 +8,10 @@ import           GHC.Generics
 
 data DiscoveryRequest =
   DiscoveryRequest
-    { pid  :: String
-    , name :: String
-    , args :: [String]
+    { pid      :: String
+    , progName :: String
+    , execPath :: String
+    , args     :: [String]
     } deriving (Eq, Show, Generic)
 
 

@@ -78,11 +78,12 @@ announce context processInfo = do
   let
     haskellProcess =
       Aeson.object
-        [ "pid"   .= pidStr
-        , "name"  .= ProcessInfo.programName processInfo
-        , "args"  .= ProcessInfo.arguments processInfo
-        , "fd"    .= maybeFileDescriptorString
-        , "inode" .= inode
+        [ "pid"       .= pidStr
+        , "progName"  .= ProcessInfo.programName processInfo
+        , "execPath"  .= ProcessInfo.executablePath processInfo
+        , "args"      .= ProcessInfo.arguments processInfo
+        , "fd"        .= maybeFileDescriptorString
+        , "inode"     .= inode
         ]
 
     announceRequest = discoveryRequestBase

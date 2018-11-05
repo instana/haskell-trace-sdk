@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-|
 Module      : Instana.SDK.Internal.AgentConnection.ProcessInfo
 Description : Holds meta data about an OS process.
@@ -7,11 +8,15 @@ module Instana.SDK.Internal.AgentConnection.ProcessInfo
     ) where
 
 
+import           GHC.Generics
+
+
 -- |Holds meta data about an OS process.
 data ProcessInfo =
   ProcessInfo
-    { pidString   :: String
-    , programName :: String
-    , arguments   :: [String]
-    }
+    { pidString      :: String
+    , programName    :: String
+    , executablePath :: String
+    , arguments      :: [String]
+    } deriving (Eq, Generic, Show)
 
