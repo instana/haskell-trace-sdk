@@ -96,11 +96,10 @@ shouldReestablishLostConnection instana =
 
 
 recordSpans :: InstanaContext -> Text -> IO ()
-recordSpans instana spanType =
+recordSpans instana spanName =
   InstanaSDK.withRootEntrySimple
     instana
-    spanType
-    "Haskell Dummy Label"
+    spanName
     simulateWork
 
 

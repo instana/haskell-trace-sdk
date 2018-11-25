@@ -8,9 +8,8 @@ module Instana.SDK.Span.EntrySpan
   , traceId
   , spanId
   , parentId
-  , spanType
+  , spanName
   , timestamp
-  , label
   , spanData
   ) where
 
@@ -57,12 +56,12 @@ parentId entrySpan =
     NonRootEntrySpan entry -> Just $ NonRootEntry.parentId entry
 
 
--- |Type of span.
-spanType :: EntrySpan -> Text
-spanType entrySpan =
+-- |Name of span.
+spanName :: EntrySpan -> Text
+spanName entrySpan =
   case entrySpan of
-    RootEntrySpan    entry -> RootEntry.spanType entry
-    NonRootEntrySpan entry -> NonRootEntry.spanType entry
+    RootEntrySpan    entry -> RootEntry.spanName entry
+    NonRootEntrySpan entry -> NonRootEntry.spanName entry
 
 
 -- |Start time.
@@ -71,14 +70,6 @@ timestamp entrySpan =
   case entrySpan of
     RootEntrySpan    entry -> RootEntry.timestamp entry
     NonRootEntrySpan entry -> NonRootEntry.timestamp entry
-
-
--- |Span label.
-label :: EntrySpan -> Text
-label entrySpan =
-  case entrySpan of
-    RootEntrySpan    entry -> RootEntry.label entry
-    NonRootEntrySpan entry -> NonRootEntry.label entry
 
 
 -- |Optional additional span data.

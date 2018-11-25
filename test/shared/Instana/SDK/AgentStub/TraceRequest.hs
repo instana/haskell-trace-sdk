@@ -14,16 +14,15 @@ type TraceRequest = [Span]
 
 data Span =
   Span
-    { t         :: String       -- traceId
-    , s         :: String       -- spanId
-    , p         :: Maybe String -- parentId
-    , n         :: Text         -- spanType
-    , ts        :: Int          -- timestamp
-    , d         :: Int          -- duration
-    , k         :: Int          -- kind
-    , label     :: Text         -- label
-    , spanError :: Bool         -- spanError
-    , spanData  :: Aeson.Value  -- spanData
+    { t        :: String       -- traceId
+    , s        :: String       -- spanId
+    , p        :: Maybe String -- parentId
+    , n        :: Text         -- spanName
+    , ts       :: Int          -- timestamp
+    , d        :: Int          -- duration
+    , k        :: Int          -- kind
+    , ec       :: Int          -- errorCount
+    , spanData :: Aeson.Value  -- spanData
     } deriving (Eq, Show, Generic)
 
 
@@ -38,22 +37,20 @@ instance FromJSON Span where
         <*> decodedObject .: "ts"
         <*> decodedObject .: "d"
         <*> decodedObject .: "k"
-        <*> decodedObject .: "label"
-        <*> decodedObject .: "error"
+        <*> decodedObject .: "ec"
         <*> decodedObject .: "data"
 
 
 instance ToJSON Span where
   toJSON sp = Aeson.object
-    [ "t"     .= t sp
-    , "s"     .= s sp
-    , "p"     .= p sp
-    , "n"     .= n sp
-    , "ts"    .= ts sp
-    , "d"     .= d sp
-    , "k"     .= k sp
-    , "label" .= label sp
-    , "error" .= spanError sp
-    , "data"  .= spanData sp
+    [ "t"    .= t sp
+    , "s"    .= s sp
+    , "p"    .= p sp
+    , "n"    .= n sp
+    , "ts"   .= ts sp
+    , "d"    .= d sp
+    , "k"    .= k sp
+    , "ec"   .= ec sp
+    , "data" .= spanData sp
     ]
 

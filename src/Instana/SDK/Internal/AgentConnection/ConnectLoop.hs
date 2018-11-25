@@ -82,15 +82,12 @@ establishAgentConnection ::
   -> ProcessInfo
   -> IO ()
 establishAgentConnection context processInfo = do
-  debugM instanaLogger $ "checking agent connection"
   currentState <- STM.atomically $
     STM.readTVar (InternalContext.connectionState context)
   -- Do nothing if a connection attempt is already in progress or connection has
   -- already been established.
   if currentState /= Unconnected
-    then do
-      debugM instanaLogger $ "agent connection is still up or establish in " ++
-        "progress, doing nothing"
+    then
       return ()
     else do
       STM.atomically $ STM.writeTVar

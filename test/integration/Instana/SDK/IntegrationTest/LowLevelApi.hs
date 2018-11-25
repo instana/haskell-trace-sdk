@@ -65,20 +65,12 @@ shouldRecordSpans instana =
               , assertBool "entry timespan" $ TraceRequest.ts rootEntrySpan > 0
               , assertBool "entry duration" $ TraceRequest.d rootEntrySpan > 0
               , assertEqual "entry kind" 1 (TraceRequest.k rootEntrySpan)
-              , assertEqual
-                  "entry label"
-                  "Haskell Dummy Root Entry Label"
-                  (TraceRequest.label rootEntrySpan)
-              , assertBool "entry error" $
-                  not $ TraceRequest.spanError rootEntrySpan
+              , assertEqual "entry error" 0
+                  (TraceRequest.ec rootEntrySpan)
               , assertBool "exit timespan" $ TraceRequest.ts exitSpan > 0
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
-              , assertEqual
-                  "exit label"
-                  "Haskell Dummy Exit Label"
-                  (TraceRequest.label exitSpan)
-              , assertBool "exit error" $ not $ TraceRequest.spanError exitSpan
+              , assertEqual "exit error" 0 (TraceRequest.ec exitSpan)
               ]
 
 
@@ -87,9 +79,8 @@ recordSpans instana = do
   entrySpan <-
     InstanaSDK.startRootEntry
       "haskell.dummy.root.entry"
-      "Haskell Dummy Root Entry Label"
   result <- doExitCall instana entrySpan
-  InstanaSDK.completeEntry instana entrySpan False
+  InstanaSDK.completeEntry instana entrySpan 0
   return result
 
 
@@ -99,9 +90,8 @@ doExitCall instana entrySpan = do
     InstanaSDK.startExit
       entrySpan
       "haskell.dummy.exit"
-      "Haskell Dummy Exit Label"
   result <- simulateExitCall
-  InstanaSDK.completeExit instana exitSpan False
+  InstanaSDK.completeExit instana exitSpan 0
   return result
 
 
@@ -131,7 +121,8 @@ shouldRecordNonRootEntry instana =
               Just exitSpan = maybeExitSpan
             assertAllIO
               [ assertEqual "result" "done" result
-              , assertEqual "entry.traceId" "trace-id" (TraceRequest.t entrySpan)
+              , assertEqual "entry.traceId" "trace-id"
+                  (TraceRequest.t entrySpan)
               , assertEqual "exit.traceId" "trace-id" (TraceRequest.t exitSpan)
               , assertBool "entry.spanId isn't trace ID" $
                   TraceRequest.s entrySpan /= "trace-id"
@@ -146,17 +137,11 @@ shouldRecordNonRootEntry instana =
               , assertBool "entry.timestamp" $ TraceRequest.ts entrySpan > 0
               , assertBool "entry.duration" $ TraceRequest.d entrySpan > 0
               , assertEqual "entry kind" 1 (TraceRequest.k entrySpan)
-              , assertEqual "entry label"
-                  "Haskell Dummy Entry Label"
-                  (TraceRequest.label entrySpan)
-              , assertBool "entry error" $ not $ TraceRequest.spanError entrySpan
+              , assertEqual "entry error" 0 (TraceRequest.ec entrySpan)
               , assertBool "exit timestamp" $ TraceRequest.ts exitSpan > 0
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" (2) (TraceRequest.k exitSpan)
-              , assertEqual "exit label"
-                  "Haskell Dummy Exit Label"
-                  (TraceRequest.label exitSpan)
-              , assertBool "exit error" $ not $ TraceRequest.spanError exitSpan
+              , assertEqual "exit error" 0 (TraceRequest.ec exitSpan)
               ]
 
 
@@ -167,9 +152,8 @@ recordNonRootEntry instana = do
       "trace-id"
       "parent-id"
       "haskell.dummy.entry"
-      "Haskell Dummy Entry Label"
   result <- doExitCall instana entrySpan
-  InstanaSDK.completeEntry instana entrySpan False
+  InstanaSDK.completeEntry instana entrySpan 0
   return result
 
 
@@ -213,10 +197,8 @@ shouldMergeData instana =
               , assertBool "entry timestamp" $ TraceRequest.ts rootEntrySpan > 0
               , assertBool "entry duration" $ TraceRequest.d rootEntrySpan > 0
               , assertEqual "entry kind" 1 (TraceRequest.k rootEntrySpan)
-              , assertEqual "entry label"
-                  "Haskell Dummy Root Entry Label"
-                  (TraceRequest.label rootEntrySpan)
-              , assertBool "entry error" $ TraceRequest.spanError rootEntrySpan
+              , assertEqual "entry error" 1
+                  (TraceRequest.ec rootEntrySpan)
               , assertEqual "entry data"
                 ( Aeson.object
                   [ "data1"     .= ("value1" :: String)
@@ -231,10 +213,7 @@ shouldMergeData instana =
               , assertBool "exit timestamp" $ TraceRequest.ts exitSpan > 0
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
-              , assertEqual "exit label"
-                "Haskell Dummy Exit Label"
-                (TraceRequest.label exitSpan)
-              , assertBool "exit error" $ TraceRequest.spanError exitSpan
+              , assertEqual "exit error" 1 (TraceRequest.ec exitSpan)
               , assertEqual "exit data"
                 ( Aeson.object
                   [ "data1"     .= ("value1" :: String)
@@ -254,10 +233,9 @@ recordSpansWithData instana = do
   entrySpan <-
     InstanaSDK.startRootEntryWithData
       "haskell.dummy.root.entry"
-      "Haskell Dummy Root Entry Label"
       (spanDataStart "entry")
   result <- doExitCallWithData instana entrySpan
-  InstanaSDK.completeEntryWithData instana entrySpan True (spanDataEnd "entry")
+  InstanaSDK.completeEntryWithData instana entrySpan 1 (spanDataEnd "entry")
   return result
 
 
@@ -267,10 +245,9 @@ doExitCallWithData instana entrySpan = do
     InstanaSDK.startExitWithData
       entrySpan
       "haskell.dummy.exit"
-      "Haskell Dummy Exit Label"
       (spanDataStart "exit")
   result <- simulateExitCall
-  InstanaSDK.completeExitWithData instana exitSpan True (spanDataEnd "exit")
+  InstanaSDK.completeExitWithData instana exitSpan 1 (spanDataEnd "exit")
   return result
 
 

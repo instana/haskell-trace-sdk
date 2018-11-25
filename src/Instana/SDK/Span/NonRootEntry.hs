@@ -23,13 +23,11 @@ data NonRootEntry =
     , spanId    :: Id
       -- |The ID of the parent span
     , parentId  :: Id
-      -- |The span type span, e.g. a short string like "yesod", "servant",
+      -- |The span name/type, e.g. a short string like "yesod", "servant",
       -- "rpc-server", ...
-    , spanType  :: Text
+    , spanName  :: Text
       -- |The time the span started
     , timestamp :: Int
-      -- |A free text label for the span
-    , label     :: Text
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
     , spanData  :: Value

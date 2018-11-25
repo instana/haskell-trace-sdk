@@ -102,18 +102,18 @@ readFromQueue context =
 
 
 execute :: Command -> InternalContext -> IO ()
-execute (CompleteEntry entrySpan spanError) =
-  queueEntrySpan entrySpan spanError emptyValue
-execute (CompleteEntryWithData entrySpan spanError spanData) =
-  queueEntrySpan entrySpan spanError spanData
-execute (CompleteExit exitSpan spanError) =
-  queueExitSpan exitSpan spanError emptyValue
-execute (CompleteExitWithData exitSpan spanError spanData) =
-  queueExitSpan exitSpan spanError spanData
+execute (CompleteEntry entrySpan errorCount) =
+  queueEntrySpan entrySpan errorCount emptyValue
+execute (CompleteEntryWithData entrySpan errorCount spanData) =
+  queueEntrySpan entrySpan errorCount spanData
+execute (CompleteExit exitSpan errorCount) =
+  queueExitSpan exitSpan errorCount emptyValue
+execute (CompleteExitWithData exitSpan errorCount spanData) =
+  queueExitSpan exitSpan errorCount spanData
 
 
-queueEntrySpan :: EntrySpan -> Bool -> Value -> InternalContext -> IO ()
-queueEntrySpan entrySpan spanError spanDataEnd context = do
+queueEntrySpan :: EntrySpan -> Int -> Value -> InternalContext -> IO ()
+queueEntrySpan entrySpan errorCount spanDataEnd context = do
   now <- round . (* 1000) <$> getPOSIXTime
   let
     timestamp = EntrySpan.timestamp entrySpan
@@ -121,21 +121,20 @@ queueEntrySpan entrySpan spanError spanDataEnd context = do
   queueSpan
     context
     FullSpan
-      { FullSpan.traceId   = EntrySpan.traceId entrySpan
-      , FullSpan.spanId    = EntrySpan.spanId entrySpan
-      , FullSpan.parentId  = EntrySpan.parentId entrySpan
-      , FullSpan.spanType  = EntrySpan.spanType entrySpan
-      , FullSpan.timestamp = timestamp
-      , FullSpan.duration  = now - timestamp
-      , FullSpan.kind      = Entry
-      , FullSpan.label     = EntrySpan.label entrySpan
-      , FullSpan.spanError = spanError
-      , FullSpan.spanData  = AesonExtra.lodashMerge spanDataStart spanDataEnd
+      { FullSpan.traceId    = EntrySpan.traceId entrySpan
+      , FullSpan.spanId     = EntrySpan.spanId entrySpan
+      , FullSpan.parentId   = EntrySpan.parentId entrySpan
+      , FullSpan.spanName   = EntrySpan.spanName entrySpan
+      , FullSpan.timestamp  = timestamp
+      , FullSpan.duration   = now - timestamp
+      , FullSpan.kind       = Entry
+      , FullSpan.errorCount = errorCount
+      , FullSpan.spanData   = AesonExtra.lodashMerge spanDataStart spanDataEnd
       }
 
 
-queueExitSpan :: ExitSpan -> Bool -> Value -> InternalContext -> IO ()
-queueExitSpan exitSpan spanError spanDataEnd context = do
+queueExitSpan :: ExitSpan -> Int -> Value -> InternalContext -> IO ()
+queueExitSpan exitSpan errorCount spanDataEnd context = do
   let
     parentSpan = ExitSpan.parentSpan exitSpan
   spanId <- Id.generate
@@ -143,18 +142,17 @@ queueExitSpan exitSpan spanError spanDataEnd context = do
   queueSpan
     context
     FullSpan
-      { FullSpan.traceId   = EntrySpan.traceId parentSpan
-      , FullSpan.spanId    = spanId
-      , FullSpan.parentId  = Just $ EntrySpan.spanId parentSpan
-      , FullSpan.spanType  = ExitSpan.spanType exitSpan
-      , FullSpan.timestamp = ExitSpan.timestamp exitSpan
-      , FullSpan.duration  = now - ExitSpan.timestamp exitSpan
-      , FullSpan.kind      = Exit
-      , FullSpan.label     = ExitSpan.label exitSpan
-      , FullSpan.spanError = spanError
-      , FullSpan.spanData  = AesonExtra.lodashMerge
-                               (ExitSpan.spanData exitSpan)
-                               spanDataEnd
+      { FullSpan.traceId    = EntrySpan.traceId parentSpan
+      , FullSpan.spanId     = spanId
+      , FullSpan.parentId   = Just $ EntrySpan.spanId parentSpan
+      , FullSpan.spanName   = ExitSpan.spanName exitSpan
+      , FullSpan.timestamp  = ExitSpan.timestamp exitSpan
+      , FullSpan.duration   = now - ExitSpan.timestamp exitSpan
+      , FullSpan.kind       = Exit
+      , FullSpan.errorCount = errorCount
+      , FullSpan.spanData   = AesonExtra.lodashMerge
+                                (ExitSpan.spanData exitSpan)
+                                spanDataEnd
       }
 
 

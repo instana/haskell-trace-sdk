@@ -126,7 +126,6 @@ createSpansUsingHighLevelApi instana = do
   InstanaSDK.withRootEntrySimple
     instana
     "haskell.dummy.root.entry"
-    "Haskell Dummy Root Entry Label"
     (simulateExitCall instana)
   return ()
 
@@ -137,7 +136,6 @@ simulateExitCall instana entrySpan =
     instana
     entrySpan
     "haskell.dummy.exit"
-    "Haskell Dummy Exit Label"
     (putStrLn "Here be dragons!")
 
 
@@ -150,21 +148,19 @@ createSpansUsingLowLevelApi instana = do
   entrySpan <-
     InstanaSDK.startRootEntry
       "haskell.dummy.root.entry"
-      "Haskell Dummy Root Entry Label"
   exitSpan <-
     InstanaSDK.startExit
       entrySpan
       "haskell.dummy.exit"
-      "Haskell Dummy Exit Label"
 
   -- Now a real app would execute some exit call, say a DB call or an
   -- HTTP call.
 
   -- mark the exit call as completed
-  InstanaSDK.completeExit instana exitSpan False
+  InstanaSDK.completeExit instana exitSpan 0
 
   -- mark the entry as completed and return
-  InstanaSDK.completeEntry instana entrySpan False
+  InstanaSDK.completeEntry instana entrySpan 0
 
   return ()
 

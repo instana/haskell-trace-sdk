@@ -57,16 +57,15 @@ instance ToJSON SpanKind where
 -- |A representation of the span with all its data. This will be send to the
 -- agent later.
 data FullSpan = FullSpan
-  { traceId   :: Id
-  , spanId    :: Id
-  , parentId  :: Maybe Id
-  , spanType  :: Text
-  , timestamp :: Int
-  , duration  :: Int
-  , kind      :: SpanKind
-  , label     :: Text
-  , spanError :: Bool
-  , spanData  :: Value
+  { traceId    :: Id
+  , spanId     :: Id
+  , parentId   :: Maybe Id
+  , spanName   :: Text
+  , timestamp  :: Int
+  , duration   :: Int
+  , kind       :: SpanKind
+  , errorCount :: Int
+  , spanData   :: Value
   } deriving (Eq, Generic, Show)
 
 
@@ -77,27 +76,54 @@ instance FromJSON FullSpan where
         <$> s .: "t"     -- traceId
         <*> s .: "s"     -- spanId
         <*> s .: "p"     -- parentId
-        <*> s .: "n"     -- type/name
+        <*> s .: "n"     -- name/type
         <*> s .: "ts"    -- timestamp
         <*> s .: "d"     -- duration
         <*> s .: "k"     -- kind (entry, exit, intermediate)
-        <*> s .: "label" -- label
-        <*> s .: "error" -- error
+        <*> s .: "ec"    -- error count
         <*> s .: "data"  -- data
 
 
+-- Compare
+-- https://github.com/instana/technical-documentation/blob/master/tracing/format.md
+-- Registered and SDK spans use the same format, exact same attributes. The only
+-- difference is the data, SDK spans should provide data.sdk (see below).
 instance ToJSON FullSpan where
   toJSON :: FullSpan -> Value
   toJSON s = Aeson.object
     [ "t"     .= traceId s
     , "s"     .= spanId s
     , "p"     .= parentId s
-    , "n"     .= spanType s
+    , "n"     .= spanName s
     , "ts"    .= timestamp s
+    , "ta"    .= ("haskell" :: String)
     , "d"     .= duration s
     , "k"     .= kind s
-    , "label" .= label s
-    , "error" .= spanError s
+    , "ec"    .= errorCount s
     , "data"  .= spanData s
+    -- TODO - missing attributes:
+    -- * data.service - should have dedicated functionality to be set (for SDK
+    --   spans)
+    -- * For SDK spans: Everything should be in data.sdk, structure is described in
+    --   https://github.com/instana/technical-documentation/blob/master/tracing/format.md#json-format-for-sdk-spans
+    -- * e: [{ # events that happened during this span, seems to be used mostly by EUM??
+    --     t: <long> # timestamp of this event relative to start (0 .. d)
+    --     v: <String> # type of this annotation (ttfb, dom-ready, etc)
+    --   }],
+    -- * f: { # <from> (source)
+    --    e: PID from announce response
+    --    h: AgentId/HostID (optional): Specified in the language announce response body. ??
+    --   },
+    -- * b: { # batching data
+    --     s: <long> # size; amount of batched spans
+    --     d: <long> # duration in ms; more realistic time of time consumed by individual batched spans. (optional, regular duration taken if absent)
+    --   },
+    -- * stack: [{ # stack trace
+    --     c: <String> # Class name
+    --     m: <String> # Method name
+    --     n: <String> # Line number
+    --     f: <String> # File name (optional in Java)
+    --   }],
+    -- * deferred: <boolean> # whether the span is deferred (optional), ??
     ]
 

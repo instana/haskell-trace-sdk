@@ -23,12 +23,10 @@ data RootEntry =
     {
       -- |The trace ID and span ID (those are identical for root spans)
       spanAndTraceId :: Id
-      -- |The span type span, e.g. a short string like "yesod", "servant",
-    , spanType       :: Text
+      -- |The span name/type, e.g. a short string like "yesod", "servant",
+    , spanName       :: Text
       -- |The time the span (and trace) started
     , timestamp      :: Int
-      -- |A free text label for the span
-    , label          :: Text
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
     , spanData       :: Value

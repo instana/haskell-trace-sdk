@@ -179,17 +179,15 @@ withRootEntrySimple ::
   MonadIO m =>
   InstanaContext
   -> Text
-  -> Text
   -> (EntrySpan -> m a)
   -> m a
-withRootEntrySimple context spanType label io =
+withRootEntrySimple context spanName io =
   withRootEntry
     context
-    spanType
-    label
+    spanName
     emptyValue
     (\entrySpan ->
-      (io entrySpan >>= (\result -> return (result, False, emptyValue)))
+      (io entrySpan >>= (\result -> return (result, 0, emptyValue)))
     )
 
 
@@ -200,14 +198,13 @@ withRootEntry ::
   MonadIO m =>
   InstanaContext
   -> Text
-  -> Text
   -> Value
-  -> (EntrySpan -> m (a, Bool, Value))
+  -> (EntrySpan -> m (a, Int, Value))
   -> m a
-withRootEntry context spanType label spanDataStart io = do
-  entrySpan <- liftIO $ startRootEntryWithData spanType label spanDataStart
-  (result, spanError, spanDataEnd) <- io entrySpan
-  liftIO $ completeEntryWithData context entrySpan spanError spanDataEnd
+withRootEntry context spanName spanDataStart io = do
+  entrySpan <- liftIO $ startRootEntryWithData spanName spanDataStart
+  (result, errorCount, spanDataEnd) <- io entrySpan
+  liftIO $ completeEntryWithData context entrySpan errorCount spanDataEnd
   return result
 
 
@@ -215,29 +212,26 @@ withRootEntry context spanType label spanDataStart io = do
 -- completed with 'completeEntry' or 'completeEntryWithData'.
 startRootEntry ::
   Text
-  -> Text
   -> IO EntrySpan
-startRootEntry spanType label =
-  startRootEntryWithData spanType label emptyValue
+startRootEntry spanName =
+  startRootEntryWithData spanName emptyValue
 
 
 -- |Creates a preliminary/incomplete root entry span with additional data, which
 -- should later be completed with 'completeEntry' or 'completeEntryWithData'.
 startRootEntryWithData ::
   Text
-  -> Text
   -> Value
   -> IO EntrySpan
-startRootEntryWithData spanType label spanData = do
+startRootEntryWithData spanName spanData = do
   timestamp <- round . (* 1000) <$> getPOSIXTime
   traceId <- Id.generate
   return $
     RootEntrySpan $
       RootEntry
         { RootEntry.spanAndTraceId = traceId
-        , RootEntry.spanType       = spanType
+        , RootEntry.spanName       = spanName
         , RootEntry.timestamp      = timestamp
-        , RootEntry.label          = label
         , RootEntry.spanData       = spanData
         }
 
@@ -250,19 +244,17 @@ withEntrySimple ::
   -> String
   -> String
   -> Text
-  -> Text
   -> (EntrySpan -> m a)
   -> m a
-withEntrySimple context traceId parentId spanType label io =
+withEntrySimple context traceId parentId spanName io =
   withEntry
     context
     traceId
     parentId
-    spanType
-    label
+    spanName
     emptyValue
     (\entrySpan ->
-      (io entrySpan >>= (\result -> return (result, False, emptyValue)))
+      (io entrySpan >>= (\result -> return (result, 0, emptyValue)))
     )
 
 
@@ -275,14 +267,13 @@ withEntry ::
   -> String
   -> String
   -> Text
-  -> Text
   -> Value
-  -> (EntrySpan -> m (a, Bool, Value))
+  -> (EntrySpan -> m (a, Int, Value))
   -> m a
-withEntry context traceId parentId spanType label spanDataStart io = do
-  entrySpan <- liftIO $ startEntryWithData traceId parentId spanType label spanDataStart
-  (result, spanError, spanDataEnd) <- io entrySpan
-  liftIO $ completeEntryWithData context entrySpan spanError spanDataEnd
+withEntry context traceId parentId spanName spanDataStart io = do
+  entrySpan <- liftIO $ startEntryWithData traceId parentId spanName spanDataStart
+  (result, errorCount, spanDataEnd) <- io entrySpan
+  liftIO $ completeEntryWithData context entrySpan errorCount spanDataEnd
   return result
 
 
@@ -292,10 +283,9 @@ startEntry ::
   String
   -> String
   -> Text
-  -> Text
   -> IO EntrySpan
-startEntry traceId parentId spanType label =
-  startEntryWithData traceId parentId spanType label emptyValue
+startEntry traceId parentId spanName =
+  startEntryWithData traceId parentId spanName emptyValue
 
 
 -- |Creates a preliminary/incomplete entry span with additional data, which
@@ -305,10 +295,9 @@ startEntryWithData ::
   String
   -> String
   -> Text
-  -> Text
   -> Value
   -> IO EntrySpan
-startEntryWithData traceId parentId spanType label spanData = do
+startEntryWithData traceId parentId spanName spanData = do
   timestamp <- round . (* 1000) <$> getPOSIXTime
   spanId <- Id.generate
   return $
@@ -317,9 +306,8 @@ startEntryWithData traceId parentId spanType label spanData = do
         { NonRootEntry.traceId   = Id.fromString traceId
         , NonRootEntry.spanId    = spanId
         , NonRootEntry.parentId  = Id.fromString parentId
-        , NonRootEntry.spanType  = spanType
+        , NonRootEntry.spanName  = spanName
         , NonRootEntry.timestamp = timestamp
-        , NonRootEntry.label     = label
         , NonRootEntry.spanData  = spanData
         }
 
@@ -329,12 +317,12 @@ startEntryWithData traceId parentId spanType label spanData = do
 completeEntry ::
   InstanaContext
   -> EntrySpan
-  -> Bool
+  -> Int
   -> IO ()
-completeEntry context entrySpan spanError =
+completeEntry context entrySpan errorCount =
   enqueueCommand
     context
-    (Command.CompleteEntry entrySpan spanError)
+    (Command.CompleteEntry entrySpan errorCount)
 
 
 -- |Completes an entry span with addtional data, to be called at the last
@@ -342,13 +330,13 @@ completeEntry context entrySpan spanError =
 completeEntryWithData ::
   InstanaContext
   -> EntrySpan
-  -> Bool
+  -> Int
   -> Value
   -> IO ()
-completeEntryWithData context entrySpan spanError spanData =
+completeEntryWithData context entrySpan errorCount spanData =
   enqueueCommand
     context
-    (Command.CompleteEntryWithData entrySpan spanError spanData)
+    (Command.CompleteEntryWithData entrySpan errorCount spanData)
 
 
 -- |Wraps an IO action in 'startExit' and 'completeExit'.
@@ -357,17 +345,15 @@ withExitSimple ::
   InstanaContext
   -> EntrySpan
   -> Text
-  -> Text
   -> m a
   -> m a
-withExitSimple context parent spanType label io =
+withExitSimple context parent spanName io =
     withExit
       context
       parent
-      spanType
-      label
+      spanName
       emptyValue
-      (io >>= (\result -> return (result, False, emptyValue)))
+      (io >>= (\result -> return (result, 0, emptyValue)))
 
 
 -- |Wraps an IO action in 'startExitWithData' and 'completeExitWithData'.
@@ -376,14 +362,13 @@ withExit ::
   InstanaContext
   -> EntrySpan
   -> Text
-  -> Text
   -> Value
-  -> m (a, Bool, Value)
+  -> m (a, Int, Value)
   -> m a
-withExit context parent spanType label spanDataStart io = do
-  exitSpan <- liftIO $ startExitWithData parent spanType label spanDataStart
-  (result, spanError, spanDataEnd) <- io
-  liftIO $ completeExitWithData context exitSpan spanError spanDataEnd
+withExit context parent spanName spanDataStart io = do
+  exitSpan <- liftIO $ startExitWithData parent spanName spanDataStart
+  (result, errorCount, spanDataEnd) <- io
+  liftIO $ completeExitWithData context exitSpan errorCount spanDataEnd
   return result
 
 
@@ -392,10 +377,9 @@ withExit context parent spanType label spanDataStart io = do
 startExit ::
   EntrySpan
   -> Text
-  -> Text
   -> IO ExitSpan
-startExit parent spanType label =
-  startExitWithData parent spanType label emptyValue
+startExit parent spanName =
+  startExitWithData parent spanName emptyValue
 
 
 -- |Creates a preliminary/incomplete exit span with additional data, which
@@ -403,17 +387,15 @@ startExit parent spanType label =
 startExitWithData ::
   EntrySpan
   -> Text
-  -> Text
   -> Value
   -> IO ExitSpan
-startExitWithData parent spanType label spanData = do
+startExitWithData parent spanName spanData = do
   timestamp <- round . (* 1000) <$> getPOSIXTime
   return $
     ExitSpan
       { ExitSpan.parentSpan  = parent
-      , ExitSpan.spanType    = spanType
+      , ExitSpan.spanName    = spanName
       , ExitSpan.timestamp   = timestamp
-      , ExitSpan.label       = label
       , ExitSpan.spanData    = spanData
       }
 
@@ -423,12 +405,12 @@ startExitWithData parent spanType label spanData = do
 completeExit ::
   InstanaContext
   -> ExitSpan
-  -> Bool
+  -> Int
   -> IO ()
-completeExit context exitSpan spanError =
+completeExit context exitSpan errorCount =
   enqueueCommand
     context
-    (Command.CompleteExit exitSpan spanError)
+    (Command.CompleteExit exitSpan errorCount)
 
 
 -- |Completes an exit span with addtional data, to be called as soon as the
@@ -436,13 +418,13 @@ completeExit context exitSpan spanError =
 completeExitWithData ::
   InstanaContext
   -> ExitSpan
-  -> Bool
+  -> Int
   -> Value
   -> IO ()
-completeExitWithData context exitSpan spanError spanData =
+completeExitWithData context exitSpan errorCount spanData =
   enqueueCommand
     context
-    (Command.CompleteExitWithData exitSpan spanError spanData)
+    (Command.CompleteExitWithData exitSpan errorCount spanData)
 
 
 emptyValue :: Value

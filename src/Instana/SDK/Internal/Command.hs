@@ -16,13 +16,13 @@ import           Instana.SDK.Span.ExitSpan  (ExitSpan)
 
 -- |A command that can be send to the worker.
 data Command =
-  -- |CompleteEntry entrySpan spanError
-  CompleteEntry EntrySpan Bool
-  -- |CompleteEntryWithData entrySpan spanError spanData
-  | CompleteEntryWithData EntrySpan Bool Value
-  -- |CompleteExit exitSpan spanError
-  | CompleteExit ExitSpan Bool
-  -- |CompleteExitWithData exitSpan spanError spanData
-  | CompleteExitWithData ExitSpan Bool Value
+  -- |CompleteEntry entrySpan errorCount
+  CompleteEntry EntrySpan Int
+  -- |CompleteEntryWithData entrySpan errorCount spanData
+  | CompleteEntryWithData EntrySpan Int Value
+  -- |CompleteExit exitSpan errorCount
+  | CompleteExit ExitSpan Int
+  -- |CompleteExitWithData exitSpan errorCount spanData
+  | CompleteExitWithData ExitSpan Int Value
   deriving (Show)
 
