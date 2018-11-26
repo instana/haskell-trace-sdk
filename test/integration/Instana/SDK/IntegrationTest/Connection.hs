@@ -13,7 +13,8 @@ import           Data.Maybe                             (isJust, isNothing)
 import           Data.Text                              (Text)
 import           Test.HUnit
 
-import           Instana.SDK.AgentStub.TraceRequest     (Span)
+import           Instana.SDK.AgentStub.TraceRequest     (From (..), Span)
+import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
@@ -22,8 +23,8 @@ import qualified Instana.SDK.SDK                        as InstanaSDK
 import           Instana.SDK.Span.EntrySpan             (EntrySpan)
 
 
-shouldRetryInitialConnectionEstablishment :: IO Test
-shouldRetryInitialConnectionEstablishment =
+shouldRetryInitialConnectionEstablishment :: String -> IO Test
+shouldRetryInitialConnectionEstablishment _ =
   return $
     TestLabel "shouldRetryInitialConnectionEstablishment" $
       TestCase $
@@ -35,8 +36,8 @@ shouldRetryInitialConnectionEstablishment =
         return ()
 
 
-shouldReestablishLostConnection :: InstanaContext -> IO Test
-shouldReestablishLostConnection instana =
+shouldReestablishLostConnection :: InstanaContext -> String -> IO Test
+shouldReestablishLostConnection instana _ =
   applyLabel "shouldReestablishLostConnection" $ do
 
     --    0 ms: send span 1
@@ -109,8 +110,8 @@ simulateWork _ =
   threadDelay $ 10 * 1000
 
 
-shouldReconnectAfterAgentRestart :: InstanaContext -> IO Test
-shouldReconnectAfterAgentRestart instana =
+shouldReconnectAfterAgentRestart :: InstanaContext -> String -> IO Test
+shouldReconnectAfterAgentRestart instana _ =
   applyLabel "shouldReconnectAfterAgentRestart" $ do
   (_, spansResultsBefore) <-
     TestHelper.withSpanCreation
@@ -182,14 +183,15 @@ verifyRecconnectAfterAgentRestart instana spansResultsBefore = do
         ]
 
 
-shouldUseTranslatedPid :: InstanaContext -> IO Test
-shouldUseTranslatedPid instana = do
+shouldUseTranslatedPid :: InstanaContext -> String -> IO Test
+shouldUseTranslatedPid instana pid = do
   applyLabel "shouldUseTranslatedPid" $ do
+    let
+      from = Just $ From pid
     (_, spansResults) <-
       TestHelper.withSpanCreation
         (recordSpans instana "haskell.dummy.pid-translation")
         [ "haskell.dummy.pid-translation" ]
-
     case spansResults of
       Left failure ->
         failIO $ "Could not load recorded spans from agent stub: " ++ failure
@@ -198,13 +200,24 @@ shouldUseTranslatedPid instana = do
           maybeSpan = TestHelper.getSpanByName
             "haskell.dummy.pid-translation"
             spans
-        assertAllIO
-          [ assertBool "span has not been recorded" $ isJust maybeSpan
-          ]
+        if isNothing maybeSpan
+          then
+            failIO "expected span has not been recorded"
+          else do
+            let
+              Just entrySpan = maybeSpan
+            assertAllIO
+              [ assertBool "entry timestamp" $ TraceRequest.ts entrySpan > 0
+              , assertBool "entry duration" $ TraceRequest.d entrySpan > 0
+              , assertEqual "entry kind" 1 (TraceRequest.k entrySpan)
+              , assertEqual "entry error" 0 (TraceRequest.ec entrySpan)
+              , assertEqual "entry from" from $ TraceRequest.f entrySpan
+              ]
 
 
-shouldUseCustomAgentName :: IO Test
-shouldUseCustomAgentName =
+
+shouldUseCustomAgentName :: String -> IO Test
+shouldUseCustomAgentName _ =
   return $
     TestLabel "shouldUseCustomAgentName" $
       TestCase $

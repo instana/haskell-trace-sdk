@@ -74,23 +74,23 @@ waitForAgentConnectionAndRun suiteGenerator instana = do
       assertFailure $
         "Could not start test suites [" ++ allLabels ++ "]. The agent " ++
         "connection could not be established: " ++ message
-    Right _ ->
-      runTestSuites suites
+    Right (_, pid) ->
+      runTestSuites pid suites
 
 
-runTestSuites :: [Suite] -> IO Counts
-runTestSuites suites = do
+runTestSuites :: String -> [Suite] -> IO Counts
+runTestSuites pid suites = do
   let
-    allIntegrationTestsIO = List.map applyLabelToSuite suites
+    allIntegrationTestsIO = List.map (applyLabelToSuite pid) suites
   allIntegrationTests <- sequence allIntegrationTestsIO
   runTestTT $ TestLabel "Span Recording" $ TestList allIntegrationTests
 
 
-applyLabelToSuite :: Suite -> IO Test
-applyLabelToSuite suite = do
+applyLabelToSuite :: String -> Suite -> IO Test
+applyLabelToSuite pid suite = do
   let
     label   = Suite.label suite
-    testsIO = Suite.tests suite
+    testsIO = (Suite.tests suite) pid
   tests <- sequence testsIO
   return $ TestLabel label $ TestList tests
 

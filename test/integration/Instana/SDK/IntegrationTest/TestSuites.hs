@@ -56,19 +56,19 @@ testSpanRecording =
       (\instana ->
         [ Suite
            { Suite.label = "Low Level API"
-           , Suite.tests =
-              [ LowLevelApi.shouldRecordSpans instana
-              , LowLevelApi.shouldRecordNonRootEntry instana
-              , LowLevelApi.shouldMergeData instana
-              ]
+           , Suite.tests = (\pid ->
+              [ LowLevelApi.shouldRecordSpans instana pid
+              , LowLevelApi.shouldRecordNonRootEntry instana pid
+              , LowLevelApi.shouldMergeData instana pid
+              ])
            }
         , Suite
            { Suite.label = "High Level API"
-           , Suite.tests =
-              [ HighLevelApi.shouldRecordSpans instana
-              , HighLevelApi.shouldRecordNonRootEntry instana
-              , HighLevelApi.shouldMergeData instana
-              ]
+           , Suite.tests = (\pid ->
+              [ HighLevelApi.shouldRecordSpans instana pid
+              , HighLevelApi.shouldRecordNonRootEntry instana pid
+              , HighLevelApi.shouldMergeData instana pid
+              ])
            }
         ]
       , Suite.defaultOpts
@@ -86,9 +86,9 @@ testConnectionEstablishment =
       (\_ ->
         [ Suite
            { Suite.label = "Initial Connection Establishment"
-           , Suite.tests = [
-               Connection.shouldRetryInitialConnectionEstablishment
-             ]
+           , Suite.tests = (\pid -> [
+               Connection.shouldRetryInitialConnectionEstablishment pid
+             ])
            }
         ]
       , Suite.defaultOpts
@@ -108,9 +108,9 @@ testConnectionLoss =
       (\instana ->
         [ Suite
           { Suite.label = "Connection Loss"
-          , Suite.tests = [
-              Connection.shouldReestablishLostConnection instana
-            ]
+          , Suite.tests = (\pid -> [
+              Connection.shouldReestablishLostConnection instana pid
+            ])
           }
         ]
       , Suite.defaultOpts
@@ -130,9 +130,9 @@ testAgentRestart =
       (\instana ->
         [ Suite
             { Suite.label = "Agent Restart"
-            , Suite.tests = [
-                Connection.shouldReconnectAfterAgentRestart instana
-              ]
+            , Suite.tests = (\pid -> [
+                Connection.shouldReconnectAfterAgentRestart instana pid
+              ])
             }
         ]
       , Suite.defaultOpts
@@ -152,8 +152,9 @@ testPidTranslation =
       (\instana ->
         [ Suite
            { Suite.label =  "PID transaltion"
-           , Suite.tests = [ Connection.shouldUseTranslatedPid instana ]
-
+           , Suite.tests = (\pid -> [
+               Connection.shouldUseTranslatedPid instana pid
+             ])
            }
         ]
       , Suite.withPidTranslation
@@ -173,9 +174,9 @@ testCustomAgentName =
       (\_ ->
         [ Suite
           { Suite.label = "Custom Agent Name"
-          , Suite.tests = [
-              Connection.shouldUseCustomAgentName
-            ]
+          , Suite.tests = (\pid -> [
+              Connection.shouldUseCustomAgentName pid
+            ])
           }
         ]
       , Suite.withCustomAgentName "Devil in Disguise"

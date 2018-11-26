@@ -12,6 +12,7 @@ import qualified Data.Aeson                             as Aeson
 import           Data.Maybe                             (isNothing)
 import           Test.HUnit
 
+import           Instana.SDK.AgentStub.TraceRequest     (From (..))
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
@@ -21,9 +22,11 @@ import qualified Instana.SDK.SDK                        as InstanaSDK
 import           Instana.SDK.Span.EntrySpan             (EntrySpan)
 
 
-shouldRecordSpans :: InstanaContext -> IO Test
-shouldRecordSpans instana =
+shouldRecordSpans :: InstanaContext -> String -> IO Test
+shouldRecordSpans instana pid =
   applyLabel "shouldRecordSpans" $ do
+    let
+      from = Just $ From pid
     (result, spansResults) <-
       TestHelper.withSpanCreation
         (recordSpans instana)
@@ -65,12 +68,13 @@ shouldRecordSpans instana =
               , assertBool "entry timespan" $ TraceRequest.ts rootEntrySpan > 0
               , assertBool "entry duration" $ TraceRequest.d rootEntrySpan > 0
               , assertEqual "entry kind" 1 (TraceRequest.k rootEntrySpan)
-              , assertEqual "entry error" 0
-                  (TraceRequest.ec rootEntrySpan)
+              , assertEqual "entry error" 0 (TraceRequest.ec rootEntrySpan)
+              , assertEqual "entry from" from $ TraceRequest.f rootEntrySpan
               , assertBool "exit timespan" $ TraceRequest.ts exitSpan > 0
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
               , assertEqual "exit error" 0 (TraceRequest.ec exitSpan)
+              , assertEqual "exit from" from $ TraceRequest.f exitSpan
               ]
 
 
@@ -95,9 +99,11 @@ doExitCall instana entrySpan = do
   return result
 
 
-shouldRecordNonRootEntry :: InstanaContext -> IO Test
-shouldRecordNonRootEntry instana =
+shouldRecordNonRootEntry :: InstanaContext -> String -> IO Test
+shouldRecordNonRootEntry instana pid =
   applyLabel "shouldRecordNonRootEntry" $ do
+    let
+      from = Just $ From pid
     (result, spansResults) <-
       TestHelper.withSpanCreation
         (recordNonRootEntry instana)
@@ -138,10 +144,12 @@ shouldRecordNonRootEntry instana =
               , assertBool "entry.duration" $ TraceRequest.d entrySpan > 0
               , assertEqual "entry kind" 1 (TraceRequest.k entrySpan)
               , assertEqual "entry error" 0 (TraceRequest.ec entrySpan)
+              , assertEqual "entry from" from $ TraceRequest.f entrySpan
               , assertBool "exit timestamp" $ TraceRequest.ts exitSpan > 0
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" (2) (TraceRequest.k exitSpan)
               , assertEqual "exit error" 0 (TraceRequest.ec exitSpan)
+              , assertEqual "exit from" from $ TraceRequest.f exitSpan
               ]
 
 
@@ -157,9 +165,11 @@ recordNonRootEntry instana = do
   return result
 
 
-shouldMergeData :: InstanaContext -> IO Test
-shouldMergeData instana =
+shouldMergeData :: InstanaContext -> String -> IO Test
+shouldMergeData instana pid =
   applyLabel "shouldMergeData" $ do
+    let
+      from = Just $ From pid
     (result, spansResults) <-
       TestHelper.withSpanCreation
         (recordSpansWithData instana)
@@ -197,8 +207,8 @@ shouldMergeData instana =
               , assertBool "entry timestamp" $ TraceRequest.ts rootEntrySpan > 0
               , assertBool "entry duration" $ TraceRequest.d rootEntrySpan > 0
               , assertEqual "entry kind" 1 (TraceRequest.k rootEntrySpan)
-              , assertEqual "entry error" 1
-                  (TraceRequest.ec rootEntrySpan)
+              , assertEqual "entry error" 1 (TraceRequest.ec rootEntrySpan)
+              , assertEqual "entry from" from $ TraceRequest.f rootEntrySpan
               , assertEqual "entry data"
                 ( Aeson.object
                   [ "data1"     .= ("value1" :: String)
@@ -214,6 +224,7 @@ shouldMergeData instana =
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
               , assertEqual "exit error" 1 (TraceRequest.ec exitSpan)
+              , assertEqual "exit from" from $ TraceRequest.f exitSpan
               , assertEqual "exit data"
                 ( Aeson.object
                   [ "data1"     .= ("value1" :: String)

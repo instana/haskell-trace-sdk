@@ -61,13 +61,13 @@ shutdownAgentStub = do
     (\ (_ :: HTTP.HttpException) -> return ())
 
 
-waitForAgentConnection :: Bool -> IO (Either String DiscoveryRequest)
+waitForAgentConnection :: Bool -> IO (Either String (DiscoveryRequest, String))
 waitForAgentConnection pidTranslation = do
   originalPid <- PosixProcess.getProcessID
   let
     pid = if pidTranslation then originalPid + 1 else originalPid
-  discoveries  <- waitForDiscoveryWithPid $ show pid
-  case discoveries of
+  discoveryWithPid  <- waitForDiscoveryWithPid $ show pid
+  case discoveryWithPid of
     Left message1 -> do
       putStrLn $
         "❗️ Could not establish agent connection " ++
@@ -87,16 +87,16 @@ waitForAgentConnection pidTranslation = do
             "(agent ready failed): " ++ message2
         Right _ -> do
           putStrLn $ "\n✅ agent connection has been established"
-          return discoveries
+          return discoveryWithPid
 
 
-waitForDiscoveryWithMyPid :: IO (Either String DiscoveryRequest)
+waitForDiscoveryWithMyPid :: IO (Either String (DiscoveryRequest, String))
 waitForDiscoveryWithMyPid = do
   pid <- PosixProcess.getProcessID
   waitForDiscoveryWithPid $ show pid
 
 
-waitForDiscoveryWithPid :: String -> IO (Either String DiscoveryRequest)
+waitForDiscoveryWithPid :: String -> IO (Either String (DiscoveryRequest, String))
 waitForDiscoveryWithPid pidStr = do
   putStrFlush $ "⏱ waiting for discovery request for pid " ++ pidStr
   discoveries <-
@@ -107,7 +107,7 @@ waitForDiscoveryWithPid pidStr = do
       return $ Left message
     Right ds -> do
       putStrLn "\n✅ recorded discovery request obtained"
-      return $ Right $ head ds
+      return $ Right $ (head ds, pidStr)
 
 
 getDiscoveries :: IO (Either String [DiscoveryRequest])

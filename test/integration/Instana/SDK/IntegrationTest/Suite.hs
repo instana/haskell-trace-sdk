@@ -16,7 +16,7 @@ import           Instana.SDK.SDK (InstanaContext)
 data Suite =
   Suite
     { label :: String
-    , tests :: [IO Test]
+    , tests :: String -> [IO Test]
     }
 
 

@@ -21,6 +21,7 @@ import           Data.Aeson                                       (Value)
 import qualified Data.Aeson                                       as Aeson
 import qualified Data.Aeson.Extra.Merge                           as AesonExtra
 import           Data.Foldable                                    (toList)
+import           Data.List                                        (map)
 import           Data.Sequence                                    ((|>))
 import qualified Data.Sequence                                    as Seq
 import           Data.Text                                        (Text)
@@ -38,6 +39,7 @@ import           Instana.SDK.Internal.Context                     (ConnectionSta
                                                                    InternalContext)
 import qualified Instana.SDK.Internal.Context                     as InternalContext
 import           Instana.SDK.Internal.FullSpan                    (FullSpan (FullSpan),
+                                                                   FullSpanWithPid (FullSpanWithPid),
                                                                    SpanKind (Entry, Exit))
 import qualified Instana.SDK.Internal.FullSpan                    as FullSpan
 import qualified Instana.SDK.Internal.Id                          as Id
@@ -239,13 +241,21 @@ sendSpansToAgent context spans pid _ = do
           (InternalConfig.agentPort config)
           haskellTracePluginPath
       ) ++ "." ++ pid
+    -- combine actual span data with static per-process data (e.g. PID)
+    spansWithPid = map
+      (\fullSpan ->
+        FullSpanWithPid {
+          FullSpan.fullSpan = fullSpan
+        , FullSpan.pid      = pid
+        }
+      ) spans
   defaultRequestSettings <- HTTP.parseUrlThrow traceEndpointUrl
-  debugM instanaLogger $ show $ Aeson.encode spans
+  debugM instanaLogger $ show $ Aeson.encode spansWithPid
   let
     request =
       defaultRequestSettings
         { HTTP.method = "POST"
-        , HTTP.requestBody = HTTP.RequestBodyLBS $ Aeson.encode spans
+        , HTTP.requestBody = HTTP.RequestBodyLBS $ Aeson.encode spansWithPid
         , HTTP.requestHeaders =
           [ ("Accept", "application/json")
           , ("Content-Type", "application/json; charset=UTF-8'")
