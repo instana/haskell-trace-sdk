@@ -2,22 +2,21 @@
 module Main where
 
 
-import           Control.Concurrent         (threadDelay)
-import           Control.Monad              (when)
-import           Instana.SDK.SDK            (InstanaContext)
-import qualified Instana.SDK.SDK            as InstanaSDK
-import           Instana.SDK.Span.EntrySpan (EntrySpan)
-import           System.Environment         (lookupEnv)
-import           System.IO                  (Handle, stdout)
+import           Control.Concurrent        (threadDelay)
+import           Control.Monad             (when)
+import           Instana.SDK.SDK           (InstanaContext)
+import qualified Instana.SDK.SDK           as InstanaSDK
+import           System.Environment        (lookupEnv)
+import           System.IO                 (Handle, stdout)
 import           System.Log.Formatter
-import           System.Log.Handler         (setFormatter)
-import           System.Log.Handler.Simple  (GenericHandler, fileHandler,
-                                             streamHandler)
-import           System.Log.Logger          (Priority (..), rootLoggerName,
-                                             setHandlers, setLevel,
-                                             updateGlobalLogger)
-import           System.Log.Logger          (infoM)
-import           Text.Read                  (readMaybe)
+import           System.Log.Handler        (setFormatter)
+import           System.Log.Handler.Simple (GenericHandler, fileHandler,
+                                            streamHandler)
+import           System.Log.Logger         (Priority (..), rootLoggerName,
+                                            setHandlers, setLevel,
+                                            updateGlobalLogger)
+import           System.Log.Logger         (infoM)
+import           Text.Read                 (readMaybe)
 
 
 appLogger :: String
@@ -97,7 +96,7 @@ keepAliveLoop instana maxIterations counter = do
   when (counter `mod` 20 == 0) $ do
     createSpansUsingLowLevelApi instana
   when (counter + 10 `mod` 20 == 0) $ do
-    createSpansUsingHighLevelApi instana
+    createSpansUsingBracketApi instana
 
   when (counter `mod` 100 == 0) $ do
     let
@@ -121,20 +120,19 @@ keepAliveLoop instana maxIterations counter = do
     keepAliveLoop instana maxIterations (counter + 1)
 
 
-createSpansUsingHighLevelApi :: InstanaContext -> IO ()
-createSpansUsingHighLevelApi instana = do
-  InstanaSDK.withRootEntrySimple
+createSpansUsingBracketApi :: InstanaContext -> IO ()
+createSpansUsingBracketApi instana = do
+  InstanaSDK.withRootEntry
     instana
     "haskell.dummy.root.entry"
     (simulateExitCall instana)
   return ()
 
 
-simulateExitCall :: InstanaContext -> EntrySpan -> IO ()
-simulateExitCall instana entrySpan =
-  InstanaSDK.withExitSimple
+simulateExitCall :: InstanaContext -> IO ()
+simulateExitCall instana =
+  InstanaSDK.withExit
     instana
-    entrySpan
     "haskell.dummy.exit"
     (putStrLn "Here be dragons!")
 
@@ -145,22 +143,17 @@ createSpansUsingLowLevelApi instana = do
   -- span ID are already available, for example from HTTP headers of an
   -- incoming request, and, if so, pass them on using InstanaSDK.startEntry
   -- instead of InstanaSDK.startRootEntry
-  entrySpan <-
-    InstanaSDK.startRootEntry
-      "haskell.dummy.root.entry"
-  exitSpan <-
-    InstanaSDK.startExit
-      entrySpan
-      "haskell.dummy.exit"
+  InstanaSDK.startRootEntry instana "haskell.dummy.root.entry"
+  InstanaSDK.startExit instana "haskell.dummy.exit"
 
   -- Now a real app would execute some exit call, say a DB call or an
   -- HTTP call.
 
   -- mark the exit call as completed
-  InstanaSDK.completeExit instana exitSpan 0
+  InstanaSDK.completeExit instana
 
   -- mark the entry as completed and return
-  InstanaSDK.completeEntry instana entrySpan 0
+  InstanaSDK.completeEntry instana
 
   return ()
 

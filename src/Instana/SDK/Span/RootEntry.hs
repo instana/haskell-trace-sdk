@@ -7,10 +7,13 @@ module Instana.SDK.Span.RootEntry
   ( RootEntry(..)
   , spanId
   , traceId
+  , addData
+  , addToErrorCount
   ) where
 
 
 import           Data.Aeson              (Value)
+import qualified Data.Aeson.Extra.Merge  as AesonExtra
 import           Data.Text               (Text)
 import           GHC.Generics
 
@@ -27,6 +30,8 @@ data RootEntry =
     , spanName       :: Text
       -- |The time the span (and trace) started
     , timestamp      :: Int
+      -- |The number of errors that occured during processing
+    , errorCount     :: Int
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
     , spanData       :: Value
@@ -41,4 +46,23 @@ traceId = spanAndTraceId
 -- |Accessor for the span ID.
 spanId :: RootEntry -> Id
 spanId = spanAndTraceId
+
+
+-- |Add to the error count.
+addToErrorCount :: Int -> RootEntry -> RootEntry
+addToErrorCount increment rootEntry =
+  let
+    ec = errorCount rootEntry
+  in
+  rootEntry { errorCount = ec + increment }
+
+
+-- |Add a value to the span's data section.
+addData :: Value -> RootEntry -> RootEntry
+addData newData rootEntry =
+  let
+    currentData = spanData rootEntry
+    mergedData = AesonExtra.lodashMerge currentData newData
+  in
+  rootEntry { spanData = mergedData }
 

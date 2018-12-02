@@ -14,8 +14,10 @@ module Instana.SDK.Internal.Context
   ) where
 
 
+import           Control.Concurrent                                         (ThreadId)
 import           Control.Concurrent.STM                                     (STM)
 import qualified Control.Concurrent.STM                                     as STM
+import           Data.Map.Strict                                            (Map)
 import           Data.Sequence                                              (Seq)
 import           Data.Text                                                  (Text)
 import qualified Foreign.C.Types                                            as CTypes
@@ -27,6 +29,7 @@ import qualified Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse as A
 import           Instana.SDK.Internal.Command                               (Command)
 import           Instana.SDK.Internal.Config                                (FinalConfig)
 import           Instana.SDK.Internal.FullSpan                              (FullSpan)
+import           Instana.SDK.Internal.SpanStack                             (SpanStack)
 
 
 -- |The current state of the connection to the agent.
@@ -75,6 +78,7 @@ data InternalContext = InternalContext
   , spanQueue       :: STM.TVar (Seq FullSpan)
   , connectionState :: STM.TVar ConnectionState
   , fileDescriptor  :: STM.TVar (Maybe CTypes.CInt)
+  , currentSpans    :: STM.TVar (Map ThreadId SpanStack)
   }
 
 

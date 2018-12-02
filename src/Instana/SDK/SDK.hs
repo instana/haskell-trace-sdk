@@ -11,64 +11,71 @@ withEntry, withExit functions for tracing.
 module Instana.SDK.SDK
     ( Config
     , InstanaContext
+    , addData
+    , addDataAt
+    , addToErrorCount
     , agentHost
-    , agentPort
     , agentName
+    , agentPort
     , completeEntry
-    , completeEntryWithData
     , completeExit
-    , completeExitWithData
     , defaultConfig
     , forceTransmissionAfter
     , forceTransmissionStartingAt
-    , maxBufferedSpans
-    , initInstana
+    , incrementErrorCount
     , initConfiguredInstana
+    , initInstana
+    , maxBufferedSpans
     , startEntry
-    , startEntryWithData
     , startExit
-    , startExitWithData
     , startRootEntry
-    , startRootEntryWithData
     , withConfiguredInstana
-    , withEntrySimple
     , withEntry
-    , withExitSimple
     , withExit
     , withInstana
-    , withRootEntrySimple
     , withRootEntry
     ) where
 
 
-import qualified Control.Concurrent.STM        as STM
-import           Control.Monad.IO.Class        (MonadIO, liftIO)
-import           Data.Aeson                    (Value)
-import qualified Data.Aeson                    as Aeson
-import qualified Data.Sequence                 as Seq
-import           Data.Text                     (Text)
-import           Data.Time.Clock.POSIX         (getPOSIXTime)
-import qualified Network.HTTP.Client           as HTTP
-import qualified Network.Socket                as Socket
-import qualified System.Posix.Process          as Process
+import           Control.Concurrent             (ThreadId)
+import qualified Control.Concurrent             as Concurrent
+import           Control.Concurrent.STM         (STM)
+import qualified Control.Concurrent.STM         as STM
+import           Control.Monad.IO.Class         (MonadIO, liftIO)
+import           Data.Aeson                     (Value)
+import qualified Data.Aeson                     as Aeson
+import qualified Data.Map.Strict                as Map
+import qualified Data.Maybe                     as Maybe
+import qualified Data.Sequence                  as Seq
+import           Data.Text                      (Text)
+import           Data.Time.Clock.POSIX          (getPOSIXTime)
+import qualified Network.HTTP.Client            as HTTP
+import qualified Network.Socket                 as Socket
+import           System.Log.Logger              (warningM)
+import qualified System.Posix.Process           as Process
 
 import           Instana.SDK.Config
-import           Instana.SDK.Internal.Command  (Command)
-import qualified Instana.SDK.Internal.Command  as Command
-import           Instana.SDK.Internal.Config   (FinalConfig)
-import qualified Instana.SDK.Internal.Config   as InternalConfig
-import           Instana.SDK.Internal.Context  (ConnectionState (..), InternalContext (InternalContext))
-import qualified Instana.SDK.Internal.Context  as InternalContext
-import qualified Instana.SDK.Internal.Id       as Id
-import qualified Instana.SDK.Internal.Logging  as Logging
-import qualified Instana.SDK.Internal.Worker   as Worker
-import           Instana.SDK.Span.EntrySpan    (EntrySpan (..))
-import           Instana.SDK.Span.ExitSpan     (ExitSpan (ExitSpan))
-import qualified Instana.SDK.Span.ExitSpan     as ExitSpan
-import           Instana.SDK.Span.NonRootEntry (NonRootEntry (NonRootEntry))
-import qualified Instana.SDK.Span.NonRootEntry as NonRootEntry
-import           Instana.SDK.Span.RootEntry    (RootEntry (RootEntry))
-import qualified Instana.SDK.Span.RootEntry    as RootEntry
+import           Instana.SDK.Internal.Command   (Command)
+import qualified Instana.SDK.Internal.Command   as Command
+import           Instana.SDK.Internal.Config    (FinalConfig)
+import qualified Instana.SDK.Internal.Config    as InternalConfig
+import           Instana.SDK.Internal.Context   (ConnectionState (..), InternalContext (InternalContext))
+import qualified Instana.SDK.Internal.Context   as InternalContext
+import qualified Instana.SDK.Internal.Id        as Id
+import           Instana.SDK.Internal.Logging   (instanaLogger)
+import qualified Instana.SDK.Internal.Logging   as Logging
+import           Instana.SDK.Internal.SpanStack (SpanStack)
+import qualified Instana.SDK.Internal.SpanStack as SpanStack
+import qualified Instana.SDK.Internal.Worker    as Worker
+import           Instana.SDK.Span.EntrySpan     (EntrySpan (..))
+import           Instana.SDK.Span.ExitSpan      (ExitSpan (ExitSpan))
+import qualified Instana.SDK.Span.ExitSpan      as ExitSpan
+import           Instana.SDK.Span.NonRootEntry  (NonRootEntry (NonRootEntry))
+import qualified Instana.SDK.Span.NonRootEntry  as NonRootEntry
+import           Instana.SDK.Span.RootEntry     (RootEntry (RootEntry))
+import qualified Instana.SDK.Span.RootEntry     as RootEntry
+import           Instana.SDK.Span.Span          (Span (..), SpanKind (..))
+import qualified Instana.SDK.Span.Span          as Span
 
 
 {-| A container for all the things the Instana SDK needs to do its work.
@@ -80,10 +87,10 @@ type InstanaContext = InternalContext
 
 The configuration is read from the environment, falling back to default values.
 -}
-initInstana :: IO InstanaContext
+initInstana :: MonadIO m => m InstanaContext
 initInstana = do
-  conf <- InternalConfig.readConfigFromEnvironmentAndApplyDefaults
-  initInstanaInternal conf
+  conf <- liftIO $ InternalConfig.readConfigFromEnvironmentAndApplyDefaults
+  liftIO $ initInstanaInternal conf
 
 
 {-| Initializes the Instana SDK and the connection to the Instana agent, then
@@ -97,17 +104,18 @@ withInstana fn = do
   withInstanaInternal conf fn
 
 
-{-| Initializes the Instana SDK and the connection to the Instana agent, using the given Instana configuration.
+{-| Initializes the Instana SDK and the connection to the Instana agent, using
+the given Instana configuration.
 
 Configuration settings that have not been set in the given configuration are
 read from the environment, falling back to default values.
 -}
-initConfiguredInstana :: Config -> IO InstanaContext
+initConfiguredInstana :: MonadIO m => Config -> m InstanaContext
 initConfiguredInstana conf  = do
-  confFromEnv <- InternalConfig.readConfigFromEnvironment
+  confFromEnv <- liftIO $ InternalConfig.readConfigFromEnvironment
   let
      mergedConf = InternalConfig.mergeConfigs conf confFromEnv
-  initInstanaInternal mergedConf
+  liftIO $ initInstanaInternal mergedConf
 
 
 {-| Initializes the Instana SDK and the connection to the Instana agent, then
@@ -143,6 +151,8 @@ initInstanaInternal conf = do
   spanQueue <- STM.newTVarIO $ Seq.empty
   connectionState <- STM.newTVarIO $ Unconnected
   fileDescriptor <- STM.newTVarIO $ Nothing
+  threadId <- Concurrent.myThreadId
+  currentSpans <- STM.newTVarIO $ Map.singleton threadId SpanStack.empty
   -- HTTP.newManager is keep-alive by default (10 connections, we set it to 5)
   manager <- HTTP.newManager $
     HTTP.defaultManagerSettings
@@ -166,6 +176,7 @@ initInstanaInternal conf = do
         , InternalContext.spanQueue = spanQueue
         , InternalContext.connectionState = connectionState
         , InternalContext.fileDescriptor = fileDescriptor
+        , InternalContext.currentSpans = currentSpans
         }
   -- The worker thread will also try to establish the connection to the agent
   -- and only start its work when that was successful.
@@ -173,264 +184,258 @@ initInstanaInternal conf = do
   return context
 
 
--- |Wraps an IO action in 'startRootEntry' and 'completeEntry'. The wrapped
--- action receives the entry span in case it wants to add child spans to it.
-withRootEntrySimple ::
-  MonadIO m =>
-  InstanaContext
-  -> Text
-  -> (EntrySpan -> m a)
-  -> m a
-withRootEntrySimple context spanName io =
-  withRootEntry
-    context
-    spanName
-    emptyValue
-    (\entrySpan ->
-      (io entrySpan >>= (\result -> return (result, 0, emptyValue)))
-    )
-
-
--- |Wraps an IO action in 'startRootEntryWithData' and 'completeEntryWithData'.
--- The wrapped action receives the entry span in case it wants to add child
--- spans to it.
+-- |Wraps an IO action in 'startRootEntry' and 'completeEntry'.
 withRootEntry ::
   MonadIO m =>
   InstanaContext
   -> Text
-  -> Value
-  -> (EntrySpan -> m (a, Int, Value))
   -> m a
-withRootEntry context spanName spanDataStart io = do
-  entrySpan <- liftIO $ startRootEntryWithData spanName spanDataStart
-  (result, errorCount, spanDataEnd) <- io entrySpan
-  liftIO $ completeEntryWithData context entrySpan errorCount spanDataEnd
+  -> m a
+withRootEntry context spanName io = do
+  startRootEntry context spanName
+  result <- io
+  completeEntry context
   return result
 
 
--- |Creates a preliminary/incomplete root entry span, which should later be
--- completed with 'completeEntry' or 'completeEntryWithData'.
-startRootEntry ::
-  Text
-  -> IO EntrySpan
-startRootEntry spanName =
-  startRootEntryWithData spanName emptyValue
-
-
--- |Creates a preliminary/incomplete root entry span with additional data, which
--- should later be completed with 'completeEntry' or 'completeEntryWithData'.
-startRootEntryWithData ::
-  Text
-  -> Value
-  -> IO EntrySpan
-startRootEntryWithData spanName spanData = do
-  timestamp <- round . (* 1000) <$> getPOSIXTime
-  traceId <- Id.generate
-  return $
-    RootEntrySpan $
-      RootEntry
-        { RootEntry.spanAndTraceId = traceId
-        , RootEntry.spanName       = spanName
-        , RootEntry.timestamp      = timestamp
-        , RootEntry.spanData       = spanData
-        }
-
-
--- |Wraps an IO action in 'startEntry' and 'completeEntry'. The wrapped action
--- receives the entry span in case it wants to add child spans to it.
-withEntrySimple ::
-  MonadIO m =>
-  InstanaContext
-  -> String
-  -> String
-  -> Text
-  -> (EntrySpan -> m a)
-  -> m a
-withEntrySimple context traceId parentId spanName io =
-  withEntry
-    context
-    traceId
-    parentId
-    spanName
-    emptyValue
-    (\entrySpan ->
-      (io entrySpan >>= (\result -> return (result, 0, emptyValue)))
-    )
-
-
--- |Wraps an IO action in 'startEntryWithData' and 'completeEntryWithData'. The
--- wrapped action receives the entry span in case it wants to add child spans to
--- it.
+-- |Wraps an IO action in 'startEntry' and 'completeEntry'.
 withEntry ::
   MonadIO m =>
   InstanaContext
   -> String
   -> String
   -> Text
-  -> Value
-  -> (EntrySpan -> m (a, Int, Value))
   -> m a
-withEntry context traceId parentId spanName spanDataStart io = do
-  entrySpan <- liftIO $ startEntryWithData traceId parentId spanName spanDataStart
-  (result, errorCount, spanDataEnd) <- io entrySpan
-  liftIO $ completeEntryWithData context entrySpan errorCount spanDataEnd
+  -> m a
+withEntry context traceId parentId spanName io = do
+  startEntry context traceId parentId spanName
+  result <- io
+  completeEntry context
   return result
 
 
+-- |Wraps an IO action in 'startExit' and 'completeExit'.
+withExit ::
+  MonadIO m =>
+  InstanaContext
+  -> Text
+  -> m a
+  -> m a
+withExit context spanName io = do
+  startExit context spanName
+  result <- io
+  completeExit context
+  return result
+
+
+-- |Creates a preliminary/incomplete root entry span, which should later be
+-- completed with 'completeEntry'.
+startRootEntry ::
+  MonadIO m =>
+  InstanaContext
+  -> Text
+  -> m ()
+startRootEntry context spanName = do
+  liftIO $ do
+    timestamp <- round . (* 1000) <$> getPOSIXTime
+    traceId <- Id.generate
+    let
+      newSpan =
+        RootEntrySpan $
+          RootEntry
+            { RootEntry.spanAndTraceId = traceId
+            , RootEntry.spanName       = spanName
+            , RootEntry.timestamp      = timestamp
+            , RootEntry.errorCount     = 0
+            , RootEntry.spanData       = emptyValue
+            }
+    pushSpan
+      context
+      (\stack ->
+        case stack of
+          Nothing ->
+            -- We did not initialise the span stack for this thread, do it now.
+            SpanStack.singleton newSpan
+          Just spanStack ->
+            SpanStack.push (Entry newSpan) spanStack
+      )
+
+
 -- |Creates a preliminary/incomplete entry span, which should later be completed
--- by calling 'completeEntry' or 'completeEntryWithData'.
+-- by calling 'completeEntry'.
 startEntry ::
-  String
+  MonadIO m =>
+  InstanaContext
+  -> String
   -> String
   -> Text
-  -> IO EntrySpan
-startEntry traceId parentId spanName =
-  startEntryWithData traceId parentId spanName emptyValue
+  -> m ()
+startEntry context traceId parentId spanName = do
+  liftIO $ do
+    timestamp <- round . (* 1000) <$> getPOSIXTime
+    spanId <- Id.generate
+    let
+      newSpan =
+        NonRootEntrySpan $
+          NonRootEntry
+            { NonRootEntry.traceId    = Id.fromString traceId
+            , NonRootEntry.spanId     = spanId
+            , NonRootEntry.parentId   = Id.fromString parentId
+            , NonRootEntry.spanName   = spanName
+            , NonRootEntry.timestamp  = timestamp
+            , NonRootEntry.errorCount = 0
+            , NonRootEntry.spanData   = emptyValue
+            }
+    pushSpan
+      context
+      (\stack ->
+        case stack of
+          Nothing ->
+            -- We did not initialise the span stack for this thread, do it now.
+            SpanStack.singleton newSpan
+          Just spanStack ->
+            SpanStack.push (Entry newSpan) spanStack
+      )
+    return ()
 
 
--- |Creates a preliminary/incomplete entry span with additional data, which
--- should later be completed by calling 'completeEntry' or
--- 'completeEntryWithData'.
-startEntryWithData ::
-  String
-  -> String
+-- |Creates a preliminary/incomplete exit span, which should later be completed
+-- with 'completeExit'.
+startExit ::
+  MonadIO m =>
+  InstanaContext
   -> Text
-  -> Value
-  -> IO EntrySpan
-startEntryWithData traceId parentId spanName spanData = do
-  timestamp <- round . (* 1000) <$> getPOSIXTime
-  spanId <- Id.generate
-  return $
-    NonRootEntrySpan $
-      NonRootEntry
-        { NonRootEntry.traceId   = Id.fromString traceId
-        , NonRootEntry.spanId    = spanId
-        , NonRootEntry.parentId  = Id.fromString parentId
-        , NonRootEntry.spanName  = spanName
-        , NonRootEntry.timestamp = timestamp
-        , NonRootEntry.spanData  = spanData
-        }
+  -> m ()
+startExit context spanName = do
+  liftIO $ do
+    entrySpan <- peekSpan context
+    case entrySpan of
+      Just (Entry parent) -> do
+        spanId <- Id.generate
+        timestamp <- round . (* 1000) <$> getPOSIXTime
+        let
+          newSpan =
+            ExitSpan
+              { ExitSpan.parentSpan  = parent
+              , ExitSpan.spanId      = spanId
+              , ExitSpan.spanName    = spanName
+              , ExitSpan.timestamp   = timestamp
+              , ExitSpan.errorCount  = 0
+              , ExitSpan.spanData    = emptyValue
+              }
+        pushSpan
+          context
+          (\stack ->
+            case stack of
+              Nothing        ->
+                -- No entry present, it is invalid to push an exit onto the
+                -- stack without an entry. But we can at least init a stack
+                -- for the current thread.
+                SpanStack.empty
+              Just spanStack ->
+                SpanStack.push (Exit newSpan) spanStack
+          )
+      Just (Exit _) -> do
+        warningM instanaLogger $
+          "Cannot start an exit span since there is already an active exit span " ++
+          "in progress."
+      Nothing -> do
+        warningM instanaLogger $
+          "Cannot start an exit span since there is no active entry span " ++
+          "(actually, there is no active span at all)."
+        return ()
 
 
 -- |Completes an entry span, to be called at the last possible moment before the
 -- call has been processed completely.
 completeEntry ::
-  InstanaContext
-  -> EntrySpan
-  -> Int
-  -> IO ()
-completeEntry context entrySpan errorCount =
-  enqueueCommand
-    context
-    (Command.CompleteEntry entrySpan errorCount)
-
-
--- |Completes an entry span with addtional data, to be called at the last
--- possible moment before the call has been processed completely.
-completeEntryWithData ::
-  InstanaContext
-  -> EntrySpan
-  -> Int
-  -> Value
-  -> IO ()
-completeEntryWithData context entrySpan errorCount spanData =
-  enqueueCommand
-    context
-    (Command.CompleteEntryWithData entrySpan errorCount spanData)
-
-
--- |Wraps an IO action in 'startExit' and 'completeExit'.
-withExitSimple ::
   MonadIO m =>
   InstanaContext
-  -> EntrySpan
-  -> Text
-  -> m a
-  -> m a
-withExitSimple context parent spanName io =
-    withExit
-      context
-      parent
-      spanName
-      emptyValue
-      (io >>= (\result -> return (result, 0, emptyValue)))
-
-
--- |Wraps an IO action in 'startExitWithData' and 'completeExitWithData'.
-withExit ::
-  MonadIO m =>
-  InstanaContext
-  -> EntrySpan
-  -> Text
-  -> Value
-  -> m (a, Int, Value)
-  -> m a
-withExit context parent spanName spanDataStart io = do
-  exitSpan <- liftIO $ startExitWithData parent spanName spanDataStart
-  (result, errorCount, spanDataEnd) <- io
-  liftIO $ completeExitWithData context exitSpan errorCount spanDataEnd
-  return result
-
-
--- |Creates a preliminary/incomplete exit span, which should later be completed
--- with 'completeExit' or 'completeExitWithData'.
-startExit ::
-  EntrySpan
-  -> Text
-  -> IO ExitSpan
-startExit parent spanName =
-  startExitWithData parent spanName emptyValue
-
-
--- |Creates a preliminary/incomplete exit span with additional data, which
--- should later be completed with 'completeExit' or 'completeExitWithData'.
-startExitWithData ::
-  EntrySpan
-  -> Text
-  -> Value
-  -> IO ExitSpan
-startExitWithData parent spanName spanData = do
-  timestamp <- round . (* 1000) <$> getPOSIXTime
-  return $
-    ExitSpan
-      { ExitSpan.parentSpan  = parent
-      , ExitSpan.spanName    = spanName
-      , ExitSpan.timestamp   = timestamp
-      , ExitSpan.spanData    = spanData
-      }
+  -> m ()
+completeEntry context = do
+  liftIO $ do
+    poppedSpan <- popSpan context EntryKind
+    case poppedSpan of
+      Just (Entry entrySpan) ->
+        enqueueCommand
+          context
+          (Command.CompleteEntry entrySpan)
+      _ -> do
+        warningM instanaLogger $
+          "Cannot complete span due to a span stack mismatch - expected an entry."
+        return ()
 
 
 -- |Completes an exit span, to be called as soon as the remote call has
 -- returned.
 completeExit ::
+  MonadIO m =>
   InstanaContext
-  -> ExitSpan
-  -> Int
-  -> IO ()
-completeExit context exitSpan errorCount =
-  enqueueCommand
-    context
-    (Command.CompleteExit exitSpan errorCount)
+  -> m ()
+completeExit context = do
+  liftIO $ do
+    poppedSpan <- popSpan context ExitKind
+    case poppedSpan of
+      Just (Exit exitSpan) ->
+        enqueueCommand
+          context
+          (Command.CompleteExit exitSpan)
+      _ -> do
+        warningM instanaLogger $
+          "Cannot complete span due to a span stack mismatch - expected an exit."
+        return ()
 
 
--- |Completes an exit span with addtional data, to be called as soon as the
--- remote call has returned.
-completeExitWithData ::
-  InstanaContext
-  -> ExitSpan
-  -> Int
-  -> Value
-  -> IO ()
-completeExitWithData context exitSpan errorCount spanData =
-  enqueueCommand
-    context
-    (Command.CompleteExitWithData exitSpan errorCount spanData)
+-- |Increments the error count for the currently active span by one. Call this
+-- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry if an
+-- error happens while processing the entry/exit.
+--
+-- This is an alias for `addToErrorCount instanaContext 1`.
+incrementErrorCount :: MonadIO m => InstanaContext -> m ()
+incrementErrorCount context =
+  addToErrorCount context 1
 
 
-emptyValue :: Value
-emptyValue = Aeson.object []
+-- |Increments the error count for the currently active span by one. Call this
+-- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry if an
+-- error happens while processing the entry/exit.
+addToErrorCount :: MonadIO m => InstanaContext -> Int -> m ()
+addToErrorCount context increment =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addToErrorCount increment span_)
 
 
+-- |Adds additional custom data to the currently active span. Call this
+-- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry.
+-- The given path can be a nested path, with path fragments separated by dots,
+-- like "http.url". This will result in
+-- "data": {
+--   ...
+--   "http": {
+--     "url": "..."
+--   },
+--   ...
+-- }
+addDataAt :: (MonadIO m, Aeson.ToJSON a) => InstanaContext -> Text -> a -> m ()
+addDataAt context path value =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addDataAt path value span_)
+
+
+-- |Adds additional custom data to the currently active span. Call this
+-- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
+-- called multiple times, data from multiple calls will be merged.
+addData :: MonadIO m => InstanaContext -> Value -> m ()
+addData context value =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addData value span_)
+
+
+-- |Sends a command to the worker thread.
 enqueueCommand :: InstanaContext -> Command -> IO ()
 enqueueCommand context command = do
   -- TODO Maybe we better should use a bounded queue and drop stuff if we can't
@@ -440,4 +445,102 @@ enqueueCommand context command = do
   let
     commandQueue = InternalContext.commandQueue context
   STM.atomically $ STM.writeTQueue commandQueue command
+
+
+-- |Makes the given span the currently active span.
+pushSpan ::
+  InstanaContext
+  -> (Maybe SpanStack -> SpanStack)
+  -> IO ()
+pushSpan context fn = do
+  threadId <- Concurrent.myThreadId
+  STM.atomically $
+    STM.modifyTVar'
+      (InternalContext.currentSpans context)
+      (\currentSpansPerThread ->
+        let
+          modifiedStack = fn $ Map.lookup threadId currentSpansPerThread
+        in
+        Map.insert threadId modifiedStack currentSpansPerThread
+      )
+
+
+-- |Yields the currently active span, taking it of the stack. The span below
+-- that will become the new active span (if there is any).
+popSpan :: InstanaContext -> SpanKind -> IO (Maybe Span)
+popSpan context expectedKind = do
+  threadId <- Concurrent.myThreadId
+  STM.atomically $ popSpanStm context threadId expectedKind
+
+
+-- |Yields the currently active span, taking it of the stack. The span below
+-- that will become the new active span (if there is any).
+popSpanStm :: InstanaContext -> ThreadId -> SpanKind -> STM (Maybe Span)
+popSpanStm context threadId expectedKind = do
+  currentSpansPerThread <- STM.readTVar $ InternalContext.currentSpans context
+  let
+    oldStack = Map.lookup threadId currentSpansPerThread
+    (modifiedStack, poppedSpan) =
+      case oldStack of
+        Nothing        ->
+          -- invalid state, there should be a stack with at least one span on it
+          (SpanStack.empty, Nothing)
+        Just spanStack ->
+          SpanStack.popWhenMatches expectedKind spanStack
+    updatedSpansPerThread =
+      Map.insert threadId modifiedStack currentSpansPerThread
+  STM.writeTVar (InternalContext.currentSpans context) updatedSpansPerThread
+  return poppedSpan
+
+
+-- |Yields the currently active span without modifying the span stack.
+peekSpan :: InstanaContext -> IO (Maybe Span)
+peekSpan context = do
+  threadId <- Concurrent.myThreadId
+  STM.atomically $ peekSpanStm context threadId
+
+
+-- |Yields the currently active span without modifying the span stack.
+peekSpanStm :: InstanaContext -> ThreadId -> STM (Maybe Span)
+peekSpanStm context threadId = do
+  currentSpansPerThread <- STM.readTVar $ InternalContext.currentSpans context
+  let
+    stack = Map.lookup threadId currentSpansPerThread
+  case stack of
+    Nothing ->
+      return $ Nothing
+    Just s ->
+      return $ SpanStack.peek s
+
+
+-- |Applies the given function to the currently active span, replacing it in
+-- place with the result of the given function.
+modifyCurrentSpan ::
+  InstanaContext
+  -> (Span -> Span)
+  -> IO ()
+modifyCurrentSpan context fn = do
+  threadId <- Concurrent.myThreadId
+  STM.atomically $
+    STM.modifyTVar' (InternalContext.currentSpans context)
+      (\currentSpansPerThread ->
+        let
+          stack = Map.lookup threadId currentSpansPerThread
+          modifiedStack = mapCurrentSpan fn stack
+        in
+        Map.insert threadId modifiedStack currentSpansPerThread
+      )
+
+
+-- |Applies the given function to the given span.
+mapCurrentSpan :: (Span -> Span) -> Maybe SpanStack -> SpanStack
+mapCurrentSpan fn stack =
+  Maybe.fromMaybe
+    SpanStack.empty
+    ((SpanStack.mapTop fn) <$> stack)
+
+
+-- |Provides an empty Aeson value.
+emptyValue :: Value
+emptyValue = Aeson.object []
 

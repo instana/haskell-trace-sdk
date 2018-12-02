@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Instana.SDK.IntegrationTest.HighLevelApi
+module Instana.SDK.IntegrationTest.BracketApi
   ( shouldRecordSpans
   , shouldRecordNonRootEntry
   , shouldMergeData
@@ -19,7 +19,6 @@ import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import           Instana.SDK.SDK                        (InstanaContext)
 import qualified Instana.SDK.SDK                        as InstanaSDK
-import           Instana.SDK.Span.EntrySpan             (EntrySpan)
 
 
 shouldRecordSpans :: InstanaContext -> String -> IO Test
@@ -77,18 +76,17 @@ shouldRecordSpans instana pid =
 recordSpans :: InstanaContext -> IO String
 recordSpans instana = do
   result <-
-    InstanaSDK.withRootEntrySimple
+    InstanaSDK.withRootEntry
       instana
       "haskell.dummy.root.entry"
       (recordExit instana)
   return $ result ++ "::entry done"
 
 
-recordExit :: InstanaContext -> EntrySpan -> IO String
-recordExit instana entrySpan =
-  InstanaSDK.withExitSimple
+recordExit :: InstanaContext -> IO String
+recordExit instana =
+  InstanaSDK.withExit
     instana
-    entrySpan
     "haskell.dummy.exit"
     simulateSimpleExitCall
 
@@ -156,7 +154,7 @@ shouldRecordNonRootEntry instana pid =
 recordNonRootEntry :: InstanaContext -> IO String
 recordNonRootEntry instana = do
   result <-
-    InstanaSDK.withEntrySimple
+    InstanaSDK.withEntry
       instana
       "trace-id"
       "parent-id"
@@ -223,7 +221,7 @@ shouldMergeData instana pid =
               , assertBool "exit timestamp" $ TraceRequest.ts exitSpan > 0
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
-              , assertEqual "exit error" 1 (TraceRequest.ec exitSpan)
+              , assertEqual "exit error" 2 (TraceRequest.ec exitSpan)
               , assertEqual "exit from" from $ TraceRequest.f exitSpan
               , assertEqual "exit data"
                   ( Aeson.object
@@ -233,6 +231,12 @@ shouldMergeData instana pid =
                     , "data2"     .= (1302 :: Int)
                     , "data3"     .= ("value3" :: String)
                     , "endKind"   .= ("exit" :: String)
+                    , "nested"    .= (Aeson.object
+                        [ "key1" .= ("nested.text.value1" :: String)
+                        , "key2" .= ("nested.text.value2" :: String)
+                        , "key3" .= (1604 :: Integer)
+                        ]
+                      )
                     ]
                   )
                   (TraceRequest.spanData exitSpan)
@@ -245,35 +249,38 @@ recordSpansWithData instana = do
     InstanaSDK.withRootEntry
       instana
       "haskell.dummy.root.entry"
-      (spanDataStart "entry")
       (recordExitWithData instana)
   return entryCallResult
 
 
-recordExitWithData ::
-  InstanaContext
-  -> EntrySpan
-  -> IO (String, Int, Value)
-recordExitWithData instana entrySpan = do
+recordExitWithData :: InstanaContext -> IO String
+recordExitWithData instana = do
+  InstanaSDK.addData instana (someSpanData "entry")
   exitCallResult <-
     InstanaSDK.withExit
       instana
-      entrySpan
       "haskell.dummy.exit"
-      (spanDataStart "exit")
-      simulateExitCall
-  return (exitCallResult ++ "::entry done", 1, spanDataEnd "entry")
+      (simulateExitCall instana)
+  InstanaSDK.incrementErrorCount instana
+  InstanaSDK.addData instana (moreSpanData "entry")
+  return $ exitCallResult ++ "::entry done"
 
 
-simulateExitCall :: IO (String, Int, Value)
-simulateExitCall = do
+simulateExitCall :: InstanaContext -> IO String
+simulateExitCall instana = do
+  InstanaSDK.addData instana (someSpanData "exit")
   -- some time needs to pass, otherwise the exit span' duration will be 0
   threadDelay $ 10 * 1000
-  return ("exit done", 1, spanDataEnd "exit")
+  InstanaSDK.addToErrorCount instana 2
+  InstanaSDK.addData instana (moreSpanData "exit")
+  InstanaSDK.addDataAt instana "nested.key1" ("nested.text.value1" :: String)
+  InstanaSDK.addDataAt instana "nested.key2" ("nested.text.value2" :: String)
+  InstanaSDK.addDataAt instana "nested.key3" (1604 :: Int)
+  return "exit done"
 
 
-spanDataStart :: String -> Value
-spanDataStart kind =
+someSpanData :: String -> Value
+someSpanData kind =
    Aeson.object
      [ "data1"     .= ("value1" :: String)
      , "data2"     .= (42 :: Int)
@@ -281,8 +288,8 @@ spanDataStart kind =
      ]
 
 
-spanDataEnd :: String -> Value
-spanDataEnd kind =
+moreSpanData :: String -> Value
+moreSpanData kind =
    Aeson.object
      [ "data2"   .= (1302 :: Int)
      , "data3"   .= ("value3" :: String)

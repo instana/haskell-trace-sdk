@@ -17,9 +17,7 @@ import           Control.Exception                                (SomeException
                                                                    catch)
 import           Control.Monad                                    (forever,
                                                                    when)
-import           Data.Aeson                                       (Value)
 import qualified Data.Aeson                                       as Aeson
-import qualified Data.Aeson.Extra.Merge                           as AesonExtra
 import           Data.Foldable                                    (toList)
 import           Data.List                                        (map)
 import           Data.Sequence                                    ((|>))
@@ -42,7 +40,6 @@ import           Instana.SDK.Internal.FullSpan                    (FullSpan (Ful
                                                                    FullSpanWithPid (FullSpanWithPid),
                                                                    SpanKind (Entry, Exit))
 import qualified Instana.SDK.Internal.FullSpan                    as FullSpan
-import qualified Instana.SDK.Internal.Id                          as Id
 import           Instana.SDK.Internal.Logging                     (instanaLogger)
 import qualified Instana.SDK.Internal.URL                         as URL
 import           Instana.SDK.Span.EntrySpan                       (EntrySpan (..))
@@ -104,22 +101,17 @@ readFromQueue context =
 
 
 execute :: Command -> InternalContext -> IO ()
-execute (CompleteEntry entrySpan errorCount) =
-  queueEntrySpan entrySpan errorCount emptyValue
-execute (CompleteEntryWithData entrySpan errorCount spanData) =
-  queueEntrySpan entrySpan errorCount spanData
-execute (CompleteExit exitSpan errorCount) =
-  queueExitSpan exitSpan errorCount emptyValue
-execute (CompleteExitWithData exitSpan errorCount spanData) =
-  queueExitSpan exitSpan errorCount spanData
+execute (CompleteEntry entrySpan) =
+  queueEntrySpan entrySpan
+execute (CompleteExit exitSpan) =
+  queueExitSpan exitSpan
 
 
-queueEntrySpan :: EntrySpan -> Int -> Value -> InternalContext -> IO ()
-queueEntrySpan entrySpan errorCount spanDataEnd context = do
+queueEntrySpan :: EntrySpan -> InternalContext -> IO ()
+queueEntrySpan entrySpan context = do
   now <- round . (* 1000) <$> getPOSIXTime
   let
     timestamp = EntrySpan.timestamp entrySpan
-    spanDataStart = EntrySpan.spanData entrySpan
   queueSpan
     context
     FullSpan
@@ -130,31 +122,28 @@ queueEntrySpan entrySpan errorCount spanDataEnd context = do
       , FullSpan.timestamp  = timestamp
       , FullSpan.duration   = now - timestamp
       , FullSpan.kind       = Entry
-      , FullSpan.errorCount = errorCount
-      , FullSpan.spanData   = AesonExtra.lodashMerge spanDataStart spanDataEnd
+      , FullSpan.errorCount = EntrySpan.errorCount entrySpan
+      , FullSpan.spanData   = EntrySpan.spanData entrySpan
       }
 
 
-queueExitSpan :: ExitSpan -> Int -> Value -> InternalContext -> IO ()
-queueExitSpan exitSpan errorCount spanDataEnd context = do
+queueExitSpan :: ExitSpan -> InternalContext -> IO ()
+queueExitSpan exitSpan context = do
   let
     parentSpan = ExitSpan.parentSpan exitSpan
-  spanId <- Id.generate
   now <- round . (* 1000) <$> getPOSIXTime
   queueSpan
     context
     FullSpan
       { FullSpan.traceId    = EntrySpan.traceId parentSpan
-      , FullSpan.spanId     = spanId
+      , FullSpan.spanId     = ExitSpan.spanId exitSpan
       , FullSpan.parentId   = Just $ EntrySpan.spanId parentSpan
       , FullSpan.spanName   = ExitSpan.spanName exitSpan
       , FullSpan.timestamp  = ExitSpan.timestamp exitSpan
       , FullSpan.duration   = now - ExitSpan.timestamp exitSpan
       , FullSpan.kind       = Exit
-      , FullSpan.errorCount = errorCount
-      , FullSpan.spanData   = AesonExtra.lodashMerge
-                                (ExitSpan.spanData exitSpan)
-                                spanDataEnd
+      , FullSpan.errorCount = ExitSpan.errorCount exitSpan
+      , FullSpan.spanData   = ExitSpan.spanData exitSpan
       }
 
 
@@ -310,8 +299,4 @@ sendSpansToAgent context spans pid _ = do
           debugM instanaLogger $ show e
           return ()
     )
-
-
-emptyValue :: Value
-emptyValue = Aeson.object []
 

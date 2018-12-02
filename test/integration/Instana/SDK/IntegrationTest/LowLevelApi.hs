@@ -19,7 +19,6 @@ import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import           Instana.SDK.SDK                        (InstanaContext)
 import qualified Instana.SDK.SDK                        as InstanaSDK
-import           Instana.SDK.Span.EntrySpan             (EntrySpan)
 
 
 shouldRecordSpans :: InstanaContext -> String -> IO Test
@@ -80,22 +79,21 @@ shouldRecordSpans instana pid =
 
 recordSpans :: InstanaContext -> IO String
 recordSpans instana = do
-  entrySpan <-
-    InstanaSDK.startRootEntry
-      "haskell.dummy.root.entry"
-  result <- doExitCall instana entrySpan
-  InstanaSDK.completeEntry instana entrySpan 0
+  InstanaSDK.startRootEntry
+    instana
+    "haskell.dummy.root.entry"
+  result <- doExitCall instana
+  InstanaSDK.completeEntry instana
   return result
 
 
-doExitCall :: InstanaContext -> EntrySpan -> IO String
-doExitCall instana entrySpan = do
-  exitSpan <-
-    InstanaSDK.startExit
-      entrySpan
-      "haskell.dummy.exit"
+doExitCall :: InstanaContext -> IO String
+doExitCall instana = do
+  InstanaSDK.startExit
+    instana
+    "haskell.dummy.exit"
   result <- simulateExitCall
-  InstanaSDK.completeExit instana exitSpan 0
+  InstanaSDK.completeExit instana
   return result
 
 
@@ -155,13 +153,13 @@ shouldRecordNonRootEntry instana pid =
 
 recordNonRootEntry :: InstanaContext -> IO String
 recordNonRootEntry instana = do
-  entrySpan <-
-    InstanaSDK.startEntry
-      "trace-id"
-      "parent-id"
-      "haskell.dummy.entry"
-  result <- doExitCall instana entrySpan
-  InstanaSDK.completeEntry instana entrySpan 0
+  InstanaSDK.startEntry
+    instana
+    "trace-id"
+    "parent-id"
+    "haskell.dummy.entry"
+  result <- doExitCall instana
+  InstanaSDK.completeEntry instana
   return result
 
 
@@ -216,6 +214,11 @@ shouldMergeData instana pid =
                   , "startKind" .= ("entry" :: String)
                   , "data2"     .= (1302 :: Int)
                   , "data3"     .= ("value3" :: String)
+                  , "nested"    .= (Aeson.object [
+                      "entry" .= (Aeson.object [
+                        "key" .= ("nested.entry.value" :: String)
+                      ])
+                    ])
                   , "endKind"   .= ("entry" :: String)
                   ]
                 )
@@ -232,6 +235,11 @@ shouldMergeData instana pid =
                   , "startKind" .= ("exit" :: String)
                   , "data2"     .= (1302 :: Int)
                   , "data3"     .= ("value3" :: String)
+                  , "nested"    .= (Aeson.object [
+                      "exit" .= (Aeson.object [
+                        "key" .= ("nested.exit.value" :: String)
+                      ])
+                    ])
                   , "endKind"   .= ("exit" :: String)
                   ]
                 )
@@ -241,24 +249,30 @@ shouldMergeData instana pid =
 
 recordSpansWithData :: InstanaContext -> IO String
 recordSpansWithData instana = do
-  entrySpan <-
-    InstanaSDK.startRootEntryWithData
-      "haskell.dummy.root.entry"
-      (spanDataStart "entry")
-  result <- doExitCallWithData instana entrySpan
-  InstanaSDK.completeEntryWithData instana entrySpan 1 (spanDataEnd "entry")
+  InstanaSDK.startRootEntry
+    instana
+    "haskell.dummy.root.entry"
+  InstanaSDK.addData instana (someSpanData "entry")
+  result <- doExitCallWithData instana
+  InstanaSDK.incrementErrorCount instana
+  InstanaSDK.addData instana (moreSpanData "entry")
+  InstanaSDK.addDataAt
+    instana "nested.entry.key" ("nested.entry.value" :: String)
+  InstanaSDK.completeEntry instana
   return result
 
 
-doExitCallWithData :: InstanaContext -> EntrySpan -> IO String
-doExitCallWithData instana entrySpan = do
-  exitSpan <-
-    InstanaSDK.startExitWithData
-      entrySpan
-      "haskell.dummy.exit"
-      (spanDataStart "exit")
+doExitCallWithData :: InstanaContext -> IO String
+doExitCallWithData instana = do
+  InstanaSDK.startExit
+    instana
+    "haskell.dummy.exit"
+  InstanaSDK.addData instana (someSpanData "exit")
   result <- simulateExitCall
-  InstanaSDK.completeExitWithData instana exitSpan 1 (spanDataEnd "exit")
+  InstanaSDK.incrementErrorCount instana
+  InstanaSDK.addData instana (moreSpanData "exit")
+  InstanaSDK.addDataAt instana "nested.exit.key" ("nested.exit.value" :: String)
+  InstanaSDK.completeExit instana
   return result
 
 
@@ -269,8 +283,8 @@ simulateExitCall = do
   return "done"
 
 
-spanDataStart :: String -> Value
-spanDataStart kind =
+someSpanData :: String -> Value
+someSpanData kind =
    Aeson.object
      [ "data1"     .= ("value1" :: String)
      , "data2"     .= (42 :: Int)
@@ -278,11 +292,11 @@ spanDataStart kind =
      ]
 
 
-spanDataEnd :: String -> Value
-spanDataEnd kind =
-   Aeson.object
-     [ "data2"   .= (1302 :: Int)
-     , "data3"   .= ("value3" :: String)
-     , "endKind" .= kind
-     ]
+moreSpanData :: String -> Value
+moreSpanData kind =
+  Aeson.object
+    [ "data2"   .= (1302 :: Int)
+    , "data3"   .= ("value3" :: String)
+    , "endKind" .= kind
+    ]
 

@@ -109,36 +109,21 @@ runApp instana = do
 
 ### Creating Spans
 
-#### High Level API/Bracket Style
+#### Bracket Style (High Level API)
 
 All functions starting with `with` accept (among other parameters) an IO action. The SDK will start a span before, then execute the given IO action and complete the span afterwards. Using this style is recommended over the low level API that requires you to start and complete spans yourself.
 
-* `withRootEntrySimple`: Creates an entry span that is the root of a trace (it has no parent span). A convenience wrapper for `withRootEntry` that requires less parameters.
 * `withRootEntry`: Creates an entry span that is the root of a trace (it has no parent span).
-* `withEntrySimple`: Creates an entry span that has a parent span. A convenience wrapper for `withEntry` that requires less parameters.
 * `withEntry`: Creates an entry span that has a parent span.
-* `withExitSimple`: Creates an exit span. A convenience wrapper for `withExit` that requires less parameters.
-
-* `withExit`: Creates an exit span.
+* `withExit`: Creates an exit span. This can only be called inside a `withRootEntry` or an `withEntry` call, as an exit span needs an entry span as its parent.
 
 #### Low Level API/Explicit Start And Complete
 
-* `startRootEntry`: Starts an entry span that is the beginning of a trace (has no parent span). You need to call `completeEntry`/`completeEntryWithData` at some point with the partial entry span value that is returned by this function.
-
-* `startRootEntryWithData`: Starts an entry span that is the beginning of a trace (has no parent span). You need to call `completeEntry`/`completeEntryWithData` at some point with the partial entry span value that is returned by this function.
-
-* `startEntry`: Starts an entry span. You need to call `completeEntry`/`completeEntryWithData` at some point with the partial entry span value that is returned by this function.
-* `startEntryWithData`:  Starts an entry span. You need to call `completeEntry`/`completeEntryWithData` at some point with the partial entry span value that is returned by this function.
-
+* `startRootEntry`: Starts an entry span that is the beginning of a trace (has no parent span). You will need to call `completeEntry` at some point.
+* `startEntry`: Starts an entry span. You will need to call `completeEntry` at some point.
 * `startExit`: Starts an exit span. You need to call `completeExit`/`completeExitWithData` at some point with the partial exit span value that is returned by this function.
-
-* `startExitWithData`: Starts an exit span. You need to call `completeExit`/`completeExitWithData` at some point with the partial exit span value that is returned by this function.
-
-
 * `completeEntry`: Finalizes an entry span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
-* `completeEntryWithData`: Finalizes an entry span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
 * `completeExit`: Finalizes an exit span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
-* `completeExitWithData`: Finalizes an exit span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
 
 ### Configuration Via Environment Variables
 

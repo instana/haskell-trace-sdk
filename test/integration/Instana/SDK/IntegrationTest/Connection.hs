@@ -20,7 +20,6 @@ import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import           Instana.SDK.SDK                        (InstanaContext)
 import qualified Instana.SDK.SDK                        as InstanaSDK
-import           Instana.SDK.Span.EntrySpan             (EntrySpan)
 
 
 shouldRetryInitialConnectionEstablishment :: String -> IO Test
@@ -98,14 +97,14 @@ shouldReestablishLostConnection instana _ =
 
 recordSpans :: InstanaContext -> Text -> IO ()
 recordSpans instana spanName =
-  InstanaSDK.withRootEntrySimple
+  InstanaSDK.withRootEntry
     instana
     spanName
     simulateWork
 
 
-simulateWork :: EntrySpan -> IO ()
-simulateWork _ =
+simulateWork :: IO ()
+simulateWork =
   -- 10 milliseconds
   threadDelay $ 10 * 1000
 

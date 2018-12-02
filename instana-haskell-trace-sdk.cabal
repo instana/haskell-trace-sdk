@@ -47,6 +47,7 @@ library
     , process
     , random
     , retry
+    , scientific
     , stm
     , text
     , time
@@ -64,6 +65,7 @@ library
       Instana.SDK.Span.ExitSpan
       Instana.SDK.Span.NonRootEntry
       Instana.SDK.Span.RootEntry
+      Instana.SDK.Span.Span
   other-modules:
       Instana.SDK.Internal.AgentConnection.AgentHostLookup
       Instana.SDK.Internal.AgentConnection.AgentReady
@@ -76,6 +78,7 @@ library
       Instana.SDK.Internal.Command
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.Context
+      Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Retry
@@ -123,20 +126,31 @@ test-suite instana-haskell-trace-sdk-unit-tests
       base >=4.7 && <5
     , bytestring
     , aeson
+    , aeson-extra
     , directory
     , HUnit
     , hslogger
     , random
+    , scientific
     , text
   other-modules:
       Instana.SDK.Internal.ConfigTest
+      Instana.SDK.Internal.SpanTest
+      Instana.SDK.Internal.SpanStackTest
       Instana.SDK.Internal.IdTest
       Instana.SDK.Internal.LoggingTest
       -- modules under test
-      Instana.SDK.Config
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.Id
+      Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.Logging
+      Instana.SDK.Span.Span
+      -- dependencies of modules under test
+      Instana.SDK.Config
+      Instana.SDK.Span.EntrySpan
+      Instana.SDK.Span.ExitSpan
+      Instana.SDK.Span.NonRootEntry
+      Instana.SDK.Span.RootEntry
   default-language: Haskell2010
 
 
@@ -206,8 +220,8 @@ test-suite instana-haskell-trace-sdk-integration-tests
   other-modules:
       Instana.SDK.AgentStub.TraceRequest
     , Instana.SDK.AgentStub.DiscoveryRequest
+    , Instana.SDK.IntegrationTest.BracketApi
     , Instana.SDK.IntegrationTest.Connection
-    , Instana.SDK.IntegrationTest.HighLevelApi
     , Instana.SDK.IntegrationTest.HttpHelper
     , Instana.SDK.IntegrationTest.HUnitExtra
     , Instana.SDK.IntegrationTest.LowLevelApi

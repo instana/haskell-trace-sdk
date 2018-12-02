@@ -1,16 +1,16 @@
 module Instana.SDK.IntegrationTest.TestSuites (allTests) where
 
 
-import           System.Process                           as Process
+import           System.Process                          as Process
 import           Test.HUnit
 
-import qualified Instana.SDK.IntegrationTest.Connection   as Connection
-import qualified Instana.SDK.IntegrationTest.HighLevelApi as HighLevelApi
-import           Instana.SDK.IntegrationTest.HUnitExtra   (mergeCounts)
-import qualified Instana.SDK.IntegrationTest.LowLevelApi  as LowLevelApi
-import qualified Instana.SDK.IntegrationTest.Runner       as TestRunner
-import           Instana.SDK.IntegrationTest.Suite        (Suite (Suite))
-import qualified Instana.SDK.IntegrationTest.Suite        as Suite
+import qualified Instana.SDK.IntegrationTest.BracketApi  as BracketApi
+import qualified Instana.SDK.IntegrationTest.Connection  as Connection
+import           Instana.SDK.IntegrationTest.HUnitExtra  (mergeCounts)
+import qualified Instana.SDK.IntegrationTest.LowLevelApi as LowLevelApi
+import qualified Instana.SDK.IntegrationTest.Runner      as TestRunner
+import           Instana.SDK.IntegrationTest.Suite       (Suite (Suite))
+import qualified Instana.SDK.IntegrationTest.Suite       as Suite
 
 
 allTests :: IO Counts
@@ -63,11 +63,11 @@ testSpanRecording =
               ])
            }
         , Suite
-           { Suite.label = "High Level API"
+           { Suite.label = "Bracket API"
            , Suite.tests = (\pid ->
-              [ HighLevelApi.shouldRecordSpans instana pid
-              , HighLevelApi.shouldRecordNonRootEntry instana pid
-              , HighLevelApi.shouldMergeData instana pid
+              [ BracketApi.shouldRecordSpans instana pid
+              , BracketApi.shouldRecordNonRootEntry instana pid
+              , BracketApi.shouldMergeData instana pid
               ])
            }
         ]

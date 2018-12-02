@@ -10,7 +10,10 @@ module Instana.SDK.Span.EntrySpan
   , parentId
   , spanName
   , timestamp
+  , errorCount
   , spanData
+  , addData
+  , addToErrorCount
   ) where
 
 
@@ -72,10 +75,38 @@ timestamp entrySpan =
     NonRootEntrySpan entry -> NonRootEntry.timestamp entry
 
 
+-- |Error count (error that occured while this span has been active).
+errorCount :: EntrySpan -> Int
+errorCount entrySpan =
+  case entrySpan of
+    RootEntrySpan    entry -> RootEntry.errorCount entry
+    NonRootEntrySpan entry -> NonRootEntry.errorCount entry
+
+
+-- |Add to the error count.
+addToErrorCount :: Int -> EntrySpan -> EntrySpan
+addToErrorCount increment entrySpan =
+  case entrySpan of
+    RootEntrySpan    entry ->
+      RootEntrySpan $ RootEntry.addToErrorCount increment entry
+    NonRootEntrySpan entry ->
+      NonRootEntrySpan $ NonRootEntry.addToErrorCount increment entry
+
+
 -- |Optional additional span data.
 spanData :: EntrySpan -> Value
 spanData entrySpan =
   case entrySpan of
     RootEntrySpan    entry -> RootEntry.spanData entry
     NonRootEntrySpan entry -> NonRootEntry.spanData entry
+
+
+-- |Add a value to the span's data section.
+addData :: Value -> EntrySpan -> EntrySpan
+addData value entrySpan =
+  case entrySpan of
+    RootEntrySpan    entry ->
+      RootEntrySpan $ RootEntry.addData value entry
+    NonRootEntrySpan entry ->
+      NonRootEntrySpan $ NonRootEntry.addData value entry
 

@@ -8,21 +8,15 @@ module Instana.SDK.Internal.Command
   ) where
 
 
-import           Data.Aeson                 (Value)
-
 import           Instana.SDK.Span.EntrySpan (EntrySpan)
 import           Instana.SDK.Span.ExitSpan  (ExitSpan)
 
 
 -- |A command that can be send to the worker.
 data Command =
-  -- |CompleteEntry entrySpan errorCount
-  CompleteEntry EntrySpan Int
-  -- |CompleteEntryWithData entrySpan errorCount spanData
-  | CompleteEntryWithData EntrySpan Int Value
-  -- |CompleteExit exitSpan errorCount
-  | CompleteExit ExitSpan Int
-  -- |CompleteExitWithData exitSpan errorCount spanData
-  | CompleteExitWithData ExitSpan Int Value
+  -- |CompleteEntry entrySpan
+  CompleteEntry EntrySpan
+  -- |CompleteExit exitSpan
+  | CompleteExit ExitSpan
   deriving (Show)
 
