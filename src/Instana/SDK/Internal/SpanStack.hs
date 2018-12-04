@@ -4,15 +4,18 @@ Module      : Instana.SDK.Internal.SpanStack
 Description : Keeps the current spans of a thread.
 -}
 module Instana.SDK.Internal.SpanStack
-  ( empty
+  ( SpanStack
+  , empty
+  , entry
   , isEmpty
+  , isSuppressed
   , mapTop
   , peek
   , pop
   , popWhenMatches
   , push
-  , singleton
-  , SpanStack
+  , pushSuppress
+  , suppress
   ) where
 
 -- Implementation Note
@@ -37,6 +40,7 @@ module Instana.SDK.Internal.SpanStack
 
 import           GHC.Generics
 
+import           Instana.SDK.Internal.Util  ((|>))
 import           Instana.SDK.Span.EntrySpan (EntrySpan)
 import           Instana.SDK.Span.ExitSpan  (ExitSpan)
 import           Instana.SDK.Span.Span      (Span (..), SpanKind (..))
@@ -45,8 +49,14 @@ import           Instana.SDK.Span.Span      (Span (..), SpanKind (..))
 {-|The stack of currently open spans in one thread.
 -}
 data SpanStack =
+    -- |Indicates that we are currently not processing any request.
     None
+    -- |Indicates that we are currently processing a request that had
+    -- X-INSTANA-L=0 set and that should not record any spans.
+  | Suppressed
+    -- |Indicates that we are currently processing an entry.
   | EntryOnly EntrySpan
+    -- |Indicates that currently an exit is in progress.
   | EntryAndExit EntrySpan ExitSpan
   deriving (Eq, Generic, Show)
 
@@ -60,9 +70,17 @@ empty =
 
 {-|Initializes a span stack with one entry span.
 -}
-singleton :: EntrySpan -> SpanStack
-singleton entrySpan =
-  push (Entry entrySpan) empty
+entry :: EntrySpan -> SpanStack
+entry entrySpan =
+  empty
+    |> push (Entry entrySpan)
+
+
+{-|Creates an span stack with a suppressed marker.
+-}
+suppress :: SpanStack
+suppress =
+  Suppressed
 
 
 {-|Checks if the span stack is empty.
@@ -72,16 +90,39 @@ isEmpty t =
   t == None
 
 
+{-|Checks if tracing is currently suppressed.
+-}
+isSuppressed :: SpanStack -> Bool
+isSuppressed t =
+  t == Suppressed
+
+
 {-|Pushes a span onto the stack. Invalid calls are ignored (like pushing an
 exit onto an empty span or an entry span onto an already existing entry span.
 -}
 push :: Span -> SpanStack -> SpanStack
 push (Entry entrySpan) None =
   EntryOnly entrySpan
+-- a new incoming entry can lift the suppression, an exit can't
+push (Entry entrySpan) Suppressed =
+  EntryOnly entrySpan
 push (Exit exitSpan) (EntryOnly entrySpan) =
   EntryAndExit entrySpan exitSpan
- -- ignore invalid calls/invalid state
+-- ignore invalid calls/invalid state
 push _ current =
+  current
+
+
+{-|Pushes a suppressed marker onto the stack. This is only valid if the span
+stack is currently empty, otherwise the span stack is returned unmodified.
+-}
+pushSuppress :: SpanStack -> SpanStack
+pushSuppress None =
+  Suppressed
+pushSuppress Suppressed =
+  Suppressed
+-- ignore invalid calls/invalid state
+pushSuppress current =
   current
 
 
@@ -90,6 +131,8 @@ stack after poppint the top element.
 -}
 pop :: SpanStack -> (SpanStack, Maybe Span)
 pop None =
+  (None, Nothing)
+pop Suppressed =
   (None, Nothing)
 pop (EntryOnly entrySpan) =
   (None, Just $ Entry entrySpan)
@@ -103,6 +146,8 @@ element is returned. If not, Nothing and an unmodified stack is returned.
 -}
 popWhenMatches :: SpanKind -> SpanStack -> (SpanStack, Maybe Span)
 popWhenMatches _ None =
+  (None, Nothing)
+popWhenMatches _ Suppressed =
   (None, Nothing)
 popWhenMatches expectedKind stack =
   case (expectedKind, peek stack) of
@@ -119,6 +164,8 @@ popWhenMatches expectedKind stack =
 peek :: SpanStack -> Maybe Span
 peek None =
   Nothing
+peek Suppressed =
+  Nothing
 peek (EntryOnly entrySpan) =
   Just $ Entry entrySpan
 peek (EntryAndExit _ exitSpan) =
@@ -131,6 +178,8 @@ is a no op if the span stack is empty.
 mapTop :: (Span -> Span) -> SpanStack -> SpanStack
 mapTop _ None =
   None
+mapTop _ Suppressed =
+  Suppressed
 mapTop fn stack =
   let
     (remainder, Just oldTop) = pop stack

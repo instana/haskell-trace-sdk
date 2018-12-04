@@ -13,6 +13,7 @@ module Instana.SDK.SDK
     , InstanaContext
     , addData
     , addDataAt
+    , addHttpTracingHeaders
     , addToErrorCount
     , agentHost
     , agentName
@@ -26,12 +27,15 @@ module Instana.SDK.SDK
     , initConfiguredInstana
     , initInstana
     , maxBufferedSpans
+    , readHttpTracingHeaders
     , startEntry
     , startExit
+    , startHttpEntry
     , startRootEntry
     , withConfiguredInstana
     , withEntry
     , withExit
+    , withHttpEntry
     , withInstana
     , withRootEntry
     ) where
@@ -44,13 +48,17 @@ import qualified Control.Concurrent.STM         as STM
 import           Control.Monad.IO.Class         (MonadIO, liftIO)
 import           Data.Aeson                     (Value)
 import qualified Data.Aeson                     as Aeson
+import qualified Data.ByteString.Char8          as BSC8
+import qualified Data.List                      as List
 import qualified Data.Map.Strict                as Map
 import qualified Data.Maybe                     as Maybe
 import qualified Data.Sequence                  as Seq
 import           Data.Text                      (Text)
 import           Data.Time.Clock.POSIX          (getPOSIXTime)
 import qualified Network.HTTP.Client            as HTTP
+import qualified Network.HTTP.Types.Header      as HTTPHeader
 import qualified Network.Socket                 as Socket
+import qualified Network.Wai                    as Wai
 import           System.Log.Logger              (warningM)
 import qualified System.Posix.Process           as Process
 
@@ -66,8 +74,10 @@ import           Instana.SDK.Internal.Logging   (instanaLogger)
 import qualified Instana.SDK.Internal.Logging   as Logging
 import           Instana.SDK.Internal.SpanStack (SpanStack)
 import qualified Instana.SDK.Internal.SpanStack as SpanStack
+import           Instana.SDK.Internal.Util      ((|>))
 import qualified Instana.SDK.Internal.Worker    as Worker
 import           Instana.SDK.Span.EntrySpan     (EntrySpan (..))
+import qualified Instana.SDK.Span.EntrySpan     as EntrySpan
 import           Instana.SDK.Span.ExitSpan      (ExitSpan (ExitSpan))
 import qualified Instana.SDK.Span.ExitSpan      as ExitSpan
 import           Instana.SDK.Span.NonRootEntry  (NonRootEntry (NonRootEntry))
@@ -76,6 +86,8 @@ import           Instana.SDK.Span.RootEntry     (RootEntry (RootEntry))
 import qualified Instana.SDK.Span.RootEntry     as RootEntry
 import           Instana.SDK.Span.Span          (Span (..), SpanKind (..))
 import qualified Instana.SDK.Span.Span          as Span
+import           Instana.SDK.TracingHeaders     (TracingHeaders (TracingHeaders))
+import qualified Instana.SDK.TracingHeaders     as TracingHeaders
 
 
 {-| A container for all the things the Instana SDK needs to do its work.
@@ -214,6 +226,48 @@ withEntry context traceId parentId spanName io = do
   return result
 
 
+-- |A convenience function that examines the given request for Instana tracing
+-- headers (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
+-- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
+-- 'completeEntry', depending on the presence of absence of these headers.
+withHttpEntry ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Request
+  -> Text
+  -> m a
+  -> m a
+withHttpEntry context request spanName io = do
+  let
+    tracingHeaders = readHttpTracingHeaders request
+    traceId = TracingHeaders.traceId tracingHeaders
+    spanId = TracingHeaders.spanId tracingHeaders
+    level = TracingHeaders.level tracingHeaders
+  case level of
+    TracingHeaders.Trace ->
+      case (traceId, spanId) of
+        (Just t, Just s) ->
+          withEntry context s t spanName io
+        _                ->
+          withRootEntry context spanName io
+    TracingHeaders.Suppress -> do
+      -- TODO We actually need to remember (on the SpanStack?) that
+      -- X-INSTANA-L=0 came in and add it to outgoing HTTP requests in
+      -- addHttpTracingHeaders!
+      liftIO $ pushSpan
+        context
+        (\stack ->
+          case stack of
+            Nothing ->
+              -- We did not initialise the span stack for this thread, do it
+              -- now.
+              SpanStack.suppress
+            Just spanStack ->
+              SpanStack.pushSuppress spanStack
+        )
+      io
+
+
 -- |Wraps an IO action in 'startExit' and 'completeExit'.
 withExit ::
   MonadIO m =>
@@ -255,9 +309,10 @@ startRootEntry context spanName = do
         case stack of
           Nothing ->
             -- We did not initialise the span stack for this thread, do it now.
-            SpanStack.singleton newSpan
+            SpanStack.entry newSpan
           Just spanStack ->
-            SpanStack.push (Entry newSpan) spanStack
+            spanStack
+            |> SpanStack.push (Entry newSpan)
       )
 
 
@@ -292,11 +347,48 @@ startEntry context traceId parentId spanName = do
         case stack of
           Nothing ->
             -- We did not initialise the span stack for this thread, do it now.
-            SpanStack.singleton newSpan
+            SpanStack.entry newSpan
           Just spanStack ->
-            SpanStack.push (Entry newSpan) spanStack
+            spanStack
+            |> SpanStack.push (Entry newSpan)
       )
     return ()
+
+
+-- |A convenience function that examines the given request for Instana tracing
+-- headers (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
+-- and either calls 'startRootEntry' or  'startEntry', depending on the presence
+-- of absence of these headers.
+startHttpEntry ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Request
+  -> Text
+  -> m ()
+startHttpEntry context request spanName = do
+  let
+    tracingHeaders = readHttpTracingHeaders request
+    traceId = TracingHeaders.traceId tracingHeaders
+    spanId = TracingHeaders.spanId tracingHeaders
+    level = TracingHeaders.level tracingHeaders
+  case level of
+    TracingHeaders.Trace ->
+      case (traceId, spanId) of
+        (Just t, Just s) ->
+          startEntry context s t spanName
+        _                ->
+          startRootEntry context spanName
+    TracingHeaders.Suppress -> do
+      liftIO $ pushSpan
+        context
+        (\stack ->
+          case stack of
+            Nothing ->
+              -- We did not initialise the span stack for this thread, do it now.
+              SpanStack.suppress
+            Just spanStack ->
+              SpanStack.pushSuppress spanStack
+        )
 
 
 -- |Creates a preliminary/incomplete exit span, which should later be completed
@@ -333,7 +425,8 @@ startExit context spanName = do
                 -- for the current thread.
                 SpanStack.empty
               Just spanStack ->
-                SpanStack.push (Exit newSpan) spanStack
+                spanStack
+                |> SpanStack.push (Exit newSpan)
           )
       Just (Exit _) -> do
         warningM instanaLogger $
@@ -435,6 +528,66 @@ addData context value =
     (\span_ -> Span.addData value span_)
 
 
+-- |Reads the Instana tracing headers
+-- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers) from
+-- the given request.
+readHttpTracingHeaders :: Wai.Request -> TracingHeaders
+readHttpTracingHeaders request =
+  let
+    headers = Wai.requestHeaders request
+    -- lookup is automatically case insensitive because
+    -- HeaderName = CI ByteString (CI -> Case Insensitive String)
+    traceId =
+      headers
+      |> List.lookup traceIdHeaderName
+      |> (<$>) BSC8.unpack
+    spanId =
+      headers
+      |> List.lookup spanIdHeaderName
+      |> (<$>) BSC8.unpack
+    level =
+      headers
+      |> List.lookup levelHeaderName
+      |> (<$>) BSC8.unpack
+  in
+  TracingHeaders
+    { TracingHeaders.traceId = traceId
+    , TracingHeaders.spanId = spanId
+    , TracingHeaders.level = TracingHeaders.maybeStringToTracingLevel level
+    }
+
+
+-- |Adds the Instana tracing headers
+-- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
+-- from the currently active span to the given HTTP client request.
+addHttpTracingHeaders ::
+  MonadIO m =>
+  InstanaContext
+  -> HTTP.Request
+  -> m HTTP.Request
+addHttpTracingHeaders context request =
+  liftIO $ do
+    suppressed <- isSuppressed context
+    entrySpan <- peekSpan context
+    case (entrySpan, suppressed) of
+      (_, True) ->
+        return $ request
+          { HTTP.requestHeaders =
+            [ (levelHeaderName, "0") ]
+          }
+      (Just (Entry currentEntrySpan), _) ->
+        return $ request
+          { HTTP.requestHeaders =
+            [ (traceIdHeaderName, Id.toByteString $
+                EntrySpan.traceId currentEntrySpan)
+            , (spanIdHeaderName, Id.toByteString $
+                EntrySpan.spanId currentEntrySpan)
+            ]
+          }
+      _ ->
+        return request
+
+
 -- |Sends a command to the worker thread.
 enqueueCommand :: InstanaContext -> Command -> IO ()
 enqueueCommand context command = do
@@ -508,9 +661,29 @@ peekSpanStm context threadId = do
     stack = Map.lookup threadId currentSpansPerThread
   case stack of
     Nothing ->
-      return $ Nothing
+      return Nothing
     Just s ->
       return $ SpanStack.peek s
+
+
+-- |Checks if tracing is suppressed for the current thread.
+isSuppressed :: InstanaContext -> IO Bool
+isSuppressed context = do
+  threadId <- Concurrent.myThreadId
+  STM.atomically $ isSuppressedStm context threadId
+
+
+-- |Checks if tracing is suppressed for the current thread.
+isSuppressedStm :: InstanaContext -> ThreadId -> STM Bool
+isSuppressedStm context threadId = do
+  currentSpansPerThread <- STM.readTVar $ InternalContext.currentSpans context
+  let
+    stack = Map.lookup threadId currentSpansPerThread
+  case stack of
+    Nothing ->
+      return False
+    Just s ->
+      return $ SpanStack.isSuppressed s
 
 
 -- |Applies the given function to the currently active span, replacing it in
@@ -543,4 +716,16 @@ mapCurrentSpan fn stack =
 -- |Provides an empty Aeson value.
 emptyValue :: Value
 emptyValue = Aeson.object []
+
+
+traceIdHeaderName :: HTTPHeader.HeaderName
+traceIdHeaderName = "X-INSTANA-T"
+
+
+spanIdHeaderName :: HTTPHeader.HeaderName
+spanIdHeaderName = "X-INSTANA-S"
+
+
+levelHeaderName :: HTTPHeader.HeaderName
+levelHeaderName = "X-INSTANA-L"
 

@@ -9,21 +9,25 @@ module Instana.SDK.Internal.Id
    ( Id
    , generate
    , fromString
+   , toByteString
+   , toText
    -- exposed for testing purposes
    , createFromIntsForTest
    )
    where
 
 
-import           Control.Monad    (replicateM)
-import           Data.Aeson       (FromJSON, ToJSON, Value)
-import qualified Data.Aeson       as Aeson
-import           Data.Aeson.Types (Parser)
-import           Data.List        (foldl)
-import qualified Data.Text        as T
+import           Control.Monad         (replicateM)
+import           Data.Aeson            (FromJSON, ToJSON, Value)
+import qualified Data.Aeson            as Aeson
+import           Data.Aeson.Types      (Parser)
+import qualified Data.ByteString.Char8 as BSC8
+import           Data.List             (foldl)
+import           Data.Text             (Text)
+import qualified Data.Text             as T
 import           GHC.Generics
-import           Numeric          (showHex)
-import qualified System.Random    as Random
+import           Numeric               (showHex)
+import qualified System.Random         as Random
 
 
 -- |Represents an ID (trace ID, span ID).
@@ -45,19 +49,8 @@ instance FromJSON Id where
 
 instance ToJSON Id where
   toJSON :: Id -> Value
-  toJSON theId =
-    case theId of
-      IntComponents intComponents ->
-        Aeson.String . T.pack $ concatenated
-          where
-            noOfComponents = length intComponents
-            concatenated =
-              foldl
-                (appendAsHex noOfComponents)
-                ""
-                (reverse intComponents)
-      IdString string ->
-        Aeson.String . T.pack $ string
+  toJSON =
+    Aeson.String . toText
 
 
 appendAsHex :: Int -> String -> Int -> String
@@ -100,6 +93,34 @@ bitsPerInt =
 -- |Converts a string into an ID.
 fromString :: String -> Id
 fromString = IdString
+
+
+-- |Converts an ID into a String
+toString :: Id -> String
+toString theId =
+  case theId of
+    IntComponents intComponents ->
+      let
+        noOfComponents = length intComponents
+      in
+      foldl
+        (appendAsHex noOfComponents)
+        ""
+        (reverse intComponents)
+    IdString string ->
+      string
+
+
+-- |Converts an ID into a Text
+toText :: Id -> Text
+toText =
+  T.pack . toString
+
+
+-- |Converts an ID into a ByteString
+toByteString :: Id -> BSC8.ByteString
+toByteString =
+  BSC8.pack . toString
 
 
 -- |Only exposed for testing, do not use this.
