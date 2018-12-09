@@ -129,7 +129,7 @@ shouldReconnectAfterAgentRestart instana _ =
   _ <- recordSpans instana "haskell.dummy.agent-restart.after-restart-1"
 
   -- wait for connection self healing
-  discoveries <- TestHelper.waitForAgentConnection False
+  discoveries <- TestHelper.waitForInternalAgentConnection False
   case discoveries of
     Left message ->
       assertFailure $

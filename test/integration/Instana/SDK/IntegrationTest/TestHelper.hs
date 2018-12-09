@@ -3,10 +3,13 @@
 module Instana.SDK.IntegrationTest.TestHelper
   ( getSpanByName
   , pingAgentStub
+  , pingApp
   , resetDiscoveries
   , resetSpans
-  , shutdownAgentStub
-  , waitForAgentConnection
+  , shutDownAgentStub
+  , shutDownApp
+  , waitForExternalAgentConnection
+  , waitForInternalAgentConnection
   , waitForDiscoveryWithMyPid
   , waitForDiscoveryWithPid
   , waitForAgentReadyWithMyPid
@@ -45,13 +48,18 @@ withSpanCreation createSpanAction expectedSpans = do
 
 pingAgentStub :: IO (HTTP.Response LBS.ByteString)
 pingAgentStub = do
-  HttpHelper.doRequest "stub/ping" "GET"
+  HttpHelper.doAgentStubRequest "stub/ping" "GET"
 
 
-shutdownAgentStub :: IO ()
-shutdownAgentStub = do
+pingApp :: IO (HTTP.Response LBS.ByteString)
+pingApp = do
+  HttpHelper.doAppRequest "ping" "GET" []
+
+
+shutDownAgentStub :: IO ()
+shutDownAgentStub = do
   catch
-    ( HttpHelper.doRequest "stub/shutdown" "POST"
+    ( HttpHelper.doAgentStubRequest "stub/shutdown" "POST"
       >> return ()
     )
     -- Ignore all exceptions for the shutdown request. Either the agent stub has
@@ -61,12 +69,35 @@ shutdownAgentStub = do
     (\ (_ :: HTTP.HttpException) -> return ())
 
 
-waitForAgentConnection :: Bool -> IO (Either String (DiscoveryRequest, String))
-waitForAgentConnection pidTranslation = do
+shutDownApp :: IO ()
+shutDownApp = do
+  catch
+    ( HttpHelper.doAppRequest "shutdown" "POST" []
+      >> return ()
+    )
+    -- Ignore all exceptions for the shutdown request. Either the app has
+    -- already been shut down (so the request results in a network error) or, if
+    -- it is successfull, it results in an HTTP 500 because the app process
+    -- terminates before responding.
+    (\ (_ :: HTTP.HttpException) -> return ())
+
+
+waitForInternalAgentConnection :: Bool -> IO (Either String (DiscoveryRequest, String))
+waitForInternalAgentConnection pidTranslation = do
   originalPid <- PosixProcess.getProcessID
   let
     pid = if pidTranslation then originalPid + 1 else originalPid
-  discoveryWithPid  <- waitForDiscoveryWithPid $ show pid
+  waitForAgentConnection $ show pid
+
+
+waitForExternalAgentConnection :: String -> IO (Either String (DiscoveryRequest, String))
+waitForExternalAgentConnection =
+  waitForAgentConnection
+
+
+waitForAgentConnection :: String -> IO (Either String (DiscoveryRequest, String))
+waitForAgentConnection pid = do
+  discoveryWithPid <- waitForDiscoveryWithPid pid
   case discoveryWithPid of
     Left message1 -> do
       putStrLn $
@@ -76,7 +107,7 @@ waitForAgentConnection pidTranslation = do
         "❗️ Could not establish agent connection " ++
         "(discovery failed): " ++ message1
     Right _ -> do
-      agentReady <- waitForAgentReadyWithPid $ show pid
+      agentReady <- waitForAgentReadyWithPid pid
       case agentReady of
         Left message2 -> do
           putStrLn $
@@ -98,7 +129,7 @@ waitForDiscoveryWithMyPid = do
 
 waitForDiscoveryWithPid :: String -> IO (Either String (DiscoveryRequest, String))
 waitForDiscoveryWithPid pidStr = do
-  putStrFlush $ "⏱ waiting for discovery request for pid " ++ pidStr
+  putStrFlush $ "⏱  waiting for discovery request for pid " ++ pidStr
   discoveries <-
     HttpHelper.retryRequest (containsDiscoveryWithPid pidStr) getDiscoveries
   case discoveries of
@@ -112,7 +143,7 @@ waitForDiscoveryWithPid pidStr = do
 
 getDiscoveries :: IO (Either String [DiscoveryRequest])
 getDiscoveries = do
-  HttpHelper.requestAndParse "stub/discoveries" "GET"
+  HttpHelper.requestAgentStubAndParse "stub/discoveries" "GET"
 
 
 containsDiscoveryWithPid ::
@@ -136,7 +167,7 @@ waitForAgentReadyWithMyPid = do
 
 waitForAgentReadyWithPid :: String -> IO (Either String ())
 waitForAgentReadyWithPid pidStr = do
-  putStrFlush $ "⏱ waiting for agent ready request for pid " ++ pidStr
+  putStrFlush $ "⏱  waiting for agent ready request for pid " ++ pidStr
   agentReadyPids <-
     HttpHelper.retryRequest
       (containsAgentReadyWithPid pidStr)
@@ -152,7 +183,7 @@ waitForAgentReadyWithPid pidStr = do
 
 getAgentReadyPids :: IO (Either String [String])
 getAgentReadyPids = do
-  HttpHelper.requestAndParse "stub/agentReady" "GET"
+  HttpHelper.requestAgentStubAndParse "stub/agentReady" "GET"
 
 
 containsAgentReadyWithPid ::
@@ -170,7 +201,7 @@ containsAgentReadyWithPid pid pidsFromResponse =
 
 waitForSpansMatching :: [Text] -> IO (Either String [Span])
 waitForSpansMatching expectedNames = do
-  putStrFlush "⏱ waiting for spans to be processed"
+  putStrFlush "⏱  waiting for spans to be processed"
   spans <- HttpHelper.retryRequest (hasMatchingSpans expectedNames) getSpans
   putStrLn "\n✅ spans have been processed"
   return spans
@@ -187,7 +218,7 @@ hasMatchingSpans expectedNames spans =
 
 getSpans :: IO (Either String [Span])
 getSpans =
- HttpHelper.requestAndParse "stub/spans" "GET"
+  HttpHelper.requestAgentStubAndParse "stub/spans" "GET"
 
 
 getSpanByName :: Text -> [Span] -> Maybe Span
@@ -210,7 +241,7 @@ reset what = do
   httpManager <- HTTP.newManager $
     HTTP.defaultManagerSettings { HTTP.managerConnCount = 5 }
   let
-    url = HttpHelper.stubUrl $ "stub/reset/" ++ what
+    url = HttpHelper.agentStubUrl $ "stub/reset/" ++ what
   defaultRequestSettings <- HTTP.parseUrlThrow url
   let
     request = defaultRequestSettings

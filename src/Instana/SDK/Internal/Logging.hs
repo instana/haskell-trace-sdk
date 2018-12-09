@@ -179,7 +179,9 @@ setLogHandlers logFileHandler stdOutHandler = do
 withFormatter :: GenericHandler Handle -> GenericHandler Handle
 withFormatter handler = setFormatter handler formatter
     -- http://hackage.haskell.org/packages/archive/hslogger/1.1.4/doc/html/System-Log-Formatter.html
-    where formatter = simpleLogFormatter "[$time $loggername $prio] $msg"
+    where
+      timeFormat = "%F %H:%M:%S.%4q %z"
+      formatter = tfLogFormatter timeFormat "[$time $loggername $pid $prio] $msg"
 
 
 -- |Parses a string into a hslogger log level.

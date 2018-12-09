@@ -107,7 +107,7 @@ putDiscovery config startupTime recorders discoveryRequest = do
   if shouldSimulateConnectionLoss config startupTime now
     then do
       liftIO $ debugM agentStubLogger $
-        "Rejecting POST trace to simulate connection loss."
+        "Rejecting PUT discovery to simulate connection loss."
       Servant.throwError err503
     else do
       liftIO $

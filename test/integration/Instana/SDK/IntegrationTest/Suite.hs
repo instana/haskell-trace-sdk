@@ -1,10 +1,12 @@
 module Instana.SDK.IntegrationTest.Suite
-  ( Suite(..)
+  ( ExternalAppSuites
+  , Suite(..)
+  , SuiteGenerator(..)
+  , SuiteGeneratorInternal
   , SuiteOpts(..)
-  , SuiteGenerator
   , defaultOpts
-  , withPidTranslation
   , withCustomAgentName
+  , withPidTranslation
   ) where
 
 
@@ -45,5 +47,16 @@ withCustomAgentName name =
   defaultOpts { customAgentName = Just name }
 
 
-type SuiteGenerator = (InstanaContext -> [Suite], SuiteOpts)
+-- |Describes a test suite that connects the integration test process to the
+-- agent stub and creates spans directly from the integration test process.
+type SuiteGeneratorInternal = (InstanaContext -> [Suite], SuiteOpts)
+
+
+-- |Describes a test suite that starts an external app which then conn the integration test process to the
+type ExternalAppSuites = ([Suite], SuiteOpts)
+
+
+data SuiteGenerator =
+    Internal SuiteGeneratorInternal
+  | External ExternalAppSuites
 

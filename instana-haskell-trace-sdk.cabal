@@ -222,17 +222,41 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , text
     , unix
   other-modules:
-      Instana.SDK.AgentStub.TraceRequest
-    , Instana.SDK.AgentStub.DiscoveryRequest
+      Instana.SDK.AgentStub.DiscoveryRequest
+    , Instana.SDK.AgentStub.TraceRequest
     , Instana.SDK.IntegrationTest.BracketApi
     , Instana.SDK.IntegrationTest.Connection
-    , Instana.SDK.IntegrationTest.HttpHelper
     , Instana.SDK.IntegrationTest.HUnitExtra
+    , Instana.SDK.IntegrationTest.HttpHelper
+    , Instana.SDK.IntegrationTest.HttpTracingHeaders
     , Instana.SDK.IntegrationTest.LowLevelApi
     , Instana.SDK.IntegrationTest.Runner
     , Instana.SDK.IntegrationTest.Suite
     , Instana.SDK.IntegrationTest.TestHelper
     , Instana.SDK.IntegrationTest.TestSuites
     , Instana.SDK.IntegrationTest.Util
+  default-language: Haskell2010
+
+
+executable instana-haskell-test-wai-server
+  main-is: Main.hs
+  hs-source-dirs:
+      test/apps/wai
+  if flag(dev)
+    ghc-options:
+      -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+  else
+    ghc-options:
+      -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , binary
+    , bytestring
+    , hslogger
+    , http-types
+    , instana-haskell-trace-sdk
+    , unix
+    , wai
+    , warp
   default-language: Haskell2010
 

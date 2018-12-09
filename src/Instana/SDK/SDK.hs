@@ -46,7 +46,7 @@ import qualified Control.Concurrent             as Concurrent
 import           Control.Concurrent.STM         (STM)
 import qualified Control.Concurrent.STM         as STM
 import           Control.Monad.IO.Class         (MonadIO, liftIO)
-import           Data.Aeson                     (Value)
+import           Data.Aeson                     (Value, (.=))
 import qualified Data.Aeson                     as Aeson
 import qualified Data.ByteString.Char8          as BSC8
 import qualified Data.List                      as List
@@ -244,16 +244,15 @@ withHttpEntry context request spanName io = do
     spanId = TracingHeaders.spanId tracingHeaders
     level = TracingHeaders.level tracingHeaders
   case level of
-    TracingHeaders.Trace ->
+    TracingHeaders.Trace -> do
+      let
+        io' = addDataFromRequest context request io
       case (traceId, spanId) of
         (Just t, Just s) ->
-          withEntry context s t spanName io
+          withEntry context t s spanName io'
         _                ->
-          withRootEntry context spanName io
+          withRootEntry context spanName io'
     TracingHeaders.Suppress -> do
-      -- TODO We actually need to remember (on the SpanStack?) that
-      -- X-INSTANA-L=0 came in and add it to outgoing HTTP requests in
-      -- addHttpTracingHeaders!
       liftIO $ pushSpan
         context
         (\stack ->
@@ -266,6 +265,39 @@ withHttpEntry context request spanName io = do
               SpanStack.pushSuppress spanStack
         )
       io
+
+
+-- |Takes an IO action and appends another side effecto to it that will add HTTP
+-- data from the given request to the current span.
+addDataFromRequest :: MonadIO m => InstanaContext -> Wai.Request -> m a -> m a
+addDataFromRequest context request originalIO =
+  originalIO >>= addHttpDataInIO context request
+
+
+addHttpDataInIO :: MonadIO m => InstanaContext -> Wai.Request -> a -> m a
+addHttpDataInIO context request ioResult = do
+  addHttpData context request
+  return ioResult
+
+
+addHttpData :: MonadIO m => InstanaContext -> Wai.Request -> m ()
+addHttpData context request = do
+  let
+    host :: String
+    host =
+      Wai.requestHeaderHost request
+      |> fmap BSC8.unpack
+      |> Maybe.fromMaybe ""
+  addData
+    context
+    (Aeson.object [ "http" .=
+      Aeson.object
+        [ "method" .= Wai.requestMethod request |> BSC8.unpack
+        , "url"    .= Wai.rawPathInfo request |> BSC8.unpack
+        , "host"   .= host
+        ]
+      ]
+    )
 
 
 -- |Wraps an IO action in 'startExit' and 'completeExit'.
@@ -374,10 +406,12 @@ startHttpEntry context request spanName = do
   case level of
     TracingHeaders.Trace ->
       case (traceId, spanId) of
-        (Just t, Just s) ->
-          startEntry context s t spanName
-        _                ->
+        (Just t, Just s) -> do
+          startEntry context t s spanName
+          addHttpData context request
+        _                -> do
           startRootEntry context spanName
+          addHttpData context request
     TracingHeaders.Suppress -> do
       liftIO $ pushSpan
         context
@@ -569,23 +603,28 @@ addHttpTracingHeaders context request =
   liftIO $ do
     suppressed <- isSuppressed context
     entrySpan <- peekSpan context
-    case (entrySpan, suppressed) of
-      (_, True) ->
-        return $ request
-          { HTTP.requestHeaders =
-            [ (levelHeaderName, "0") ]
-          }
-      (Just (Entry currentEntrySpan), _) ->
-        return $ request
-          { HTTP.requestHeaders =
-            [ (traceIdHeaderName, Id.toByteString $
-                EntrySpan.traceId currentEntrySpan)
-            , (spanIdHeaderName, Id.toByteString $
-                EntrySpan.spanId currentEntrySpan)
-            ]
-          }
-      _ ->
-        return request
+    let
+      originalHeaders = HTTP.requestHeaders request
+      updatedRequest =
+        case (entrySpan, suppressed) of
+          (_, True) ->
+            request {
+              HTTP.requestHeaders = ((levelHeaderName, "0") : originalHeaders)
+            }
+          (Just (Entry currentEntrySpan), _) ->
+            request {
+              HTTP.requestHeaders =
+                (originalHeaders ++
+                  [ (traceIdHeaderName, Id.toByteString $
+                      EntrySpan.traceId currentEntrySpan)
+                  , (spanIdHeaderName, Id.toByteString $
+                      EntrySpan.spanId currentEntrySpan)
+                  ]
+                )
+            }
+          _ ->
+            request
+    return updatedRequest
 
 
 -- |Sends a command to the worker thread.

@@ -2,13 +2,18 @@
 module Instana.SDK.IntegrationTest.Runner (runTestsIgnoringHandles) where
 
 
+import qualified Data.ByteString.Lazy.Char8             as LBSC8
 import           Data.List                              as List
 import           GHC.IO.Handle                          (Handle)
+import qualified Network.HTTP.Client                    as HTTP
 import           System.Process                         as Process
 import           Test.HUnit
 
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
-import           Instana.SDK.IntegrationTest.Suite      (Suite, SuiteGenerator)
+import           Instana.SDK.IntegrationTest.Suite      (ExternalAppSuites,
+                                                         Suite,
+                                                         SuiteGenerator (..),
+                                                         SuiteGeneratorInternal)
 import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import           Instana.SDK.IntegrationTest.Util       (putStrFlush)
@@ -32,11 +37,20 @@ runTestsIgnoringHandles suiteGenerator _ _ _ _ =
 
 runTests :: SuiteGenerator -> IO Counts
 runTests suiteGenerator = do
-  putStrFlush "⏱ waiting for agent stub to come up"
+  putStrFlush "⏱  waiting for agent stub to come up"
   _ <- HttpHelper.retryRequestRecovering TestHelper.pingAgentStub
   putStrLn "\n✅ agent stub is up"
+  case suiteGenerator of
+    Internal suiteGeneratorInternal ->
+      runInternalTests suiteGeneratorInternal
+    External externalAppSuites ->
+      runExternalTestsWithExternalApp externalAppSuites
+
+
+runInternalTests :: SuiteGeneratorInternal -> IO Counts
+runInternalTests suiteGeneratorInternal = do
   let
-    (_, opts) = suiteGenerator
+    (_, opts) = suiteGeneratorInternal
     config =
       InstanaSDK.defaultConfig
         { InstanaSDK.agentHost = Just HttpHelper.agentStubHost
@@ -44,7 +58,7 @@ runTests suiteGenerator = do
         , InstanaSDK.agentName = Suite.customAgentName opts
         }
   results <- InstanaSDK.withConfiguredInstana config $
-    waitForAgentConnectionAndRun suiteGenerator
+    waitForInternalAgentConnectionAndRun suiteGeneratorInternal
   -- The withProcess call that starts the agent stub should also terminate it
   -- when the test suite is done or when an error occurs while running the test
   -- suite. On MacOS, this works. On Linux, the agent stub does not get
@@ -55,17 +69,68 @@ runTests suiteGenerator = do
   -- first started agent stub instance would never be shut down. To make sure
   -- the agent stub instance gets shut down, we send an extra HTTP request to
   -- ask the agent stub to terminate itself.
-  _ <- TestHelper.shutdownAgentStub
+  _ <- TestHelper.shutDownAgentStub
   return results
 
 
-waitForAgentConnectionAndRun :: SuiteGenerator -> InstanaContext -> IO Counts
-waitForAgentConnectionAndRun suiteGenerator instana = do
+runExternalTestsWithExternalApp :: ExternalAppSuites -> IO Counts
+runExternalTestsWithExternalApp externalAppSuites = do
+  putStrFlush "⏱  waiting for app to come up"
+  appPingResponse <- HttpHelper.retryRequestRecovering TestHelper.pingApp
   let
-    (generatorFn, opts) = suiteGenerator
+    appPingBody = HTTP.responseBody appPingResponse
+    appPid = LBSC8.unpack appPingBody
+  putStrLn $ "\n✅ app is up, PID: " ++ appPid
+  results <-
+    waitForExternalAgentConnectionAndRun externalAppSuites appPid
+  -- The withProcess calls that starts the agent stub and the external app
+  -- should also terminate them when the test suite is done or when an error
+  -- occurs while running the test suite. On MacOS, this works. On Linux, these
+  -- processes do not get terminated, for the following reasons: They are
+  -- started via
+  -- "/bin/sh -c \"stack exec ...\"" and Process.createWith will send a TERM
+  -- signal to terminate the started process. On Linux, this results only in the
+  -- "bin/sh" process to be terminated, but the "stack exec" not. Thus, the
+  -- first started agent stub/app instance would never be shut down. To make
+  -- sure the process instances get shut down, we send an extra HTTP request to
+  -- ask the processes to terminate themselves.
+  _ <- TestHelper.shutDownAgentStub
+  _ <- TestHelper.shutDownApp
+  return results
+
+
+-- |Waits for an the integration test process to establish a connection to the
+-- agent, then runs the tests.
+waitForInternalAgentConnectionAndRun ::
+  SuiteGeneratorInternal
+  -> InstanaContext
+  -> IO Counts
+waitForInternalAgentConnectionAndRun suiteGeneratorInternal instana = do
+  let
+    (generatorFn, opts) = suiteGeneratorInternal
     suites = generatorFn instana
   discoveries <-
-    TestHelper.waitForAgentConnection (Suite.usePidTranslation opts)
+    TestHelper.waitForInternalAgentConnection (Suite.usePidTranslation opts)
+  case discoveries of
+    Left message -> do
+      let
+        suiteLabels = List.map Suite.label suites
+        allLabels = List.intercalate ", " suiteLabels
+      assertFailure $
+        "Could not start test suites [" ++ allLabels ++ "]. The agent " ++
+        "connection could not be established: " ++ message
+    Right (_, pid) ->
+      runTestSuites pid suites
+
+
+-- |Waits for an external app to establish a connection to the agent, then runs
+-- the tests.
+waitForExternalAgentConnectionAndRun :: ExternalAppSuites -> String -> IO Counts
+waitForExternalAgentConnectionAndRun externalAppSuites appPid = do
+  let
+    (suites, _) = externalAppSuites
+  discoveries <-
+    TestHelper.waitForExternalAgentConnection appPid
   case discoveries of
     Left message -> do
       let
@@ -83,7 +148,7 @@ runTestSuites pid suites = do
   let
     allIntegrationTestsIO = List.map (applyLabelToSuite pid) suites
   allIntegrationTests <- sequence allIntegrationTestsIO
-  runTestTT $ TestLabel "Span Recording" $ TestList allIntegrationTests
+  runTestTT $ TestList allIntegrationTests
 
 
 applyLabelToSuite :: String -> Suite -> IO Test
@@ -91,6 +156,17 @@ applyLabelToSuite pid suite = do
   let
     label   = Suite.label suite
     testsIO = (Suite.tests suite) pid
-  tests <- sequence testsIO
+    -- Reset the agent stub's recordeds spans after each test, but do not reset
+    -- the discoveries, as all tests of one suite share the connection
+    -- establishment process.
+    testsWithReset =
+      List.map
+        (\testIO ->
+          testIO >>=
+            (\testResult -> TestHelper.resetSpans >> return testResult)
+        )
+        testsIO
+  -- sequence all tests into one action
+  tests <- sequence testsWithReset
   return $ TestLabel label $ TestList tests
 

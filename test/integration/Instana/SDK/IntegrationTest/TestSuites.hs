@@ -1,16 +1,17 @@
 module Instana.SDK.IntegrationTest.TestSuites (allTests) where
 
 
-import           System.Process                          as Process
+import           System.Process                                 as Process
 import           Test.HUnit
 
-import qualified Instana.SDK.IntegrationTest.BracketApi  as BracketApi
-import qualified Instana.SDK.IntegrationTest.Connection  as Connection
-import           Instana.SDK.IntegrationTest.HUnitExtra  (mergeCounts)
-import qualified Instana.SDK.IntegrationTest.LowLevelApi as LowLevelApi
-import qualified Instana.SDK.IntegrationTest.Runner      as TestRunner
-import           Instana.SDK.IntegrationTest.Suite       (Suite (Suite))
-import qualified Instana.SDK.IntegrationTest.Suite       as Suite
+import qualified Instana.SDK.IntegrationTest.BracketApi         as BracketApi
+import qualified Instana.SDK.IntegrationTest.Connection         as Connection
+import qualified Instana.SDK.IntegrationTest.HttpTracingHeaders as HttpTracingHeaders
+import           Instana.SDK.IntegrationTest.HUnitExtra         (mergeCounts)
+import qualified Instana.SDK.IntegrationTest.LowLevelApi        as LowLevelApi
+import qualified Instana.SDK.IntegrationTest.Runner             as TestRunner
+import           Instana.SDK.IntegrationTest.Suite              (Suite (Suite), SuiteGenerator (External, Internal))
+import qualified Instana.SDK.IntegrationTest.Suite              as Suite
 
 
 allTests :: IO Counts
@@ -21,6 +22,7 @@ allTests = do
   agentRestart                 <- testAgentRestart
   pidTranslation               <- testPidTranslation
   customAgentName              <- testCustomAgentName
+  httpTracingHeaders           <- testHttpTracingHeaders
   let
     mergedResults =
       mergeCounts
@@ -30,6 +32,7 @@ allTests = do
         , agentRestart
         , pidTranslation
         , customAgentName
+        , httpTracingHeaders
         ]
     caseCount = cases mergedResults
     triedCount = tried mergedResults
@@ -53,7 +56,7 @@ testSpanRecording :: IO Counts
 testSpanRecording =
   let
     suiteGenerator =
-      (\instana ->
+      Internal (\instana ->
         [ Suite
            { Suite.label = "Low Level API"
            , Suite.tests = (\pid ->
@@ -83,7 +86,7 @@ testConnectionEstablishment :: IO Counts
 testConnectionEstablishment =
   let
     suiteGenerator =
-      (\_ ->
+      Internal (\_ ->
         [ Suite
            { Suite.label = "Initial Connection Establishment"
            , Suite.tests = (\pid -> [
@@ -105,7 +108,7 @@ testConnectionLoss :: IO Counts
 testConnectionLoss =
   let
     suiteGenerator =
-      (\instana ->
+      Internal (\instana ->
         [ Suite
           { Suite.label = "Connection Loss"
           , Suite.tests = (\pid -> [
@@ -127,7 +130,7 @@ testAgentRestart :: IO Counts
 testAgentRestart =
   let
     suiteGenerator =
-      (\instana ->
+      Internal (\instana ->
         [ Suite
             { Suite.label = "Agent Restart"
             , Suite.tests = (\pid -> [
@@ -149,7 +152,7 @@ testPidTranslation :: IO Counts
 testPidTranslation =
   let
     suiteGenerator =
-      (\instana ->
+      Internal (\instana ->
         [ Suite
            { Suite.label =  "PID transaltion"
            , Suite.tests = (\pid -> [
@@ -171,7 +174,7 @@ testCustomAgentName :: IO Counts
 testCustomAgentName =
   let
     suiteGenerator =
-      (\_ ->
+      Internal (\_ ->
         [ Suite
           { Suite.label = "Custom Agent Name"
           , Suite.tests = (\pid -> [
@@ -188,4 +191,35 @@ testCustomAgentName =
         "stack exec instana-haskell-agent-stub"
       )
      (TestRunner.runTestsIgnoringHandles suiteGenerator)
+
+
+testHttpTracingHeaders :: IO Counts
+testHttpTracingHeaders =
+  let
+    suiteGenerator =
+      External (
+        [ Suite
+            { Suite.label = "HTTP Tracing Headers"
+            , Suite.tests = (\pid -> [
+                HttpTracingHeaders.shouldCreateRootEntryWithBracketApi pid
+              , HttpTracingHeaders.shouldCreateNonRootEntryWithBracketApi pid
+              , HttpTracingHeaders.shouldSuppressWithBracketApi
+              , HttpTracingHeaders.shouldCreateRootEntryWithLowLevelApi pid
+              , HttpTracingHeaders.shouldCreateNonRootEntryWithLowLevelApi pid
+              , HttpTracingHeaders.shouldSuppressWithLowLevelApi
+              ])
+            }
+          ]
+        , Suite.defaultOpts
+        )
+  in
+  Process.withCreateProcess
+    (Process.shell "stack exec instana-haskell-agent-stub")
+    (\_ _ _ _ ->
+      (Process.withCreateProcess
+        -- TODO We need to wait for different discoveries, agent ready request here, that is, a different PID, because now not the test is creating spans but the instana-haskell-test-wai-server
+        (Process.shell "INSTANA_LOG_LEVEL=TRACE INSTANA_LOG_LEVEL_STDOUT=TRACE stack exec instana-haskell-test-wai-server")
+        (TestRunner.runTestsIgnoringHandles suiteGenerator)
+      )
+    )
 

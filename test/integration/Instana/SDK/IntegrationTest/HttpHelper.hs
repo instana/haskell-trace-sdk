@@ -3,13 +3,16 @@
 module Instana.SDK.IntegrationTest.HttpHelper
   ( agentStubHost
   , agentStubPort
+  , agentStubUrl
+  , appUrl
   , defaultHeaders
-  , doRequest
+  , doAgentStubRequest
+  , doAppRequest
   , parseResponse
-  , requestAndParse
+  , requestAgentStubAndParse
+  , requestAppAndParse
   , retryRequest
   , retryRequestRecovering
-  , stubUrl
   ) where
 
 
@@ -19,7 +22,7 @@ import qualified Data.Aeson                       as Aeson
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString.Lazy             as LBS
 import qualified Network.HTTP.Client              as HTTP
-import           Network.HTTP.Types.Header        (HeaderName)
+import           Network.HTTP.Types.Header        (Header, HeaderName)
 import           Network.HTTP.Types.Method        (Method)
 
 import           Instana.SDK.IntegrationTest.Util (putStrFlush)
@@ -48,42 +51,100 @@ agentStubBaseUrl =
   "http://" ++ agentStubHost ++ ":" ++ (show agentStubPort) ++ "/"
 
 
-stubUrl :: String -> String
-stubUrl path =
+agentStubUrl :: String -> String
+agentStubUrl path =
   agentStubBaseUrl ++ path
+
+
+appHost :: String
+appHost = "127.0.0.1"
+
+
+appPort :: Int
+appPort = 1207
+
+
+appBaseUrl :: String
+appBaseUrl =
+  "http://" ++ appHost ++ ":" ++ (show appPort) ++ "/"
+
+
+appUrl :: String -> String
+appUrl path =
+  appBaseUrl ++ path
 
 
 defaultHeaders :: [(HeaderName, ByteString)]
 defaultHeaders =
   [ ("Accept", "application/json")
-  , ("Content-Type", "application/json; charset=UTF-8'")
+  , ("Content-Type", "application/json; charset=UTF-8")
   ]
+
+
+requestAgentStubAndParse ::
+  Aeson.FromJSON a =>
+  String
+  -> ByteString
+  -> IO (Either String a)
+requestAgentStubAndParse path method =
+  requestAndParse path method [] agentStubUrl
+
+
+requestAppAndParse ::
+  Aeson.FromJSON a =>
+  String
+  -> ByteString
+  -> [Header]
+  -> IO (Either String a)
+requestAppAndParse path method headers =
+  requestAndParse path method headers appUrl
+
+
+doAgentStubRequest ::
+  String
+  -> Method
+  -> IO (HTTP.Response LBS.ByteString)
+doAgentStubRequest path method =
+  doRequest path method [] agentStubUrl
+
+
+doAppRequest ::
+  String
+  -> Method
+  -> [Header]
+  -> IO (HTTP.Response LBS.ByteString)
+doAppRequest path method headers =
+  doRequest path method headers appUrl
 
 
 requestAndParse ::
   Aeson.FromJSON a =>
   String
-  -> ByteString
+  -> Method
+  -> [Header]
+  -> (String -> String)
   -> IO (Either String a)
-requestAndParse path method = do
-  response <- doRequest path method
+requestAndParse path method headers urlCreator = do
+  response <- doRequest path method headers urlCreator
   parseResponse response
 
 
 doRequest ::
   String
   -> Method
+  -> [Header]
+  -> (String -> String)
   -> IO (HTTP.Response LBS.ByteString)
-doRequest path method = do
+doRequest path method headers urlCreator = do
   httpManager <- HTTP.newManager $
     HTTP.defaultManagerSettings { HTTP.managerConnCount = 5 }
   let
-    url = stubUrl path
+    url = urlCreator path
   defaultRequestSettings <- HTTP.parseUrlThrow url
   let
     request = defaultRequestSettings
        { HTTP.method = method
-       , HTTP.requestHeaders = defaultHeaders
+       , HTTP.requestHeaders = defaultHeaders ++ headers
        }
   HTTP.httpLbs request httpManager
 

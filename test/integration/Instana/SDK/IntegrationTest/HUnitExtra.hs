@@ -1,8 +1,9 @@
 module Instana.SDK.IntegrationTest.HUnitExtra
-  ( failIO
+  ( applyLabel
   , assertAllIO
-  , applyLabel
+  , failIO
   , mergeCounts
+  , passIO
   ) where
 
 
@@ -13,6 +14,11 @@ import           Test.HUnit
 failIO :: String -> IO Test
 failIO message =
   return $ TestCase $ assertFailure message
+
+
+passIO :: IO Test
+passIO =
+  return $ TestCase $ assertBool "" True
 
 
 assertAllIO :: [Assertion] -> IO Test

@@ -39,5 +39,7 @@ initLogging = do
 
 withFormatter :: GenericHandler Handle -> GenericHandler Handle
 withFormatter handler = setFormatter handler formatter
-    where formatter = simpleLogFormatter "<$time $loggername $prio> $msg"
+    where
+      timeFormat = "%F %H:%M:%S.%4q %z"
+      formatter = tfLogFormatter timeFormat "<$time $loggername $pid $prio> $msg"
 
