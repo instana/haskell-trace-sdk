@@ -23,7 +23,8 @@ import           Instana.SDK.AgentStub.Config            (AgentStubConfig)
 import qualified Instana.SDK.AgentStub.Config            as Config
 import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
 import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
-import           Instana.SDK.AgentStub.DiscoveryResponse (DiscoveryResponse (DiscoveryResponse))
+import           Instana.SDK.AgentStub.DiscoveryResponse (DiscoveryResponse (DiscoveryResponse),
+                                                          SecretsConfig (SecretsConfig))
 import qualified Instana.SDK.AgentStub.DiscoveryResponse as DiscoveryResponse
 import           Instana.SDK.AgentStub.Logging           (agentStubLogger)
 import           Instana.SDK.AgentStub.Recorders         (Recorders)
@@ -129,6 +130,12 @@ putDiscovery config startupTime recorders discoveryRequest = do
         DiscoveryResponse
           { DiscoveryResponse.pid = translatedPid
           , DiscoveryResponse.agentUuid = "agent-stub-id"
+          , DiscoveryResponse.extraHeaders = Nothing
+          , DiscoveryResponse.secrets =
+            SecretsConfig
+              { DiscoveryResponse.matcher = ""
+              , DiscoveryResponse.list = []
+              }
           }
 
 

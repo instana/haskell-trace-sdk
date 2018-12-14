@@ -148,8 +148,8 @@ decodeAnnounceResponse response = do
     maybeParsed :: Maybe AnnounceResponse
     maybeParsed = Aeson.decode body
   case maybeParsed of
-    Just announceResponse ->
-      return $ Just announceResponse
+    Just _ -> do
+      return maybeParsed
     Nothing ->
       fail $ "Can't parse announce response" ++ (show body)
 

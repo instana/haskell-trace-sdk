@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-|
 Module      : Instana.SDK.TracingHeaders
 Description : A set of tracing headers
@@ -6,13 +7,29 @@ Description : A set of tracing headers
 module Instana.SDK.TracingHeaders
   ( TracingHeaders(..)
   , TracingLevel(..)
+  , levelHeaderName
   , maybeStringToTracingLevel
+  , spanIdHeaderName
   , stringToTracingLevel
+  , traceIdHeaderName
   , tracingLevelToString
   ) where
 
 
 import           GHC.Generics
+import qualified Network.HTTP.Types.Header as HTTPHeader
+
+
+traceIdHeaderName :: HTTPHeader.HeaderName
+traceIdHeaderName = "X-INSTANA-T"
+
+
+spanIdHeaderName :: HTTPHeader.HeaderName
+spanIdHeaderName = "X-INSTANA-S"
+
+
+levelHeaderName :: HTTPHeader.HeaderName
+levelHeaderName = "X-INSTANA-L"
 
 
 data TracingLevel =

@@ -1,9 +1,15 @@
 module Instana.SDK.IntegrationTest.Util
-  ( putStrFlush
+  ( (|>)
+  , putStrFlush
   ) where
 
 
 import           System.IO (hFlush, stdout)
+
+
+(|>) :: a -> (a -> b) -> b
+(|>) =
+  flip ($)
 
 
 putStrFlush :: String -> IO ()

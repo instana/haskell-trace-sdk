@@ -56,7 +56,6 @@ import qualified Data.Sequence                  as Seq
 import           Data.Text                      (Text)
 import           Data.Time.Clock.POSIX          (getPOSIXTime)
 import qualified Network.HTTP.Client            as HTTP
-import qualified Network.HTTP.Types.Header      as HTTPHeader
 import qualified Network.Socket                 as Socket
 import qualified Network.Wai                    as Wai
 import           System.Log.Logger              (warningM)
@@ -434,43 +433,49 @@ startExit ::
   -> m ()
 startExit context spanName = do
   liftIO $ do
-    entrySpan <- peekSpan context
-    case entrySpan of
-      Just (Entry parent) -> do
-        spanId <- Id.generate
-        timestamp <- round . (* 1000) <$> getPOSIXTime
-        let
-          newSpan =
-            ExitSpan
-              { ExitSpan.parentSpan  = parent
-              , ExitSpan.spanId      = spanId
-              , ExitSpan.spanName    = spanName
-              , ExitSpan.timestamp   = timestamp
-              , ExitSpan.errorCount  = 0
-              , ExitSpan.spanData    = emptyValue
-              }
-        pushSpan
-          context
-          (\stack ->
-            case stack of
-              Nothing        ->
-                -- No entry present, it is invalid to push an exit onto the
-                -- stack without an entry. But we can at least init a stack
-                -- for the current thread.
-                SpanStack.empty
-              Just spanStack ->
-                spanStack
-                |> SpanStack.push (Exit newSpan)
-          )
-      Just (Exit _) -> do
-        warningM instanaLogger $
-          "Cannot start an exit span since there is already an active exit span " ++
-          "in progress."
-      Nothing -> do
-        warningM instanaLogger $
-          "Cannot start an exit span since there is no active entry span " ++
-          "(actually, there is no active span at all)."
-        return ()
+    suppressed <- isSuppressed context
+    if suppressed then
+      return ()
+    else do
+      entrySpan <- peekSpan context
+      case entrySpan of
+        Just (Entry parent) -> do
+          spanId <- Id.generate
+          timestamp <- round . (* 1000) <$> getPOSIXTime
+          let
+            newSpan =
+              ExitSpan
+                { ExitSpan.parentSpan  = parent
+                , ExitSpan.spanId      = spanId
+                , ExitSpan.spanName    = spanName
+                , ExitSpan.timestamp   = timestamp
+                , ExitSpan.errorCount  = 0
+                , ExitSpan.spanData    = emptyValue
+                }
+          pushSpan
+            context
+            (\stack ->
+              case stack of
+                Nothing        ->
+                  -- No entry present, it is invalid to push an exit onto the
+                  -- stack without an entry. But we can at least init a stack
+                  -- for the current thread.
+                  SpanStack.empty
+                Just spanStack ->
+                  spanStack
+                  |> SpanStack.push (Exit newSpan)
+            )
+        Just (Exit ex) -> do
+          warningM instanaLogger $
+            "Cannot start exit span \"" ++ show spanName ++
+            "\" since there is already an active exit span " ++
+            "in progress: " ++ show ex
+        Nothing -> do
+          warningM instanaLogger $
+            "Cannot start exit span \"" ++ show spanName ++
+            "\" since there is no active entry span " ++
+            "(actually, there is no active span at all)."
+          return ()
 
 
 -- |Completes an entry span, to be called at the last possible moment before the
@@ -481,15 +486,21 @@ completeEntry ::
   -> m ()
 completeEntry context = do
   liftIO $ do
-    poppedSpan <- popSpan context EntryKind
-    case poppedSpan of
-      Just (Entry entrySpan) ->
+    (poppedSpan, warning) <- popSpan context EntryKind
+    case (poppedSpan, warning) of
+      (Just (Entry entrySpan), _) ->
         enqueueCommand
           context
           (Command.CompleteEntry entrySpan)
+      (_, Just warnMessage) -> do
+        warningM instanaLogger $
+          "Cannot complete entry span due to a span stack mismatch: " ++
+          warnMessage
+        return ()
       _ -> do
         warningM instanaLogger $
-          "Cannot complete span due to a span stack mismatch - expected an entry."
+          "Cannot complete entry span due to a span stack mismatch - there " ++
+          "is no active span or the currently active span is not an entry."
         return ()
 
 
@@ -501,16 +512,25 @@ completeExit ::
   -> m ()
 completeExit context = do
   liftIO $ do
-    poppedSpan <- popSpan context ExitKind
-    case poppedSpan of
-      Just (Exit exitSpan) ->
-        enqueueCommand
-          context
-          (Command.CompleteExit exitSpan)
-      _ -> do
-        warningM instanaLogger $
-          "Cannot complete span due to a span stack mismatch - expected an exit."
-        return ()
+    suppressed <- isSuppressed context
+    if suppressed then
+      return ()
+    else do
+      (poppedSpan, warning) <- popSpan context ExitKind
+      case (poppedSpan, warning) of
+        (Just (Exit exitSpan), _) ->
+          enqueueCommand
+            context
+            (Command.CompleteExit exitSpan)
+        (_, Just warnMessage) -> do
+          warningM instanaLogger $
+            "Cannot complete exit span due to a span stack mismatch: " ++
+            warnMessage
+        _ -> do
+          warningM instanaLogger $
+            "Cannot complete exit span due to a span stack mismatch - there " ++
+            "is no active span or the currently active span is not an exit."
+          return ()
 
 
 -- |Increments the error count for the currently active span by one. Call this
@@ -573,15 +593,15 @@ readHttpTracingHeaders request =
     -- HeaderName = CI ByteString (CI -> Case Insensitive String)
     traceId =
       headers
-      |> List.lookup traceIdHeaderName
+      |> List.lookup TracingHeaders.traceIdHeaderName
       |> (<$>) BSC8.unpack
     spanId =
       headers
-      |> List.lookup spanIdHeaderName
+      |> List.lookup TracingHeaders.spanIdHeaderName
       |> (<$>) BSC8.unpack
     level =
       headers
-      |> List.lookup levelHeaderName
+      |> List.lookup TracingHeaders.levelHeaderName
       |> (<$>) BSC8.unpack
   in
   TracingHeaders
@@ -609,15 +629,16 @@ addHttpTracingHeaders context request =
         case (entrySpan, suppressed) of
           (_, True) ->
             request {
-              HTTP.requestHeaders = ((levelHeaderName, "0") : originalHeaders)
+              HTTP.requestHeaders =
+                ((TracingHeaders.levelHeaderName, "0") : originalHeaders)
             }
           (Just (Entry currentEntrySpan), _) ->
             request {
               HTTP.requestHeaders =
                 (originalHeaders ++
-                  [ (traceIdHeaderName, Id.toByteString $
+                  [ (TracingHeaders.traceIdHeaderName, Id.toByteString $
                       EntrySpan.traceId currentEntrySpan)
-                  , (spanIdHeaderName, Id.toByteString $
+                  , (TracingHeaders.spanIdHeaderName, Id.toByteString $
                       EntrySpan.spanId currentEntrySpan)
                   ]
                 )
@@ -659,7 +680,7 @@ pushSpan context fn = do
 
 -- |Yields the currently active span, taking it of the stack. The span below
 -- that will become the new active span (if there is any).
-popSpan :: InstanaContext -> SpanKind -> IO (Maybe Span)
+popSpan :: InstanaContext -> SpanKind -> IO (Maybe Span, Maybe String)
 popSpan context expectedKind = do
   threadId <- Concurrent.myThreadId
   STM.atomically $ popSpanStm context threadId expectedKind
@@ -667,22 +688,30 @@ popSpan context expectedKind = do
 
 -- |Yields the currently active span, taking it of the stack. The span below
 -- that will become the new active span (if there is any).
-popSpanStm :: InstanaContext -> ThreadId -> SpanKind -> STM (Maybe Span)
+popSpanStm ::
+  InstanaContext
+  -> ThreadId
+  -> SpanKind
+  -> STM (Maybe Span, Maybe String)
 popSpanStm context threadId expectedKind = do
   currentSpansPerThread <- STM.readTVar $ InternalContext.currentSpans context
   let
     oldStack = Map.lookup threadId currentSpansPerThread
-    (modifiedStack, poppedSpan) =
+    (modifiedStack, poppedSpan, warning) =
       case oldStack of
         Nothing        ->
           -- invalid state, there should be a stack with at least one span on it
-          (SpanStack.empty, Nothing)
+          ( SpanStack.empty
+          , Nothing
+          , Just $ "Invalid state: Trying to pop the span stack while there " ++
+                   "is no span stack for this thread yet."
+          )
         Just spanStack ->
           SpanStack.popWhenMatches expectedKind spanStack
     updatedSpansPerThread =
       Map.insert threadId modifiedStack currentSpansPerThread
   STM.writeTVar (InternalContext.currentSpans context) updatedSpansPerThread
-  return poppedSpan
+  return (poppedSpan, warning)
 
 
 -- |Yields the currently active span without modifying the span stack.
@@ -755,16 +784,4 @@ mapCurrentSpan fn stack =
 -- |Provides an empty Aeson value.
 emptyValue :: Value
 emptyValue = Aeson.object []
-
-
-traceIdHeaderName :: HTTPHeader.HeaderName
-traceIdHeaderName = "X-INSTANA-T"
-
-
-spanIdHeaderName :: HTTPHeader.HeaderName
-spanIdHeaderName = "X-INSTANA-S"
-
-
-levelHeaderName :: HTTPHeader.HeaderName
-levelHeaderName = "X-INSTANA-L"
 

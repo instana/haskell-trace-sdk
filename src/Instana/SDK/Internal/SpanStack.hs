@@ -142,21 +142,38 @@ pop (EntryAndExit entrySpan exitSpan) =
 
 {-|Pops the top element, but only if the top element is of the expected kind.
 If so, a tuple of the top element and the remaining stack after popping the top
-element is returned. If not, Nothing and an unmodified stack is returned.
+element is returned. If not, Nothing and an unmodified stack is returned. The
+last part of the 3-tuple is an error message that is only provided if there is
+a mismatch between the expected span kind and the actual span kind on the top of
+the stack.
 -}
-popWhenMatches :: SpanKind -> SpanStack -> (SpanStack, Maybe Span)
+popWhenMatches :: SpanKind -> SpanStack -> (SpanStack, Maybe Span, Maybe String)
 popWhenMatches _ None =
-  (None, Nothing)
+  (None, Nothing, Nothing)
+popWhenMatches EntryKind Suppressed =
+  -- This effectively unsuppresses - we started an entry that was suppressed and
+  -- now we are asked to complete this very entry, so the suppression is lifted
+  -- and we are back to a pristine state, ready to start the next entry when the
+  -- next request comes in.
+  (None, Nothing, Nothing)
 popWhenMatches _ Suppressed =
-  (None, Nothing)
+  (Suppressed, Nothing, Nothing)
 popWhenMatches expectedKind stack =
   case (expectedKind, peek stack) of
     (EntryKind, Just (Entry _)) ->
-      pop stack
+      (st, sp, Nothing)
+      where
+        (st, sp) = pop stack
     (ExitKind, Just (Exit _)) ->
-      pop stack
-    _ ->
-      (stack, Nothing)
+      (st, sp, Nothing)
+      where
+        (st, sp) = pop stack
+    (_, actualTopElement) ->
+      ( stack
+      , Nothing
+      , Just $ "Cannot pop \"" ++ (show expectedKind) ++
+        " from span stack. Current top element: " ++ show actualTopElement
+      )
 
 
 {-|Returns the top element without modifying the stack.

@@ -4,10 +4,15 @@ module Instana.SDK.IntegrationTest.TestSuites (allTests) where
 import           System.Process                                 as Process
 import           Test.HUnit
 
+import qualified Data.List                                      as List
+import           Data.Maybe                                     (isJust)
 import qualified Instana.SDK.IntegrationTest.BracketApi         as BracketApi
 import qualified Instana.SDK.IntegrationTest.Connection         as Connection
 import qualified Instana.SDK.IntegrationTest.HttpTracingHeaders as HttpTracingHeaders
-import           Instana.SDK.IntegrationTest.HUnitExtra         (mergeCounts)
+import           Instana.SDK.IntegrationTest.HUnitExtra         (ConditionalSuite (..),
+                                                                 isExclusive,
+                                                                 mergeCounts,
+                                                                 unwrapOrSkip)
 import qualified Instana.SDK.IntegrationTest.LowLevelApi        as LowLevelApi
 import qualified Instana.SDK.IntegrationTest.Runner             as TestRunner
 import           Instana.SDK.IntegrationTest.Suite              (Suite (Suite), SuiteGenerator (External, Internal))
@@ -16,24 +21,31 @@ import qualified Instana.SDK.IntegrationTest.Suite              as Suite
 
 allTests :: IO Counts
 allTests = do
-  spanRecordingSuite           <- testSpanRecording
-  connectionEstablishmentSuite <- testConnectionEstablishment
-  connectionLoss               <- testConnectionLoss
-  agentRestart                 <- testAgentRestart
-  pidTranslation               <- testPidTranslation
-  customAgentName              <- testCustomAgentName
-  httpTracingHeaders           <- testHttpTracingHeaders
   let
-    mergedResults =
-      mergeCounts
-        [ spanRecordingSuite
-        , connectionEstablishmentSuite
-        , connectionLoss
-        , agentRestart
-        , pidTranslation
-        , customAgentName
-        , httpTracingHeaders
-        ]
+    allTheTests =
+      [ testSpanRecording
+      , testConnectionEstablishment
+      , testConnectionLoss
+      , testAgentRestart
+      , testPidTranslation
+      , testCustomAgentName
+      , testHttpTracingHeaders
+      ]
+    exlusiveSuite =
+      List.find isExclusive allTheTests
+    unwrapped =
+      case exlusiveSuite of
+        Just suite ->
+          [unwrapOrSkip suite]
+        Nothing ->
+          List.map unwrapOrSkip allTheTests
+  if isJust exlusiveSuite then
+    putStrLn $ "\n\nRunning one exclusive suite, ignoring all others."
+  else
+    putStrLn $ "\n\nRunning " ++ show (List.length unwrapped) ++ " test suite(s)..."
+  results <- sequence unwrapped
+  let
+    mergedResults = mergeCounts results
     caseCount = cases mergedResults
     triedCount = tried mergedResults
     errCount = errors mergedResults
@@ -52,7 +64,7 @@ allTests = do
   return mergedResults
 
 
-testSpanRecording :: IO Counts
+testSpanRecording :: ConditionalSuite
 testSpanRecording =
   let
     suiteGenerator =
@@ -77,12 +89,13 @@ testSpanRecording =
       , Suite.defaultOpts
       )
   in
-    Process.withCreateProcess
-      (Process.shell "stack exec instana-haskell-agent-stub")
-      (TestRunner.runTestsIgnoringHandles suiteGenerator)
+    Run $
+      Process.withCreateProcess
+        (Process.shell "stack exec instana-haskell-agent-stub")
+        (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
 
-testConnectionEstablishment :: IO Counts
+testConnectionEstablishment :: ConditionalSuite
 testConnectionEstablishment =
   let
     suiteGenerator =
@@ -97,14 +110,15 @@ testConnectionEstablishment =
       , Suite.defaultOpts
       )
   in
-    Process.withCreateProcess
-      (Process.shell
-        "STARTUP_DELAY=2500 stack exec instana-haskell-agent-stub"
-      )
-     (TestRunner.runTestsIgnoringHandles suiteGenerator)
+    Run $
+      Process.withCreateProcess
+        (Process.shell
+          "STARTUP_DELAY=2500 stack exec instana-haskell-agent-stub"
+        )
+       (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
 
-testConnectionLoss :: IO Counts
+testConnectionLoss :: ConditionalSuite
 testConnectionLoss =
   let
     suiteGenerator =
@@ -119,14 +133,15 @@ testConnectionLoss =
       , Suite.defaultOpts
       )
   in
-    Process.withCreateProcess
-      (Process.shell
-        "SIMULATE_CONNECTION_LOSS=true stack exec instana-haskell-agent-stub"
-      )
-     (TestRunner.runTestsIgnoringHandles suiteGenerator)
+    Run $
+      Process.withCreateProcess
+        (Process.shell
+          "SIMULATE_CONNECTION_LOSS=true stack exec instana-haskell-agent-stub"
+        )
+       (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
 
-testAgentRestart :: IO Counts
+testAgentRestart :: ConditionalSuite
 testAgentRestart =
   let
     suiteGenerator =
@@ -141,14 +156,15 @@ testAgentRestart =
       , Suite.defaultOpts
       )
   in
-    Process.withCreateProcess
-      (Process.shell
-        "stack exec instana-haskell-agent-stub"
-      )
-     (TestRunner.runTestsIgnoringHandles suiteGenerator)
+    Run $
+      Process.withCreateProcess
+        (Process.shell
+          "stack exec instana-haskell-agent-stub"
+        )
+       (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
 
-testPidTranslation :: IO Counts
+testPidTranslation :: ConditionalSuite
 testPidTranslation =
   let
     suiteGenerator =
@@ -163,14 +179,15 @@ testPidTranslation =
       , Suite.withPidTranslation
       )
   in
-    Process.withCreateProcess
-      (Process.shell
-        "SIMULATE_PID_TRANSLATION=why_not stack exec instana-haskell-agent-stub"
-      )
-     (TestRunner.runTestsIgnoringHandles suiteGenerator)
+    Run $
+      Process.withCreateProcess
+        (Process.shell
+          "SIMULATE_PID_TRANSLATION=why_not stack exec instana-haskell-agent-stub"
+        )
+       (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
 
-testCustomAgentName :: IO Counts
+testCustomAgentName :: ConditionalSuite
 testCustomAgentName =
   let
     suiteGenerator =
@@ -185,15 +202,16 @@ testCustomAgentName =
       , Suite.withCustomAgentName "Devil in Disguise"
       )
   in
-    Process.withCreateProcess
-      (Process.shell $
-        "AGENT_NAME=\"Devil in Disguise\" " ++
-        "stack exec instana-haskell-agent-stub"
-      )
-     (TestRunner.runTestsIgnoringHandles suiteGenerator)
+    Run $
+      Process.withCreateProcess
+        (Process.shell $
+          "AGENT_NAME=\"Devil in Disguise\" " ++
+          "stack exec instana-haskell-agent-stub"
+        )
+       (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
 
-testHttpTracingHeaders :: IO Counts
+testHttpTracingHeaders :: ConditionalSuite
 testHttpTracingHeaders =
   let
     suiteGenerator =
@@ -213,13 +231,13 @@ testHttpTracingHeaders =
         , Suite.defaultOpts
         )
   in
-  Process.withCreateProcess
-    (Process.shell "stack exec instana-haskell-agent-stub")
-    (\_ _ _ _ ->
-      (Process.withCreateProcess
-        -- TODO We need to wait for different discoveries, agent ready request here, that is, a different PID, because now not the test is creating spans but the instana-haskell-test-wai-server
-        (Process.shell "INSTANA_LOG_LEVEL=TRACE INSTANA_LOG_LEVEL_STDOUT=TRACE stack exec instana-haskell-test-wai-server")
-        (TestRunner.runTestsIgnoringHandles suiteGenerator)
+  Run $
+    Process.withCreateProcess
+      (Process.shell "stack exec instana-haskell-agent-stub")
+      (\_ _ _ _ ->
+        (Process.withCreateProcess
+          (Process.shell "INSTANA_LOG_LEVEL=TRACE INSTANA_LOG_LEVEL_STDOUT=TRACE stack exec instana-haskell-test-wai-server")
+          (TestRunner.runTestsIgnoringHandles suiteGenerator)
+        )
       )
-    )
 

@@ -74,7 +74,7 @@ popShouldReturnNothingOnEmpty =
 popWhenMatchesShouldReturnNothingOnEmpty :: Test
 popWhenMatchesShouldReturnNothingOnEmpty =
   TestCase $
-    assertEqual "empty#popWhenMatches" Nothing (snd $ SpanStack.popWhenMatches EntryKind empty)
+    assertEqual "empty#popWhenMatches" Nothing (snd3 $ SpanStack.popWhenMatches EntryKind empty)
 
 
 peekShouldReturnNothingOnEmpty :: Test
@@ -94,7 +94,7 @@ popWhenMatchesEmptyShouldLeaveEmpty :: Test
 popWhenMatchesEmptyShouldLeaveEmpty =
   TestCase $
     assertBool "empty#popWhenMatches leaves empty" $
-      SpanStack.isEmpty $ (fst $ SpanStack.popWhenMatches EntryKind empty)
+      SpanStack.isEmpty $ (fst3 $ SpanStack.popWhenMatches EntryKind empty)
 
 
 shouldPushEntry :: Test
@@ -125,7 +125,7 @@ popWhenMatchesShouldReturnEntry =
   TestCase $
     assertEqual "push/popWhenMatches"
       (Just $ Entry entrySpan)
-      (snd $ SpanStack.popWhenMatches EntryKind entryOnly)
+      (snd3 $ SpanStack.popWhenMatches EntryKind entryOnly)
 
 
 popWhenNotMatchesEntryShouldReturnNothing :: Test
@@ -133,7 +133,7 @@ popWhenNotMatchesEntryShouldReturnNothing =
   TestCase $
     assertEqual "push/popWhenNotMatches"
       (Nothing)
-      (snd $ SpanStack.popWhenMatches ExitKind entryOnly)
+      (snd3 $ SpanStack.popWhenMatches ExitKind entryOnly)
 
 
 peekShouldReturnEntry :: Test
@@ -155,13 +155,13 @@ popEntryWhenMatchesShouldLeaveEmpty :: Test
 popEntryWhenMatchesShouldLeaveEmpty =
   TestCase $
     assertBool "push/popWhenMatches leaves empty" $
-      SpanStack.isEmpty $ (fst $ SpanStack.popWhenMatches EntryKind entryOnly)
+      SpanStack.isEmpty $ (fst3 $ SpanStack.popWhenMatches EntryKind entryOnly)
 
 
 popEntryWhenNotMatchesEntryShouldLeaveStackUnchanged :: Test
 popEntryWhenNotMatchesEntryShouldLeaveStackUnchanged =
   let
-    newStack = fst $ SpanStack.popWhenMatches ExitKind entryOnly
+    newStack = fst3 $ SpanStack.popWhenMatches ExitKind entryOnly
     top = SpanStack.peek newStack
   in
   TestCase $
@@ -191,7 +191,7 @@ shouldNotPushEntryOnEntry =
 popShouldReturnExit :: Test
 popShouldReturnExit =
   TestCase $
-    assertEqual "push/push/popWhenMatches"
+    assertEqual "push/push/pop"
       (Just $ Exit exitSpan)
       (snd $ SpanStack.pop entryAndExit)
 
@@ -201,7 +201,7 @@ popWhenMatchesShouldReturnExit =
   TestCase $
     assertEqual "push/push/popWhenMatches"
       (Just $ Exit exitSpan)
-      (snd $ SpanStack.popWhenMatches ExitKind entryAndExit)
+      (snd3 $ SpanStack.popWhenMatches ExitKind entryAndExit)
 
 
 popWhenNotMatchesExitShouldReturnNothing :: Test
@@ -211,7 +211,7 @@ popWhenNotMatchesExitShouldReturnNothing =
   TestCase $
     assertEqual "push/push/popWhenNotMatches"
       Nothing
-      (snd $ SpanStack.popWhenMatches EntryKind entryAndExit)
+      (snd3 $ SpanStack.popWhenMatches EntryKind entryAndExit)
 
 
 peekShouldReturnExit :: Test
@@ -234,13 +234,13 @@ popExitWhenMatcheShouldLeaveNotEmpty =
   TestCase $
     assertBool "push/push/popWhenMatches leaves not empty" $
       not $ SpanStack.isEmpty $
-        (fst $ SpanStack.popWhenMatches ExitKind entryAndExit)
+        (fst3 $ SpanStack.popWhenMatches ExitKind entryAndExit)
 
 
 popExitWhenNotMatcheExitShouldLeaveNotEmpty :: Test
 popExitWhenNotMatcheExitShouldLeaveNotEmpty =
   let
-    newStack = fst $ SpanStack.popWhenMatches EntryKind entryAndExit
+    newStack = fst3 $ SpanStack.popWhenMatches EntryKind entryAndExit
     top = SpanStack.peek newStack
   in
   TestCase $
@@ -315,4 +315,12 @@ exitSpan =
 
 emptyValue :: Value
 emptyValue = Aeson.object []
+
+
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a
+
+
+snd3 :: (a, b, c) -> b
+snd3 (_, b, _) = b
 

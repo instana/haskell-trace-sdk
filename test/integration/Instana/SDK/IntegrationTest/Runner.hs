@@ -146,13 +146,13 @@ waitForExternalAgentConnectionAndRun externalAppSuites appPid = do
 runTestSuites :: String -> [Suite] -> IO Counts
 runTestSuites pid suites = do
   let
-    allIntegrationTestsIO = List.map (applyLabelToSuite pid) suites
+    allIntegrationTestsIO = List.map (wrapSuite pid) suites
   allIntegrationTests <- sequence allIntegrationTestsIO
   runTestTT $ TestList allIntegrationTests
 
 
-applyLabelToSuite :: String -> Suite -> IO Test
-applyLabelToSuite pid suite = do
+wrapSuite :: String -> Suite -> IO Test
+wrapSuite pid suite = do
   let
     label   = Suite.label suite
     testsIO = (Suite.tests suite) pid
