@@ -10,9 +10,9 @@ haskellDiscoveryPath :: String
 haskellDiscoveryPath = "com.instana.plugin.haskell.discovery"
 
 
--- | accept data prefix
-haskellAcceptDataPathPrefix :: String
-haskellAcceptDataPathPrefix = "com.instana.plugin.haskell."
+-- | entity data prefix
+haskellEntityDataPathPrefix :: String
+haskellEntityDataPathPrefix = "com.instana.plugin.haskell."
 
 
 -- | trace resource

@@ -38,6 +38,8 @@ library
     , bytestring
     , containers
     , directory
+    , ekg-core
+    , ekg-json
     , exceptions
     , hslogger
     , http-client
@@ -52,6 +54,7 @@ library
     , text
     , time
     , unix
+    , unordered-containers
     , wai
   if flag(dev)
     ghc-options:
@@ -83,6 +86,8 @@ library
       Instana.SDK.Internal.FullSpan
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
+      Instana.SDK.Internal.Metrics.Collector
+      Instana.SDK.Internal.Metrics.Compression
       Instana.SDK.Internal.Retry
       Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.URL
@@ -91,16 +96,16 @@ library
   default-language: Haskell2010
 
 
-executable instana-haskell-sample-exe
+executable instana-haskell-example-exe
   main-is: Main.hs
   hs-source-dirs:
-      sample-app
+      example-app
   if flag(dev)
     ghc-options:
-      -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+      -Wall -Werror -threaded -rtsopts "-with-rtsopts=-T -N "
   else
     ghc-options:
-      -Wall -threaded -rtsopts -with-rtsopts=-N
+      -Wall -threaded -rtsopts "-with-rtsopts=-T -N "
   build-depends:
       base >=4.7 && <5
     , hslogger
@@ -131,21 +136,25 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , aeson
     , aeson-extra
     , directory
+    , ekg-core
     , HUnit
     , hslogger
     , random
     , scientific
     , text
+    , unordered-containers
   other-modules:
       Instana.SDK.Internal.ConfigTest
       Instana.SDK.Internal.IdTest
       Instana.SDK.Internal.LoggingTest
+      Instana.SDK.Internal.MetricsCompressionTest
       Instana.SDK.Internal.SpanStackTest
       Instana.SDK.Internal.SpanTest
       -- modules under test
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
+      Instana.SDK.Internal.Metrics.Compression
       Instana.SDK.Internal.SpanStack
       Instana.SDK.Span.Span
       -- dependencies of modules under test
@@ -183,8 +192,12 @@ executable instana-haskell-agent-stub
   other-modules:
       Instana.SDK.AgentStub.API
     , Instana.SDK.AgentStub.Config
+      Instana.SDK.AgentStub.CounterMetric
     , Instana.SDK.AgentStub.DiscoveryRequest
     , Instana.SDK.AgentStub.DiscoveryResponse
+    , Instana.SDK.AgentStub.EntityDataRequest
+    , Instana.SDK.AgentStub.GaugeMetric
+    , Instana.SDK.AgentStub.LabelMetric
     , Instana.SDK.AgentStub.Logging
     , Instana.SDK.AgentStub.Main
     , Instana.SDK.AgentStub.Recorders
@@ -203,10 +216,10 @@ test-suite instana-haskell-trace-sdk-integration-tests
       test/integration, test/shared
   if flag(dev)
     ghc-options:
-      -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+      -Wall -Werror -threaded -rtsopts "-with-rtsopts=-T -N "
   else
     ghc-options:
-      -Wall -threaded -rtsopts -with-rtsopts=-N
+      -Wall -threaded -rtsopts "-with-rtsopts=-T -N "
   build-depends:
       base >=4.7 && <5
     , aeson
@@ -221,8 +234,13 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , retry
     , text
     , unix
+    , unordered-containers
   other-modules:
-      Instana.SDK.AgentStub.DiscoveryRequest
+      Instana.SDK.AgentStub.CounterMetric
+    , Instana.SDK.AgentStub.DiscoveryRequest
+    , Instana.SDK.AgentStub.EntityDataRequest
+    , Instana.SDK.AgentStub.GaugeMetric
+    , Instana.SDK.AgentStub.LabelMetric
     , Instana.SDK.AgentStub.TraceRequest
     , Instana.SDK.IntegrationTest.BracketApi
     , Instana.SDK.IntegrationTest.Connection
@@ -230,6 +248,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , Instana.SDK.IntegrationTest.HttpHelper
     , Instana.SDK.IntegrationTest.HttpTracingHeaders
     , Instana.SDK.IntegrationTest.LowLevelApi
+    , Instana.SDK.IntegrationTest.Metrics
     , Instana.SDK.IntegrationTest.Runner
     , Instana.SDK.IntegrationTest.Suite
     , Instana.SDK.IntegrationTest.TestHelper
@@ -244,10 +263,10 @@ executable instana-haskell-test-wai-server
       test/apps/wai
   if flag(dev)
     ghc-options:
-      -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+      -Wall -Werror -threaded -rtsopts "-with-rtsopts=-T -N "
   else
     ghc-options:
-      -Wall -threaded -rtsopts -with-rtsopts=-N
+      -Wall -threaded -rtsopts "-with-rtsopts=-T -N "
   build-depends:
       base >=4.7 && <5
     , binary

@@ -8,6 +8,8 @@ module Instana.SDK.IntegrationTest.TestHelper
   , resetSpans
   , shutDownAgentStub
   , shutDownApp
+  , waitForEntityDataWithMyPid
+  , waitForEntityDataWithPid
   , waitForExternalAgentConnection
   , waitForInternalAgentConnection
   , waitForDiscoveryWithMyPid
@@ -19,20 +21,26 @@ module Instana.SDK.IntegrationTest.TestHelper
   ) where
 
 
-import           Control.Exception                      (catch)
-import qualified Data.ByteString.Lazy                   as LBS
-import           Data.Either                            (Either)
-import qualified Data.List                              as List
-import           Data.Text                              (Text)
-import qualified Network.HTTP.Client                    as HTTP
-import qualified System.Posix.Process                   as PosixProcess
+import           Control.Exception                       (catch)
+import qualified Data.ByteString.Lazy                    as LBS
+import           Data.Either                             (Either)
+import qualified Data.List                               as List
+import qualified Data.Maybe                              as Maybe
+import           Data.Text                               (Text)
+import qualified Data.Text                               as T
+import qualified Network.HTTP.Client                     as HTTP
+import qualified System.Posix.Process                    as PosixProcess
 
-import           Instana.SDK.AgentStub.DiscoveryRequest (DiscoveryRequest)
-import qualified Instana.SDK.AgentStub.DiscoveryRequest as DiscoveryRequest
-import           Instana.SDK.AgentStub.TraceRequest     (Span)
-import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
-import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
-import           Instana.SDK.IntegrationTest.Util       (putStrFlush)
+import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
+import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
+import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
+import qualified Instana.SDK.AgentStub.EntityDataRequest as EntityDataRequest
+import           Instana.SDK.AgentStub.LabelMetric       (LabelMetric (LabelMetric))
+import qualified Instana.SDK.AgentStub.LabelMetric       as LabelMetric
+import           Instana.SDK.AgentStub.TraceRequest      (Span)
+import qualified Instana.SDK.AgentStub.TraceRequest      as TraceRequest
+import qualified Instana.SDK.IntegrationTest.HttpHelper  as HttpHelper
+import           Instana.SDK.IntegrationTest.Util        (putStrFlush, (|>))
 
 
 withSpanCreation ::
@@ -183,7 +191,7 @@ waitForAgentReadyWithPid pidStr = do
 
 getAgentReadyPids :: IO (Either String [String])
 getAgentReadyPids = do
-  HttpHelper.requestAgentStubAndParse "stub/agentReady" "GET"
+  HttpHelper.requestAgentStubAndParse "stub/agent-ready" "GET"
 
 
 containsAgentReadyWithPid ::
@@ -197,6 +205,54 @@ containsAgentReadyWithPid pid pidsFromResponse =
       List.filter
         (\p -> p == pid)
         pidsFromResponse
+
+
+waitForEntityDataWithMyPid :: IO (Either String [EntityDataRequest])
+waitForEntityDataWithMyPid = do
+  pid <- PosixProcess.getProcessID
+  waitForEntityDataWithPid $ show pid
+
+
+waitForEntityDataWithPid :: String -> IO (Either String [EntityDataRequest])
+waitForEntityDataWithPid pidStr = do
+  putStrFlush $
+    "⏱  waiting for entity data for pid " ++ pidStr ++ " to be collected"
+  entityDataRequests <-
+    HttpHelper.retryRequest
+      (containsEntityDataRequestsWithPid pidStr)
+      getEntityDataRequests
+  case entityDataRequests of
+    Left message -> do
+      putStrLn $ "\n❗️ recorded entity data request(s) could not be obtained"
+      return $ Left message
+    Right _ -> do
+      putStrLn $ "\n✅ recorded entity data request(s) have been obtained"
+      return entityDataRequests
+
+
+getEntityDataRequests :: IO (Either String [EntityDataRequest])
+getEntityDataRequests = do
+  HttpHelper.requestAgentStubAndParse "stub/entity-data" "GET"
+
+
+containsEntityDataRequestsWithPid ::
+  String
+  -> [EntityDataRequest]
+  -> Bool
+containsEntityDataRequestsWithPid pid entityDataRequests =
+  length matchingEntityDataRequests >= 1
+  where
+    matchingEntityDataRequests =
+      List.filter
+        (\edr ->
+          (edr
+            |> EntityDataRequest.pid
+            |> Maybe.fromMaybe (LabelMetric "no PID available")
+            |> LabelMetric.val
+            |> T.unpack
+          ) == pid
+        )
+        entityDataRequests
 
 
 waitForSpansMatching :: [Text] -> IO (Either String [Span])
@@ -226,6 +282,8 @@ getSpanByName name =
   List.find (\s -> TraceRequest.n s == name)
 
 
+-- |Will also reset agent ready requests and entity data requests (basically
+-- forget that the announce/connection establishment has ever happened)
 resetDiscoveries :: IO ()
 resetDiscoveries =
   reset "discoveries"

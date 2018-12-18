@@ -23,6 +23,7 @@ import           Data.Text                                                  (Tex
 import qualified Foreign.C.Types                                            as CTypes
 import           GHC.Generics
 import           Network.HTTP.Client                                        as HttpClient
+import qualified System.Metrics                                             as Metrics
 
 import           Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse (AnnounceResponse)
 import qualified Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse as AnnounceResponse
@@ -43,8 +44,26 @@ data ConnectionState =
     -- |Announce was successful, waiting for the agent to signal readyness.
   | Announced
     -- |Agent has signaled that it is ready to accept data.
-  | AgentReady AgentConnection
+  | AgentReady Ready
   deriving (Eq, Show, Generic)
+
+
+-- |Data to hold after agent ready event.
+data Ready =
+  Ready
+    { connection :: AgentConnection
+    , metrics    :: Metrics.Store
+    } deriving (Generic)
+
+
+instance Eq Ready where
+  r1 == r2 =
+    connection r1 == connection r2
+
+
+instance Show Ready where
+  show r =
+     show $ connection r
 
 
 -- |Meta data about the connection to the agent.
@@ -60,12 +79,18 @@ data AgentConnection =
 
 
 -- |Creates a "ready" connection state from an AnnounceResponse.
-mkAgentReadyState :: AnnounceResponse -> ConnectionState
-mkAgentReadyState announceResponse =
+mkAgentReadyState :: AnnounceResponse -> Metrics.Store -> ConnectionState
+mkAgentReadyState announceResponse metricsStore =
+  let
+    agentConnection = AgentConnection
+      { pid          = show $ AnnounceResponse.pid announceResponse
+      , agentUuid    = AnnounceResponse.agentUuid announceResponse
+      }
+  in
   AgentReady $
-    AgentConnection
-      { pid       = show $ AnnounceResponse.pid announceResponse
-      , agentUuid = AnnounceResponse.agentUuid announceResponse
+    Ready
+      { connection = agentConnection
+      , metrics    = metricsStore
       }
 
 
@@ -79,6 +104,7 @@ data InternalContext = InternalContext
   , connectionState :: STM.TVar ConnectionState
   , fileDescriptor  :: STM.TVar (Maybe CTypes.CInt)
   , currentSpans    :: STM.TVar (Map ThreadId SpanStack)
+  , previousMetrics :: STM.TVar Metrics.Sample
   }
 
 
@@ -129,21 +155,30 @@ readPid context =
 mapConnectionState :: (AgentConnection -> a) -> ConnectionState -> Maybe a
 mapConnectionState fn state =
   case state of
-    AgentReady agentConnection ->
+    AgentReady (Ready agentConnection _) ->
       Just $ fn agentConnection
     _ ->
       Nothing
 
 
 -- |Executes an IO action only when the connection to the agent has been
--- established. The action receives the PID and the agent UUID as parameters.
-whenConnected :: InternalContext -> (String -> Text -> IO ()) -> IO ()
+-- established. The action receives the PID, the agent UUID and the internal
+-- metrics store as parameters (basically everything that is only available with
+-- an established agent connection).
+whenConnected ::
+  InternalContext
+  -> (String -> Text -> Metrics.Store -> IO ())
+  -> IO ()
 whenConnected context action = do
   state <- STM.atomically $ STM.readTVar $ connectionState context
-  whenConnectedState state action
+  whenConnectedState
+    state
+    (\(Ready agentConnection metricsStore) ->
+      action (pid agentConnection) (agentUuid agentConnection) metricsStore
+    )
 
 
-whenConnectedState :: ConnectionState -> (String -> Text -> IO ()) -> IO ()
+whenConnectedState :: ConnectionState -> (Ready -> IO ()) -> IO ()
 whenConnectedState state action = do
   case state of
     Unconnected ->
@@ -154,6 +189,6 @@ whenConnectedState state action = do
       return ()
     Announced ->
       return ()
-    AgentReady agentConnection ->
-      action (pid agentConnection) (agentUuid agentConnection)
+    AgentReady ready -> do
+      action ready
 

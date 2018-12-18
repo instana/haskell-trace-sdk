@@ -214,7 +214,6 @@ shouldUseTranslatedPid instana pid = do
               ]
 
 
-
 shouldUseCustomAgentName :: String -> IO Test
 shouldUseCustomAgentName _ =
   return $

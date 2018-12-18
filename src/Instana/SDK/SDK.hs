@@ -49,6 +49,7 @@ import           Control.Monad.IO.Class         (MonadIO, liftIO)
 import           Data.Aeson                     (Value, (.=))
 import qualified Data.Aeson                     as Aeson
 import qualified Data.ByteString.Char8          as BSC8
+import qualified Data.HashMap.Strict            as HashMap
 import qualified Data.List                      as List
 import qualified Data.Map.Strict                as Map
 import qualified Data.Maybe                     as Maybe
@@ -164,6 +165,7 @@ initInstanaInternal conf = do
   fileDescriptor <- STM.newTVarIO $ Nothing
   threadId <- Concurrent.myThreadId
   currentSpans <- STM.newTVarIO $ Map.singleton threadId SpanStack.empty
+  previousMetrics <- STM.newTVarIO $ HashMap.empty
   -- HTTP.newManager is keep-alive by default (10 connections, we set it to 5)
   manager <- HTTP.newManager $
     HTTP.defaultManagerSettings
@@ -188,6 +190,7 @@ initInstanaInternal conf = do
         , InternalContext.connectionState = connectionState
         , InternalContext.fileDescriptor = fileDescriptor
         , InternalContext.currentSpans = currentSpans
+        , InternalContext.previousMetrics = previousMetrics
         }
   -- The worker thread will also try to establish the connection to the agent
   -- and only start its work when that was successful.

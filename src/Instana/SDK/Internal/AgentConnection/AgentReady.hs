@@ -5,7 +5,7 @@ Description : Handles the agent ready phase for establishing the connection to
 the agent.
 -}
 module Instana.SDK.Internal.AgentConnection.AgentReady
-    ( waitUntilAgentIsReadyToAcceptTraces
+    ( waitUntilAgentIsReadyToAcceptData
     ) where
 
 
@@ -21,25 +21,32 @@ import           System.Log.Logger                                          (deb
 import           Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse (AnnounceResponse)
 import qualified Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse as AnnounceResponse
 import           Instana.SDK.Internal.AgentConnection.Json.Util             (emptyResponseDecoder)
-import           Instana.SDK.Internal.AgentConnection.Paths
+import           Instana.SDK.Internal.AgentConnection.Paths                 (haskellEntityDataPathPrefix)
+import           Instana.SDK.Internal.AgentConnection.ProcessInfo           (ProcessInfo)
 import qualified Instana.SDK.Internal.Config                                as InternalConfig
 import           Instana.SDK.Internal.Context                               (ConnectionState (..),
                                                                              InternalContext)
 import qualified Instana.SDK.Internal.Context                               as InternalContext
 import           Instana.SDK.Internal.Logging                               (instanaLogger)
+import qualified Instana.SDK.Internal.Metrics.Collector                     as MetricsCollector
 import qualified Instana.SDK.Internal.Retry                                 as Retry
 import qualified Instana.SDK.Internal.URL                                   as URL
 
 
 -- |Starts the connection establishment phase where we wait for the agent to
 -- signal that it is ready to accept data.
-waitUntilAgentIsReadyToAcceptTraces ::
+waitUntilAgentIsReadyToAcceptData ::
   InternalContext
   -> String
+  -> ProcessInfo
   -> AnnounceResponse
   -> IO ()
-waitUntilAgentIsReadyToAcceptTraces context originalPidStr announceResponse = do
-  debugM instanaLogger "Waiting until the agent is ready to accept traces."
+waitUntilAgentIsReadyToAcceptData
+    context
+    originalPidStr
+    processInfo
+    announceResponse = do
+  debugM instanaLogger "Waiting until the agent is ready to accept data."
   let
     translatedPidStr = show $ AnnounceResponse.pid announceResponse
     pidTranslationStr =
@@ -52,7 +59,7 @@ waitUntilAgentIsReadyToAcceptTraces context originalPidStr announceResponse = do
       URL.mkHttp
         (InternalConfig.agentHost config)
         (InternalConfig.agentPort config)
-        (haskellAcceptDataPathPrefix ++ translatedPidStr)
+        (haskellEntityDataPathPrefix ++ translatedPidStr)
   agentReadyRequestBase <- HTTP.parseUrlThrow $ show acceptDataUrl
   let
     acceptDataRequest = agentReadyRequestBase
@@ -82,8 +89,11 @@ waitUntilAgentIsReadyToAcceptTraces context originalPidStr announceResponse = do
 
   if success
     then do
+      metricsStore <-
+        MetricsCollector.registerMetrics translatedPidStr processInfo
       let
-         state = InternalContext.mkAgentReadyState announceResponse
+         state =
+           InternalContext.mkAgentReadyState announceResponse metricsStore
       STM.atomically $
         STM.writeTVar (InternalContext.connectionState context) state
       infoM instanaLogger $

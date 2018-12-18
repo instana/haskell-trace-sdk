@@ -8,8 +8,9 @@ module Instana.SDK.AgentStub.StubAPI
 
 import           Servant
 
-import           Instana.SDK.AgentStub.DiscoveryRequest (DiscoveryRequest)
-import           Instana.SDK.AgentStub.TraceRequest     (Span)
+import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
+import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
+import           Instana.SDK.AgentStub.TraceRequest      (Span)
 
 
 type StubAPI =
@@ -19,9 +20,12 @@ type StubAPI =
        -- GET /stub/discoveries
   :<|> "discoveries"
        :> Get '[JSON] [DiscoveryRequest]
-       -- GET /stub/agentReady
-  :<|> "agentReady"
+       -- GET /stub/agent-ready
+  :<|> "agent-ready"
        :> Get '[JSON] [String]
+       -- GET /stub/entity-data
+  :<|> "entity-data"
+       :> Get '[JSON] [EntityDataRequest]
        -- GET /stub/spans
   :<|> "spans"
        :> Get '[JSON] [Span]
@@ -36,7 +40,7 @@ type ResetAPI =
        -- POST /stub/reset/discoveries
        "discoveries"
        :> PostNoContent '[JSON] NoContent
-       -- POST /stub/reset/spans
+       -- POST /stub/reset/agent-ready-requests
   :<|> "spans"
        :> PostNoContent '[JSON] NoContent
 

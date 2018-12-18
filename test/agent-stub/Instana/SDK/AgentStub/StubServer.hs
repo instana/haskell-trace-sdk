@@ -2,22 +2,24 @@
 module Instana.SDK.AgentStub.StubServer (stubServer) where
 
 
-import           Control.Monad.IO.Class                 (liftIO)
-import           Data.STRef                             (modifySTRef, readSTRef)
-import           Servant                                ((:<|>) (..),
-                                                         NoContent (NoContent))
+import           Control.Monad.IO.Class                  (liftIO)
+import           Data.STRef                              (modifySTRef,
+                                                          readSTRef)
+import           Servant                                 ((:<|>) (..),
+                                                          NoContent (NoContent))
 import qualified Servant
-import qualified System.Exit                            as Exit
-import           System.Log.Logger                      (debugM, infoM)
-import qualified System.Posix.Process                   as Posix
+import qualified System.Exit                             as Exit
+import           System.Log.Logger                       (debugM, infoM)
+import qualified System.Posix.Process                    as Posix
 
-import           Instana.SDK.AgentStub.DiscoveryRequest (DiscoveryRequest)
-import           Instana.SDK.AgentStub.Logging          (agentStubLogger)
-import           Instana.SDK.AgentStub.Recorders        (Recorders)
-import qualified Instana.SDK.AgentStub.Recorders        as Recorders
-import           Instana.SDK.AgentStub.StubAPI          (ResetAPI, StubAPI)
-import           Instana.SDK.AgentStub.TraceRequest     (Span)
-import           Instana.SDK.AgentStub.Util             (stToServant)
+import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
+import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
+import           Instana.SDK.AgentStub.Logging           (agentStubLogger)
+import           Instana.SDK.AgentStub.Recorders         (Recorders)
+import qualified Instana.SDK.AgentStub.Recorders         as Recorders
+import           Instana.SDK.AgentStub.StubAPI           (ResetAPI, StubAPI)
+import           Instana.SDK.AgentStub.TraceRequest      (Span)
+import           Instana.SDK.AgentStub.Util              (stToServant)
 
 
 stubServer :: Recorders -> Servant.Server StubAPI
@@ -25,6 +27,7 @@ stubServer recorders =
       getPing
  :<|> getRecordedDiscoveries recorders
  :<|> getRecordedAgentReadyRequests recorders
+ :<|> getRecordedEntityDataRequests recorders
  :<|> getRecordedSpans recorders
  :<|> postShutdown
  :<|> resetServer recorders
@@ -50,6 +53,15 @@ getRecordedAgentReadyRequests recorders = do
   return recordedAgentReadyPids
 
 
+getRecordedEntityDataRequests ::
+  Recorders
+  -> Servant.Handler [EntityDataRequest]
+getRecordedEntityDataRequests recorders = do
+  recordedEntityDataRequests <-
+    stToServant $ readSTRef $ Recorders.entityDataRecorder recorders
+  return recordedEntityDataRequests
+
+
 getRecordedSpans :: Recorders -> Servant.Handler [Span]
 getRecordedSpans recorders = do
   recordedSpans <- stToServant $ readSTRef $ Recorders.spanRecorder recorders
@@ -73,9 +85,12 @@ resetServer recorders =
 
 postResetDiscoveries :: Recorders -> Servant.Handler NoContent
 postResetDiscoveries recorders = do
-  liftIO $ debugM agentStubLogger $ "resetting recorded discoveries"
+  liftIO $ debugM agentStubLogger $
+    "resetting recorded discoveries, agent ready and entity data requests"
   stToServant $ modifySTRef (Recorders.discoveryRecorder recorders) (\_ -> [])
   stToServant $ modifySTRef (Recorders.agentReadyRecorder recorders) (\_ -> [])
+  stToServant $
+    modifySTRef (Recorders.entityDataRecorder recorders) (\_ -> [])
   return NoContent
 
 

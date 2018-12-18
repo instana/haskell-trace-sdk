@@ -20,6 +20,7 @@ allTests =
     , TestLabel "shouldGenerate" shouldGenerate
     ]
 
+
 shouldEncodeIntComponents :: Test
 shouldEncodeIntComponents =
   let

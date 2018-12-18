@@ -19,6 +19,7 @@ import           Control.Monad                                    (forever,
                                                                    when)
 import qualified Data.Aeson                                       as Aeson
 import           Data.Foldable                                    (toList)
+import qualified Data.HashMap.Strict                              as HashMap
 import           Data.List                                        (map)
 import           Data.Sequence                                    ((|>))
 import qualified Data.Sequence                                    as Seq
@@ -28,9 +29,12 @@ import qualified Network.HTTP.Client                              as HTTP
 import qualified Network.HTTP.Types.Status                        as HttpTypes
 import           System.Log.Logger                                (debugM,
                                                                    warningM)
+import qualified System.Metrics                                   as Metrics
+import qualified System.Metrics.Json                              as Metrics.Json
 
 import qualified Instana.SDK.Internal.AgentConnection.ConnectLoop as ConnectLoop
-import           Instana.SDK.Internal.AgentConnection.Paths
+import           Instana.SDK.Internal.AgentConnection.Paths       (haskellEntityDataPathPrefix,
+                                                                   haskellTracePluginPath)
 import           Instana.SDK.Internal.Command                     (Command (..))
 import qualified Instana.SDK.Internal.Config                      as InternalConfig
 import           Instana.SDK.Internal.Context                     (ConnectionState (..),
@@ -41,6 +45,8 @@ import           Instana.SDK.Internal.FullSpan                    (FullSpan (Ful
                                                                    SpanKind (Entry, Exit))
 import qualified Instana.SDK.Internal.FullSpan                    as FullSpan
 import           Instana.SDK.Internal.Logging                     (instanaLogger)
+import qualified Instana.SDK.Internal.Metrics.Collector           as MetricsCollector
+import qualified Instana.SDK.Internal.Metrics.Compression         as MetricsCompression
 import qualified Instana.SDK.Internal.URL                         as URL
 import           Instana.SDK.Span.EntrySpan                       (EntrySpan (..))
 import qualified Instana.SDK.Span.EntrySpan                       as EntrySpan
@@ -53,7 +59,7 @@ spawnWorker :: InternalContext -> IO()
 spawnWorker context = do
   debugM instanaLogger "Spawning Instana Haskell SDK worker"
 
-  -- The worker starts three threads, which continuously:
+  -- The worker starts five threads, which continuously:
   --
   -- 1) Check if the connection to the agent is already/still up. If not, this
   --    thread will start to establish a connection to the agent.
@@ -71,6 +77,13 @@ spawnWorker context = do
   --    buffered spans, if any. Again, sending the spans will only be attempted
   --    when connected, see above.
   _ <- Concurrent.forkIO $ initDrainSpanBufferAfterTimeoutLoop context
+
+  -- 4) Collect and send metrics, if connected.
+  _ <- Concurrent.forkIO $ collectAndSendMetricsLoop context
+
+  -- 5) Make sure full metrics instad of diffs get send every five minutes
+  _ <- Concurrent.forkIO $ resetPreviouslySendMetrics context
+
   return ()
 
 
@@ -219,8 +232,9 @@ sendSpansToAgent ::
   -> [FullSpan]
   -> String
   -> Text
+  -> Metrics.Store
   -> IO ()
-sendSpansToAgent context spans pid _ = do
+sendSpansToAgent context spans pid _ _ = do
   let
     config = InternalContext.config context
     traceEndpointUrl =
@@ -239,7 +253,6 @@ sendSpansToAgent context spans pid _ = do
         }
       ) spans
   defaultRequestSettings <- HTTP.parseUrlThrow traceEndpointUrl
-  debugM instanaLogger $ show $ Aeson.encode spansWithPid
   let
     request =
       defaultRequestSettings
@@ -255,9 +268,6 @@ sendSpansToAgent context spans pid _ = do
   -- of spans? Perhaps do 3 quick retries before giving up, maybe excluding a
   -- 404 response status (because that clearly indicates that a new connection
   -- establishment process has to be initiated.
-
-  -- TODO reduce debug logging
-  debugM instanaLogger "sending spans now"
 
   -- Right now, if sending the spans fails (either in the context of
   -- drainSpanBufferAfterTimeoutLoop or queueSpan), the exception will be
@@ -276,6 +286,128 @@ sendSpansToAgent context spans pid _ = do
   catch
     (do
       _ <- HTTP.httpLbs request $ InternalContext.httpManager context
+      return ()
+    )
+    (\(e :: HTTP.HttpException) -> do
+      let
+        statusCode =
+          case e of
+            HTTP.HttpExceptionRequest _ (HTTP.StatusCodeException response _) ->
+              HttpTypes.statusCode (HTTP.responseStatus response)
+            _ ->
+              0
+      if statusCode == 404
+        then do
+          -- Reset agent to unconnected, triggers a new sensor agent
+          -- handshake.
+          STM.atomically $
+            STM.writeTVar
+              (InternalContext.connectionState context)
+              Unconnected
+          return ()
+        else do
+          debugM instanaLogger $ show e
+          return ()
+    )
+
+
+collectAndSendMetricsLoop :: InternalContext -> IO()
+collectAndSendMetricsLoop context = do
+  let
+    delayMicroSeconds = 1000 * 1000 -- once each second
+  -- offset metrics collection from span buffer draining
+  Concurrent.threadDelay $ 500 * 1000
+  forever $ collectAndSendMetricsSafe delayMicroSeconds context
+
+
+-- |Resets the previously send metrics to an empty map so we send the full set
+-- of metrics the next time (instead of just the diff).
+resetPreviouslySendMetrics :: InternalContext -> IO()
+resetPreviouslySendMetrics context = do
+  let
+    delayMicroSeconds = 5 * 60 * 1000 * 1000 -- once every five minutes
+  forever $ do
+    catch
+      (STM.atomically $ STM.writeTVar
+         (InternalContext.previousMetrics context)
+         HashMap.empty
+      )
+      (\e -> warningM instanaLogger $ show (e :: SomeException))
+    Concurrent.threadDelay delayMicroSeconds
+
+
+collectAndSendMetricsSafe :: Int -> InternalContext -> IO()
+collectAndSendMetricsSafe delayMicroSeconds context = do
+  catch
+    ( do
+        collectAndSendMetricsWhenConnected context
+    )
+    -- exceptions in collectAndSendMetrics must not kill the loop, so we just catch
+    -- everything
+    (\e -> warningM instanaLogger $ show (e :: SomeException))
+  Concurrent.threadDelay delayMicroSeconds
+
+
+collectAndSendMetricsWhenConnected :: InternalContext -> IO ()
+collectAndSendMetricsWhenConnected context =
+  InternalContext.whenConnected context $
+    collectAndSendMetrics context
+
+
+collectAndSendMetrics ::
+  InternalContext
+  -> String
+  -> Text
+  -> Metrics.Store
+  -> IO ()
+collectAndSendMetrics context translatedPidStr _ metricsStore = do
+  previousMetrics <-
+    STM.atomically $ STM.readTVar $ InternalContext.previousMetrics context
+  sampledMetrics <- MetricsCollector.sampleAll metricsStore
+  let
+    compressedMetrics =
+      MetricsCompression.compressSample previousMetrics sampledMetrics
+    metricsAsJson = Metrics.Json.Sample compressedMetrics
+    config = InternalContext.config context
+    metricsEndpointUrl =
+      URL.mkHttp
+        (InternalConfig.agentHost config)
+        (InternalConfig.agentPort config)
+        (haskellEntityDataPathPrefix ++ translatedPidStr)
+  defaultRequestSettings <- HTTP.parseUrlThrow $ show metricsEndpointUrl
+  let
+    request =
+      defaultRequestSettings
+        { HTTP.method = "POST"
+        , HTTP.requestBody = HTTP.RequestBodyLBS $ Aeson.encode metricsAsJson
+        , HTTP.requestHeaders =
+          [ ("Accept", "application/json")
+          , ("Content-Type", "application/json; charset=UTF-8'")
+          ]
+        }
+
+  -- TODO Would we want to retry the request? Or do we just lose this batch
+  -- of data? Perhaps do 3 quick retries before giving up, maybe excluding a
+  -- 404 response status (because that clearly indicates that a new connection
+  -- establishment process has to be initiated.
+
+  -- Right now, if sending the data fails, the exception will be logged and we
+  -- move on.
+  -- That means that if the agent is unavailable for some time, we will try to
+  -- send data at least every second regardless.
+  -- We could do something more sophisticated here like trying to send spans
+  -- less frequently after a number of failed attempts. Maybe we could use
+  -- http://hackage.haskell.org/package/glue-0.2.0/docs/Glue-CircuitBreaker.html
+  --
+  -- Also, as a small performance improvement, we might want to stop
+  -- _collecting_ metrics until the connection has been reestablished.
+  catch
+    (do
+      _ <- HTTP.httpLbs request $ InternalContext.httpManager context
+      _ <- STM.atomically $
+             STM.writeTVar
+               (InternalContext.previousMetrics context)
+               sampledMetrics
       return ()
     )
     (\(e :: HTTP.HttpException) -> do

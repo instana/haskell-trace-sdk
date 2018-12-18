@@ -1,4 +1,4 @@
 .stack-work/
+example-app.log
 agent-stub.log
-sample-app.log
 wai-warp-app.log

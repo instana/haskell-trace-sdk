@@ -26,6 +26,7 @@ import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
 import           Instana.SDK.AgentStub.DiscoveryResponse (DiscoveryResponse (DiscoveryResponse),
                                                           SecretsConfig (SecretsConfig))
 import qualified Instana.SDK.AgentStub.DiscoveryResponse as DiscoveryResponse
+import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
 import           Instana.SDK.AgentStub.Logging           (agentStubLogger)
 import           Instana.SDK.AgentStub.Recorders         (Recorders)
 import qualified Instana.SDK.AgentStub.Recorders         as Recorders
@@ -42,8 +43,9 @@ mainServer ::
   -> Servant.Server API
 mainServer config startupTime recorders =
       getRoot config
- :<|> headAgentReady config startupTime recorders
  :<|> putDiscovery config startupTime recorders
+ :<|> headAgentReady config startupTime recorders
+ :<|> postEntityData config startupTime recorders
  :<|> postTrace config startupTime recorders
  :<|> StubServer.stubServer recorders
 
@@ -53,6 +55,48 @@ getRoot ::
   -> Servant.Handler (Headers '[Header "Server" String] NoContent)
 getRoot config =
   return $ Servant.addHeader (Config.agentName config) NoContent
+
+
+putDiscovery ::
+  AgentStubConfig
+  -> Int
+  -> Recorders
+  -> DiscoveryRequest
+  -> Servant.Handler DiscoveryResponse
+putDiscovery config startupTime recorders discoveryRequest = do
+  now <- liftIO $ round . (* 1000) <$> getPOSIXTime
+  if shouldSimulateConnectionLoss config startupTime now
+    then do
+      liftIO $ debugM agentStubLogger $
+        "Rejecting PUT discovery to simulate connection loss."
+      Servant.throwError err503
+    else do
+      liftIO $
+        debugM agentStubLogger $ "PUT discovery " ++ show discoveryRequest
+      let
+        pidStr = DiscoveryRequest.pid discoveryRequest
+        pid = fromMaybe 0 $ readMaybe pidStr
+        translatedPid =
+          if Config.simulatPidTranslation config
+           then pid + 1
+           else pid
+        translatedDiscoveryRequest =
+          discoveryRequest { DiscoveryRequest.pid = show translatedPid }
+      stToServant $
+        modifySTRef
+          (Recorders.discoveryRecorder recorders)
+          ((++) [translatedDiscoveryRequest])
+      return $
+        DiscoveryResponse
+          { DiscoveryResponse.pid = translatedPid
+          , DiscoveryResponse.agentUuid = "agent-stub-id"
+          , DiscoveryResponse.extraHeaders = Nothing
+          , DiscoveryResponse.secrets =
+            SecretsConfig
+              { DiscoveryResponse.matcher = ""
+              , DiscoveryResponse.list = []
+              }
+          }
 
 
 headAgentReady ::
@@ -97,46 +141,49 @@ headAgentReady
           Servant.throwError err404
 
 
-putDiscovery ::
+postEntityData ::
   AgentStubConfig
   -> Int
   -> Recorders
-  -> DiscoveryRequest
-  -> Servant.Handler DiscoveryResponse
-putDiscovery config startupTime recorders discoveryRequest = do
+  -> String
+  -> EntityDataRequest
+  -> Servant.Handler NoContent
+postEntityData
+    config
+    startupTime
+    recorders
+    pidString
+    entityData
+     = do
   now <- liftIO $ round . (* 1000) <$> getPOSIXTime
   if shouldSimulateConnectionLoss config startupTime now
     then do
       liftIO $ debugM agentStubLogger $
-        "Rejecting PUT discovery to simulate connection loss."
+        "Rejecting POST entity data to simulate connection loss."
       Servant.throwError err503
     else do
-      liftIO $
-        debugM agentStubLogger $ "PUT discovery " ++ show discoveryRequest
+      liftIO $ debugM agentStubLogger $ "POST entity data " ++ pidString
+      recordedDiscoveries <-
+        stToServant $ readSTRef $ Recorders.discoveryRecorder recorders
       let
-        pidStr = DiscoveryRequest.pid discoveryRequest
-        pid = fromMaybe 0 $ readMaybe pidStr
-        translatedPid =
-          if Config.simulatPidTranslation config
-           then pid + 1
-           else pid
-        translatedDiscoveryRequest =
-          discoveryRequest { DiscoveryRequest.pid = show translatedPid }
-      stToServant $
-        modifySTRef
-          (Recorders.discoveryRecorder recorders)
-          ((++) [translatedDiscoveryRequest])
-      return $
-        DiscoveryResponse
-          { DiscoveryResponse.pid = translatedPid
-          , DiscoveryResponse.agentUuid = "agent-stub-id"
-          , DiscoveryResponse.extraHeaders = Nothing
-          , DiscoveryResponse.secrets =
-            SecretsConfig
-              { DiscoveryResponse.matcher = ""
-              , DiscoveryResponse.list = []
-              }
-          }
+        pidStrWithoutPrefix =
+          if isPrefixOf "com.instana.plugin.haskell." pidString
+            then drop 27 pidString else ""
+        knownPids = List.map DiscoveryRequest.pid recordedDiscoveries
+        pidHasBeenAnnounced = elem pidStrWithoutPrefix knownPids
+      if pidHasBeenAnnounced
+        then do
+          liftIO $ debugM agentStubLogger $ show entityData
+          stToServant $
+            modifySTRef
+              (Recorders.entityDataRecorder recorders)
+              ((++) [entityData])
+          return NoContent
+        else do
+          liftIO $ warningM agentStubLogger $
+            "Rejecting entity data request for unannounced PID " ++
+              pidStrWithoutPrefix
+          Servant.throwError err404
 
 
 postTrace ::

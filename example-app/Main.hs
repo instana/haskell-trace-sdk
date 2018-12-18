@@ -20,7 +20,7 @@ import           Text.Read                 (readMaybe)
 
 
 appLogger :: String
-appLogger = "SampleApp"
+appLogger = "ExampleApp"
 
 
 main :: IO ()
@@ -161,7 +161,7 @@ createSpansUsingLowLevelApi instana = do
 initLogging :: IO ()
 initLogging = do
   updateGlobalLogger appLogger $ setLevel INFO
-  appFileHandler <- fileHandler "sample-app.log" INFO
+  appFileHandler <- fileHandler "example-app.log" INFO
   appStreamHandler <- streamHandler stdout INFO
   let
     formattedAppFileHandler = withFormatter appFileHandler

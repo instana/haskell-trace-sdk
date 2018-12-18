@@ -121,12 +121,13 @@ announce context processInfo = do
     debugM instanaLogger $
       "Haskell process " ++ pidStr ++
       " has been successfully announced to agent, now waiting for the agent " ++
-      "to be ready to accept traces."
+      "to be ready to accept data."
 
     -- transition to next phase of sensor-agent handshake
-    AgentReady.waitUntilAgentIsReadyToAcceptTraces
+    AgentReady.waitUntilAgentIsReadyToAcceptData
       context
       pidStr
+      processInfo
       announceResponse
   else do
     warningM instanaLogger $

@@ -14,6 +14,7 @@ import           Instana.SDK.IntegrationTest.HUnitExtra         (ConditionalSuit
                                                                  mergeCounts,
                                                                  unwrapOrSkip)
 import qualified Instana.SDK.IntegrationTest.LowLevelApi        as LowLevelApi
+import qualified Instana.SDK.IntegrationTest.Metrics            as Metrics
 import qualified Instana.SDK.IntegrationTest.Runner             as TestRunner
 import           Instana.SDK.IntegrationTest.Suite              (Suite (Suite), SuiteGenerator (External, Internal))
 import qualified Instana.SDK.IntegrationTest.Suite              as Suite
@@ -30,6 +31,7 @@ allTests = do
       , testPidTranslation
       , testCustomAgentName
       , testHttpTracingHeaders
+      , testMetrics
       ]
     exlusiveSuite =
       List.find isExclusive allTheTests
@@ -240,4 +242,27 @@ testHttpTracingHeaders =
           (TestRunner.runTestsIgnoringHandles suiteGenerator)
         )
       )
+
+
+testMetrics :: ConditionalSuite
+testMetrics =
+  let
+    suiteGenerator =
+      Internal (\instana ->
+        [ Suite
+           { Suite.label =  "Metrics"
+           , Suite.tests = (\pid -> [
+               Metrics.shouldReportMetrics instana pid
+             ])
+           }
+        ]
+      , Suite.withPidTranslation
+      )
+  in
+    Run $
+      Process.withCreateProcess
+        (Process.shell
+          "SIMULATE_PID_TRANSLATION=yes_please stack exec instana-haskell-agent-stub"
+        )
+       (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
