@@ -48,6 +48,8 @@ library
     , network
     , process
     , random
+    , regex-base
+    , regex-tdfa
     , retry
     , scientific
     , stm
@@ -89,6 +91,7 @@ library
       Instana.SDK.Internal.Metrics.Collector
       Instana.SDK.Internal.Metrics.Compression
       Instana.SDK.Internal.Retry
+      Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.URL
       Instana.SDK.Internal.Util
@@ -140,14 +143,18 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , HUnit
     , hslogger
     , random
+    , regex-base
+    , regex-tdfa
     , scientific
     , text
     , unordered-containers
   other-modules:
+      -- the actual tests
       Instana.SDK.Internal.ConfigTest
       Instana.SDK.Internal.IdTest
       Instana.SDK.Internal.LoggingTest
       Instana.SDK.Internal.MetricsCompressionTest
+      Instana.SDK.Internal.SecretsTest
       Instana.SDK.Internal.SpanStackTest
       Instana.SDK.Internal.SpanTest
       -- modules under test
@@ -155,6 +162,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Metrics.Compression
+      Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
       Instana.SDK.Span.Span
       -- dependencies of modules under test
@@ -246,7 +254,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , Instana.SDK.IntegrationTest.Connection
     , Instana.SDK.IntegrationTest.HUnitExtra
     , Instana.SDK.IntegrationTest.HttpHelper
-    , Instana.SDK.IntegrationTest.HttpTracingHeaders
+    , Instana.SDK.IntegrationTest.HttpTracing
     , Instana.SDK.IntegrationTest.LowLevelApi
     , Instana.SDK.IntegrationTest.Metrics
     , Instana.SDK.IntegrationTest.Runner
@@ -272,6 +280,7 @@ executable instana-haskell-test-wai-server
     , binary
     , bytestring
     , hslogger
+    , http-client
     , http-types
     , instana-haskell-trace-sdk
     , unix

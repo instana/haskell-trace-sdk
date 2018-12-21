@@ -5,6 +5,7 @@ import qualified Instana.SDK.Internal.ConfigTest             as ConfigTest
 import qualified Instana.SDK.Internal.IdTest                 as IdTest
 import qualified Instana.SDK.Internal.LoggingTest            as LoggingTest
 import qualified Instana.SDK.Internal.MetricsCompressionTest as MetricsCompressionTest
+import qualified Instana.SDK.Internal.SecretsTest            as SecretsTest
 import qualified Instana.SDK.Internal.SpanStackTest          as SpanStackTest
 import qualified Instana.SDK.Internal.SpanTest               as SpanTest
 
@@ -23,6 +24,7 @@ allTests =
     , IdTest.allTests
     , LoggingTest.allTests
     , MetricsCompressionTest.allTests
+    , SecretsTest.allTests
     , SpanTest.allTests
     , SpanStackTest.allTests
     ]

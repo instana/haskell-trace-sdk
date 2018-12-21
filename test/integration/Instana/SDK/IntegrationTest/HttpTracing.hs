@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Instana.SDK.IntegrationTest.HttpTracingHeaders
+module Instana.SDK.IntegrationTest.HttpTracing
   ( shouldCreateRootEntryWithBracketApi
   , shouldCreateNonRootEntryWithBracketApi
   , shouldSuppressWithBracketApi
@@ -18,7 +18,7 @@ import           Data.Maybe                             (isNothing)
 import           Instana.SDK.AgentStub.TraceRequest     (From (..), Span)
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
-import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
+import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel, applyLabel,
                                                          assertAllIO, failIO)
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import qualified Network.HTTP.Client                    as HTTP
@@ -74,12 +74,12 @@ shouldSuppressWithLowLevelApi =
 
 runBracketTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
 runBracketTest pid headers extraAsserts =
-  runTest pid "bracket/api" headers extraAsserts
+  runTest pid "bracket/api?some=query&parameters=1" headers extraAsserts
 
 
 runLowLevelTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
 runLowLevelTest pid headers extraAsserts =
-  runTest pid "low/level/api" headers extraAsserts
+  runTest pid "low/level/api?some=query&parameters=2" headers extraAsserts
 
 
 runTest :: String -> String -> [Header] -> (Span -> [Assertion]) -> IO Test
@@ -90,7 +90,8 @@ runTest pid urlPath headers extraAsserts = do
     result = LBSC8.unpack $ HTTP.responseBody response
     from = Just $ From pid
   spansResults <-
-    TestHelper.waitForSpansMatching [ "haskell.wai.server" , "haskell.dummy.exit" ]
+    TestHelper.waitForSpansMatching
+      [ "haskell.wai.server" , "haskell.http.client" ]
   case spansResults of
     Left failure ->
       failIO $ "Could not load recorded spans from agent stub: " ++ failure
@@ -98,7 +99,7 @@ runTest pid urlPath headers extraAsserts = do
       let
         maybeEntrySpan =
           TestHelper.getSpanByName "haskell.wai.server" spans
-        maybeExitSpan = TestHelper.getSpanByName "haskell.dummy.exit" spans
+        maybeExitSpan = TestHelper.getSpanByName "haskell.http.client" spans
       if isNothing maybeEntrySpan || isNothing maybeExitSpan
         then
           failIO "expected spans have not been recorded"
@@ -175,17 +176,30 @@ commonAsserts entrySpan exitSpan result from =
   , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
   , assertEqual "exit error" 0 (TraceRequest.ec exitSpan)
   , assertEqual "exit from" from $ TraceRequest.f exitSpan
+  , assertEqual "exit data"
+    ( Aeson.object
+      [ "http" .= (Aeson.object
+          [ "method" .= ("GET" :: String)
+          , "url"    .= ("http://127.0.0.1:1302/" :: String)
+          , "params" .= ("some=query&parameters=2" :: String)
+          , "status" .= (200 :: Int)
+          ]
+        )
+      ]
+    )
+    (TraceRequest.spanData exitSpan)
   ]
 
 
 bracketAsserts :: Span -> [Assertion]
 bracketAsserts entrySpan =
-  [ assertEqual "exit data"
+  [ assertEqual "entry data"
     ( Aeson.object
-      [ "http"    .= (Aeson.object
+      [ "http"       .= (Aeson.object
           [ "method" .= ("GET" :: String)
-          , "url" .= ("/bracket/api" :: String)
-          , "host" .= ("127.0.0.1:1207" :: String)
+          , "host"   .= ("127.0.0.1:1207" :: String)
+          , "url"    .= ("/bracket/api" :: String)
+          , "params" .= ("some=query&parameters=1" :: String)
           ]
         )
       ]
@@ -196,12 +210,13 @@ bracketAsserts entrySpan =
 
 lowLevelAsserts :: Span -> [Assertion]
 lowLevelAsserts entrySpan =
-  [ assertEqual "exit data"
+  [ assertEqual "entry data"
     ( Aeson.object
-      [ "http"    .= (Aeson.object
+      [ "http"       .= (Aeson.object
           [ "method" .= ("GET" :: String)
-          , "url" .= ("/low/level/api" :: String)
-          , "host" .= ("127.0.0.1:1207" :: String)
+          , "host"   .= ("127.0.0.1:1207" :: String)
+          , "url"    .= ("/low/level/api" :: String)
+          , "params" .= ("some=query&parameters=2" :: String)
           ]
         )
       ]

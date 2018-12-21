@@ -31,11 +31,13 @@ module Instana.SDK.SDK
     , startEntry
     , startExit
     , startHttpEntry
+    , startHttpExit
     , startRootEntry
     , withConfiguredInstana
     , withEntry
     , withExit
     , withHttpEntry
+    , withHttpExit
     , withInstana
     , withRootEntry
     ) where
@@ -55,8 +57,10 @@ import qualified Data.Map.Strict                as Map
 import qualified Data.Maybe                     as Maybe
 import qualified Data.Sequence                  as Seq
 import           Data.Text                      (Text)
+import qualified Data.Text                      as T
 import           Data.Time.Clock.POSIX          (getPOSIXTime)
 import qualified Network.HTTP.Client            as HTTP
+import qualified Network.HTTP.Types             as HTTPTypes
 import qualified Network.Socket                 as Socket
 import qualified Network.Wai                    as Wai
 import           System.Log.Logger              (warningM)
@@ -72,6 +76,7 @@ import qualified Instana.SDK.Internal.Context   as InternalContext
 import qualified Instana.SDK.Internal.Id        as Id
 import           Instana.SDK.Internal.Logging   (instanaLogger)
 import qualified Instana.SDK.Internal.Logging   as Logging
+import qualified Instana.SDK.Internal.Secrets   as Secrets
 import           Instana.SDK.Internal.SpanStack (SpanStack)
 import qualified Instana.SDK.Internal.SpanStack as SpanStack
 import           Instana.SDK.Internal.Util      ((|>))
@@ -231,7 +236,7 @@ withEntry context traceId parentId spanName io = do
 -- |A convenience function that examines the given request for Instana tracing
 -- headers (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
 -- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
--- 'completeEntry', depending on the presence of absence of these headers.
+-- 'completeEntry', depending on the presence or absence of these headers.
 withHttpEntry ::
   MonadIO m =>
   InstanaContext
@@ -297,6 +302,7 @@ addHttpData context request = do
         [ "method" .= Wai.requestMethod request |> BSC8.unpack
         , "url"    .= Wai.rawPathInfo request |> BSC8.unpack
         , "host"   .= host
+        , "params" .= (processQueryString $ Wai.rawQueryString request)
         ]
       ]
     )
@@ -312,6 +318,22 @@ withExit ::
 withExit context spanName io = do
   startExit context spanName
   result <- io
+  completeExit context
+  return result
+
+
+-- |Wraps an IO action in 'startHttpExit' and 'completeExit'. The given action
+-- is accepted as a function (Request -> IO a) and is expected to use the
+-- provided request parameter for executing the HTTP request.
+withHttpExit ::
+  MonadIO m =>
+  InstanaContext
+  -> HTTP.Request
+  -> (HTTP.Request -> m a)
+  -> m a
+withHttpExit context request io = do
+  request' <- startHttpExit context request
+  result <- io request'
   completeExit context
   return result
 
@@ -479,6 +501,78 @@ startExit context spanName = do
             "\" since there is no active entry span " ++
             "(actually, there is no active span at all)."
           return ()
+
+
+-- |Creates a preliminary/incomplete http exit span, which should later be
+-- completed with 'completeExit'. The Instana tracing headers are added to the
+-- request and the modified request value is returned (use the return value of
+-- this function to execute your request instead of the request value passed
+-- into this function).
+startHttpExit ::
+  MonadIO m =>
+  InstanaContext
+  -> HTTP.Request
+  -> m HTTP.Request
+startHttpExit context request = do
+  request' <- addHttpTracingHeaders context request
+  let
+    originalCheckResponse = HTTP.checkResponse request'
+    request'' =
+      request'
+        { HTTP.checkResponse = (\req res -> do
+            let
+              status =
+                res
+                  |> HTTP.responseStatus
+                  |> HTTPTypes.statusCode
+            addData context
+              (Aeson.object [ "http" .=
+                Aeson.object
+                  [ "status" .= status
+                  ]
+                ]
+              )
+            originalCheckResponse req res
+          )
+        }
+    port = ":" ++ (show $ HTTP.port request)
+    protocol = if HTTP.secure request then "https://" else "http://"
+    host = BSC8.unpack $ HTTP.host request
+    path = BSC8.unpack $ HTTP.path request
+    url = protocol ++ host ++ port ++ path
+
+  startExit context "haskell.http.client"
+  addData
+    context
+    (Aeson.object [ "http" .=
+      Aeson.object
+        [ "method" .= (BSC8.unpack $ HTTP.method request)
+        , "url"    .= url
+        , "params" .= (processQueryString $ HTTP.queryString request)
+        ]
+      ]
+    )
+  return request''
+
+
+processQueryString :: BSC8.ByteString -> Text
+processQueryString queryString =
+  let
+    matcher = Secrets.defaultSecretsMatcher
+  in
+  queryString
+    |> BSC8.unpack
+    |> T.pack
+    |> (\t -> if (not . T.null) t && T.head  t == '?' then T.tail t else t)
+    |> T.splitOn "&"
+    |> List.map (T.splitOn "=")
+    |> List.filter
+        (\pair ->
+          List.length pair == 2 &&
+          (not . Secrets.isSecret matcher) (List.head pair)
+        )
+    |> List.map (T.intercalate "=")
+    |> T.intercalate "&"
 
 
 -- |Completes an entry span, to be called at the last possible moment before the

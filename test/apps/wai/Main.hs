@@ -8,7 +8,8 @@ import qualified Data.Binary.Builder        as Builder
 import qualified Data.ByteString.Lazy.Char8 as LBSC8
 import           Instana.SDK.SDK            (InstanaContext)
 import qualified Instana.SDK.SDK            as InstanaSDK
-import qualified Network.HTTP.Types         as HTTP
+import qualified Network.HTTP.Client        as HTTP
+import qualified Network.HTTP.Types         as HTTPTypes
 import qualified Network.Wai                as Wai
 import qualified Network.Wai.Handler.Warp   as Warp
 import qualified System.Exit                as Exit
@@ -29,8 +30,8 @@ appLogger :: String
 appLogger = "WaiWarpApp"
 
 
-application :: InstanaContext -> CPid -> Wai.Application
-application instana pid request respond = do
+application :: InstanaContext -> HTTP.Manager -> CPid -> Wai.Application
+application instana httpManager pid request respond = do
   let
     route = Wai.pathInfo request
     method = Wai.requestMethod request
@@ -42,9 +43,9 @@ application instana pid request respond = do
     ("POST", ["shutdown"]) ->
       shutDown respond
     ("GET", ["bracket", "api"]) ->
-      bracketApi instana request respond
+      bracketApi instana httpManager request respond
     ("GET", ["low", "level", "api"]) ->
-      lowLevelApi instana request respond
+      lowLevelApi instana httpManager request respond
     _ ->
       respond404 respond
 
@@ -54,7 +55,10 @@ root ::
   -> IO Wai.ResponseReceived
 root respond =
   respond $
-    Wai.responseLBS HTTP.status200 [("Content-Type", "text/plain")] "Instana Haskell Trace SDK Integration Test Wai Dummy App"
+    Wai.responseLBS
+      HTTPTypes.status200
+      [("Content-Type", "text/plain")]
+      "Instana Haskell Trace SDK Integration Test Wai Dummy App"
 
 
 ping ::
@@ -63,7 +67,7 @@ ping ::
   -> IO Wai.ResponseReceived
 ping respond pid = do
   respond $
-    Wai.responseLBS HTTP.status200 [] $ LBSC8.pack $ show pid
+    Wai.responseLBS HTTPTypes.status200 [] $ LBSC8.pack $ show pid
 
 
 shutDown ::
@@ -73,40 +77,52 @@ shutDown respond = do
   liftIO $ infoM appLogger $ "Wai/Warp app shutdown requested"
   _ <-liftIO $ Posix.exitImmediately Exit.ExitSuccess
   respond $
-    Wai.responseBuilder HTTP.status204 [] Builder.empty
+    Wai.responseBuilder HTTPTypes.status204 [] Builder.empty
 
 
 bracketApi ::
   InstanaContext
+  -> HTTP.Manager
   -> Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-bracketApi instana request respond =
-  InstanaSDK.withHttpEntry instana request "haskell.wai.server" $ do
-    InstanaSDK.withExit instana "haskell.dummy.exit" $
-      -- some time needs to pass, otherwise the exit span's duration will be 0
-      threadDelay $ 10 * 1000
+bracketApi instana httpManager requestIn respond =
+  InstanaSDK.withHttpEntry instana requestIn "haskell.wai.server" $ do
+    requestOut <-
+      HTTP.parseUrlThrow $
+        "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
+    _ <- InstanaSDK.withHttpExit
+      instana
+      requestOut
+      (\req -> do
+        _ <- HTTP.httpLbs req httpManager
+        threadDelay $ 1000 -- make sure there is a duration > 0
+      )
     respond $
       Wai.responseBuilder
-        HTTP.status200
+        HTTPTypes.status200
         [("Content-Type", "application/json; charset=UTF-8")]
         "{\"reponse\": \"ok\"}"
 
 
 lowLevelApi ::
   InstanaContext
+  -> HTTP.Manager
   -> Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-lowLevelApi instana request respond = do
-  InstanaSDK.startHttpEntry instana request "haskell.wai.server"
-  InstanaSDK.startExit instana "haskell.dummy.exit"
-  -- some time needs to pass, otherwise the exit span's duration will be 0
-  threadDelay $ 10 * 1000
+lowLevelApi instana httpManager requestIn respond = do
+  InstanaSDK.startHttpEntry instana requestIn "haskell.wai.server"
+  requestOut <-
+    HTTP.parseUrlThrow $
+      "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
+  requestOut' <- InstanaSDK.startHttpExit instana requestOut
+  _ <- HTTP.httpLbs requestOut' httpManager
+  threadDelay $ 1000 -- make sure there is a duration > 0
   InstanaSDK.completeExit instana
   result <- respond $
     Wai.responseBuilder
-      HTTP.status200
+      HTTPTypes.status200
       [("Content-Type", "application/json; charset=UTF-8")]
       "{\"reponse\": \"ok\"}"
   InstanaSDK.completeEntry instana
@@ -118,19 +134,20 @@ respond404 ::
   -> IO Wai.ResponseReceived
 respond404 respond =
   respond $
-    Wai.responseLBS HTTP.status404 [] "not found"
+    Wai.responseLBS HTTPTypes.status404 [] "not found"
 
 
 main :: IO ()
 main = do
   initLogging
+  httpManager <- initHttpManager
   let
     config = InstanaSDK.defaultConfig { InstanaSDK.agentPort = Just 1302 }
-  InstanaSDK.withConfiguredInstana config $ runApp
+  InstanaSDK.withConfiguredInstana config $ runApp httpManager
 
 
-runApp :: InstanaContext -> IO ()
-runApp instana = do
+runApp :: HTTP.Manager -> InstanaContext -> IO ()
+runApp httpManager instana = do
   pid <- Posix.getProcessID
   let
     host = "127.0.0.1"
@@ -140,7 +157,7 @@ runApp instana = do
   infoM appLogger $
     "Starting Wai/Warp app at " ++ host ++ ":" ++ show port ++
     " (PID: " ++ show pid ++ ")."
-  Warp.runSettings warpSettings $ application instana pid
+  Warp.runSettings warpSettings $ application instana httpManager pid
 
 
 initLogging :: IO ()
@@ -162,4 +179,13 @@ withFormatter handler = setFormatter handler formatter
   where
     timeFormat = "%F %H:%M:%S.%4q %z"
     formatter = tfLogFormatter timeFormat "{$time $loggername $pid $prio} $msg"
+
+
+initHttpManager :: IO HTTP.Manager
+initHttpManager =
+  HTTP.newManager $
+    HTTP.defaultManagerSettings
+      { HTTP.managerConnCount = 5
+      , HTTP.managerResponseTimeout = HTTP.responseTimeoutMicro $ 5000 * 1000
+      }
 

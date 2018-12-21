@@ -93,8 +93,8 @@ putDiscovery config startupTime recorders discoveryRequest = do
           , DiscoveryResponse.extraHeaders = Nothing
           , DiscoveryResponse.secrets =
             SecretsConfig
-              { DiscoveryResponse.matcher = ""
-              , DiscoveryResponse.list = []
+              { DiscoveryResponse.matcher = "contains-ignore-case"
+              , DiscoveryResponse.list = ["key", "pass", "secret"]
               }
           }
 

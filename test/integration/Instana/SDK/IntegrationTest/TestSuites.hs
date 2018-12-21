@@ -1,23 +1,23 @@
 module Instana.SDK.IntegrationTest.TestSuites (allTests) where
 
 
-import           System.Process                                 as Process
+import           System.Process                          as Process
 import           Test.HUnit
 
-import qualified Data.List                                      as List
-import           Data.Maybe                                     (isJust)
-import qualified Instana.SDK.IntegrationTest.BracketApi         as BracketApi
-import qualified Instana.SDK.IntegrationTest.Connection         as Connection
-import qualified Instana.SDK.IntegrationTest.HttpTracingHeaders as HttpTracingHeaders
-import           Instana.SDK.IntegrationTest.HUnitExtra         (ConditionalSuite (..),
-                                                                 isExclusive,
-                                                                 mergeCounts,
-                                                                 unwrapOrSkip)
-import qualified Instana.SDK.IntegrationTest.LowLevelApi        as LowLevelApi
-import qualified Instana.SDK.IntegrationTest.Metrics            as Metrics
-import qualified Instana.SDK.IntegrationTest.Runner             as TestRunner
-import           Instana.SDK.IntegrationTest.Suite              (Suite (Suite), SuiteGenerator (External, Internal))
-import qualified Instana.SDK.IntegrationTest.Suite              as Suite
+import qualified Data.List                               as List
+import           Data.Maybe                              (isJust)
+import qualified Instana.SDK.IntegrationTest.BracketApi  as BracketApi
+import qualified Instana.SDK.IntegrationTest.Connection  as Connection
+import qualified Instana.SDK.IntegrationTest.HttpTracing as HttpTracing
+import           Instana.SDK.IntegrationTest.HUnitExtra  (ConditionalSuite (..),
+                                                          isExclusive,
+                                                          mergeCounts,
+                                                          unwrapOrSkip)
+import qualified Instana.SDK.IntegrationTest.LowLevelApi as LowLevelApi
+import qualified Instana.SDK.IntegrationTest.Metrics     as Metrics
+import qualified Instana.SDK.IntegrationTest.Runner      as TestRunner
+import           Instana.SDK.IntegrationTest.Suite       (Suite (Suite), SuiteGenerator (External, Internal))
+import qualified Instana.SDK.IntegrationTest.Suite       as Suite
 
 
 allTests :: IO Counts
@@ -30,7 +30,7 @@ allTests = do
       , testAgentRestart
       , testPidTranslation
       , testCustomAgentName
-      , testHttpTracingHeaders
+      , testHttpTracing
       , testMetrics
       ]
     exlusiveSuite =
@@ -213,20 +213,20 @@ testCustomAgentName =
        (TestRunner.runTestsIgnoringHandles suiteGenerator)
 
 
-testHttpTracingHeaders :: ConditionalSuite
-testHttpTracingHeaders =
+testHttpTracing :: ConditionalSuite
+testHttpTracing =
   let
     suiteGenerator =
       External (
         [ Suite
             { Suite.label = "HTTP Tracing Headers"
             , Suite.tests = (\pid -> [
-                HttpTracingHeaders.shouldCreateRootEntryWithBracketApi pid
-              , HttpTracingHeaders.shouldCreateNonRootEntryWithBracketApi pid
-              , HttpTracingHeaders.shouldSuppressWithBracketApi
-              , HttpTracingHeaders.shouldCreateRootEntryWithLowLevelApi pid
-              , HttpTracingHeaders.shouldCreateNonRootEntryWithLowLevelApi pid
-              , HttpTracingHeaders.shouldSuppressWithLowLevelApi
+                HttpTracing.shouldCreateRootEntryWithBracketApi pid
+              , HttpTracing.shouldCreateNonRootEntryWithBracketApi pid
+              , HttpTracing.shouldSuppressWithBracketApi
+              , HttpTracing.shouldCreateRootEntryWithLowLevelApi pid
+              , HttpTracing.shouldCreateNonRootEntryWithLowLevelApi pid
+              , HttpTracing.shouldSuppressWithLowLevelApi
               ])
             }
           ]
