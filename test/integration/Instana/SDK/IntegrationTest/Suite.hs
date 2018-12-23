@@ -5,6 +5,7 @@ module Instana.SDK.IntegrationTest.Suite
   , SuiteGeneratorInternal
   , SuiteOpts(..)
   , defaultOpts
+  , suiteOpts
   , withCustomAgentName
   , withPidTranslation
   ) where
@@ -24,27 +25,29 @@ data Suite =
 
 data SuiteOpts =
   SuiteOpts
-    { usePidTranslation :: Bool
+    { suiteLabel        :: String
+    , usePidTranslation :: Bool
     , customAgentName   :: Maybe String
     }
 
 
-defaultOpts :: SuiteOpts
-defaultOpts =
+defaultOpts :: String -> SuiteOpts
+defaultOpts suiteLabel_ =
   SuiteOpts
-    { usePidTranslation = False
+    { suiteLabel        = suiteLabel_
+    , usePidTranslation = False
     , customAgentName   = Nothing
     }
 
 
-withPidTranslation :: SuiteOpts
-withPidTranslation =
-  defaultOpts { usePidTranslation = True }
+withPidTranslation :: String -> SuiteOpts
+withPidTranslation suiteLabel_ =
+  (defaultOpts suiteLabel_) { usePidTranslation = True }
 
 
-withCustomAgentName :: String -> SuiteOpts
-withCustomAgentName name =
-  defaultOpts { customAgentName = Just name }
+withCustomAgentName :: String -> String -> SuiteOpts
+withCustomAgentName suiteLabel_ agentName =
+  (defaultOpts suiteLabel_) { customAgentName = Just agentName }
 
 
 -- |Describes a test suite that connects the integration test process to the
@@ -59,4 +62,19 @@ type ExternalAppSuites = ([Suite], SuiteOpts)
 data SuiteGenerator =
     Internal SuiteGeneratorInternal
   | External ExternalAppSuites
+
+
+suiteOpts :: SuiteGenerator -> SuiteOpts
+suiteOpts gen =
+  case gen of
+    Internal g ->
+      let
+        (_, opts) = g
+      in
+      opts
+    External g ->
+      let
+        (_, opts) = g
+      in
+      opts
 

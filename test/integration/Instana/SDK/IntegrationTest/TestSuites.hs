@@ -88,7 +88,7 @@ testSpanRecording =
               ])
            }
         ]
-      , Suite.defaultOpts
+      , Suite.defaultOpts "Span Recording"
       )
   in
     Run $
@@ -109,7 +109,7 @@ testConnectionEstablishment =
              ])
            }
         ]
-      , Suite.defaultOpts
+      , Suite.defaultOpts "Connection Establishment"
       )
   in
     Run $
@@ -132,7 +132,7 @@ testConnectionLoss =
             ])
           }
         ]
-      , Suite.defaultOpts
+      , Suite.defaultOpts "Connection Loss"
       )
   in
     Run $
@@ -155,7 +155,7 @@ testAgentRestart =
               ])
             }
         ]
-      , Suite.defaultOpts
+      , Suite.defaultOpts "Agent Restart"
       )
   in
     Run $
@@ -178,7 +178,7 @@ testPidTranslation =
              ])
            }
         ]
-      , Suite.withPidTranslation
+      , Suite.withPidTranslation "PID Translation"
       )
   in
     Run $
@@ -201,7 +201,7 @@ testCustomAgentName =
             ])
           }
         ]
-      , Suite.withCustomAgentName "Devil in Disguise"
+      , Suite.withCustomAgentName "Custom Agent Name" "Devil in Disguise"
       )
   in
     Run $
@@ -230,7 +230,7 @@ testHttpTracing =
               ])
             }
           ]
-        , Suite.defaultOpts
+        , Suite.defaultOpts "Http Tracing"
         )
   in
   Run $
@@ -256,7 +256,7 @@ testMetrics =
              ])
            }
         ]
-      , Suite.withPidTranslation
+      , Suite.withPidTranslation "Metrics"
       )
   in
     Run $
