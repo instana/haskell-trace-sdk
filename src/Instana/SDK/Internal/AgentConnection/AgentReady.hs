@@ -90,7 +90,10 @@ waitUntilAgentIsReadyToAcceptData
   if success
     then do
       metricsStore <-
-        MetricsCollector.registerMetrics translatedPidStr processInfo
+        MetricsCollector.registerMetrics
+          translatedPidStr
+          processInfo
+          (InternalContext.sdkStartTime context)
       let
          state =
            InternalContext.mkAgentReadyState announceResponse metricsStore

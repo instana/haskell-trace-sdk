@@ -3,10 +3,11 @@ module Instana.SDK.AgentStub.EntityDataRequest where
 
 
 import           Data.Aeson
-import qualified Data.Aeson                        as Aeson
+import qualified Data.Aeson                          as Aeson
 import           GHC.Generics
 
-import           Instana.SDK.AgentStub.LabelMetric (LabelMetric)
+import           Instana.SDK.AgentStub.CounterMetric (CounterMetric)
+import           Instana.SDK.AgentStub.LabelMetric   (LabelMetric)
 
 
 -- Example entity data JSON:
@@ -26,6 +27,14 @@ import           Instana.SDK.AgentStub.LabelMetric (LabelMetric)
 --   "pid": {
 --     "type": "l",
 --     "val": "30114"
+--   },
+--   "sensorVersion": {
+--     "type": "l",
+--     "val": "0.1.0.0"
+--   },
+--   "startTime": {
+--     "type": "c",
+--     "val": 1545569786526
 --   },
 --   "rts": {
 --     "gc": {
@@ -114,8 +123,11 @@ data EntityDataRequest =
   EntityDataRequest
     { pid            :: Maybe LabelMetric
     , executablePath :: Maybe LabelMetric
-    , arguments      :: Maybe LabelMetric -- arguments are concatenated
+    -- arguments are concatenated, separate by one space character
+    , arguments      :: Maybe LabelMetric
     , programName    :: Maybe LabelMetric
+    , startTime      :: Maybe CounterMetric
+    , sensorVersion  :: Maybe LabelMetric
     , rts            :: Maybe RtsData
     } deriving (Eq, Show, Generic)
 

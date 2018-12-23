@@ -162,6 +162,10 @@ withInstanaInternal conf fn = do
 
 initInstanaInternal :: FinalConfig -> IO InstanaContext
 initInstanaInternal conf = do
+  -- sdkStartTime will be used to approximate the process start time on
+  -- non-Linux platforms where System.SysInfo is not available. The assumption
+  -- is that the SDK is initialized right at the start of the process.
+  sdkStartTime <- round . (* 1000) <$> getPOSIXTime
   pid <- Process.getProcessID
   Logging.initLogger $ show pid
   commandQueue <- STM.newTQueueIO
@@ -189,6 +193,7 @@ initInstanaInternal conf = do
     context =
       InternalContext
         { InternalContext.config = conf
+        , InternalContext.sdkStartTime = sdkStartTime
         , InternalContext.httpManager = manager
         , InternalContext.commandQueue = commandQueue
         , InternalContext.spanQueue = spanQueue

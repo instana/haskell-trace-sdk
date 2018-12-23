@@ -12,10 +12,13 @@ import           Data.Maybe                              (isJust)
 import qualified Data.Text                               as T
 import           Test.HUnit
 
+import           Instana.SDK.AgentStub.CounterMetric     (CounterMetric)
+import qualified Instana.SDK.AgentStub.CounterMetric     as CounterMetric
 import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
 import qualified Instana.SDK.AgentStub.EntityDataRequest as EntityDataRequest
 import           Instana.SDK.AgentStub.LabelMetric       (LabelMetric (LabelMetric))
 import qualified Instana.SDK.AgentStub.LabelMetric       as LabelMetric
+
 import           Instana.SDK.IntegrationTest.HUnitExtra  (applyLabel,
                                                           assertAllIO, failIO)
 import qualified Instana.SDK.IntegrationTest.TestHelper  as TestHelper
@@ -42,16 +45,23 @@ shouldReportMetrics _ pid =
               "executable path"
               "instana-haskell-trace-sdk-integration-tests"
               (EntityDataRequest.executablePath entityData)
-
           , assertLabelIs
               "program name"
               "instana-haskell-trace-sdk-integration-tests"
               (EntityDataRequest.programName entityData)
-
           , assertLabelIs
               "arguments"
               ""
               (EntityDataRequest.arguments entityData)
+          , assertLabelIs
+              "sensorVersion"
+              "0.1.0.0"
+              (EntityDataRequest.sensorVersion entityData)
+          , assertCounterSatisfies
+              "startTime"
+              (1545570995405 <)
+              (EntityDataRequest.startTime entityData)
+
           , assertMetricsArePresent
               "RTS GC metrics does not contain all expected metric keys"
               -- The list of metrics might depend on GHC version and ekg-core
@@ -115,6 +125,19 @@ label s =
   Just $ LabelMetric
     { LabelMetric.val = T.pack s
     }
+
+
+assertCounterSatisfies ::
+  String
+  -> (Int -> Bool)
+  -> Maybe CounterMetric
+  -> Assertion
+assertCounterSatisfies testLabel predicate counterMetric =
+  case counterMetric of
+    Just metric ->
+      assertBool testLabel (predicate $ CounterMetric.val metric)
+    Nothing ->
+      assertFailure $ testLabel ++ " - counter metric is Nothing"
 
 
 assertMetricsArePresent :: String -> [String] -> EntityDataRequest -> Assertion
