@@ -57,7 +57,7 @@ import qualified Instana.SDK.Span.ExitSpan                        as ExitSpan
 -- |Spawns the SDK's worker. There should only be one worker at any time.
 spawnWorker :: InternalContext -> IO()
 spawnWorker context = do
-  debugM instanaLogger "Spawning Instana Haskell SDK worker"
+  debugM instanaLogger "Spawning the Instana Haskell SDK worker"
 
   -- The worker starts five threads, which continuously:
   --
@@ -297,14 +297,8 @@ sendSpansToAgent context spans pid _ _ = do
             _ ->
               0
       if statusCode == 404
-        then do
-          -- Reset agent to unconnected, triggers a new sensor agent
-          -- handshake.
-          STM.atomically $
-            STM.writeTVar
-              (InternalContext.connectionState context)
-              Unconnected
-          return ()
+        then
+          resetToUnconnected context
         else do
           debugM instanaLogger $ show e
           return ()
@@ -419,16 +413,31 @@ collectAndSendMetrics context translatedPidStr _ metricsStore = do
             _ ->
               0
       if statusCode == 404
-        then do
-          -- Reset agent to unconnected, triggers a new sensor agent
-          -- handshake.
-          STM.atomically $
-            STM.writeTVar
-              (InternalContext.connectionState context)
-              Unconnected
-          return ()
+        then
+          resetToUnconnected context
         else do
           debugM instanaLogger $ show e
           return ()
     )
+
+
+-- |Resets the agent connection to unconnected but only if it is currently
+-- in state AgentReady (that is, the connection is fully established). This
+-- triggers a new sensor agent handshake. The reasoning behind resetting it only
+-- when it is in state AgentReady is that we do not want to interfer with any
+-- attempts to establish a connection that is currently in flight, we only want
+-- to record the fact that we have lost the connection if we thought we were
+-- connected but are not.
+resetToUnconnected :: InternalContext -> IO ()
+resetToUnconnected context = do
+  STM.atomically $
+    STM.modifyTVar'
+      (InternalContext.connectionState context)
+      (\state ->
+        case state of
+          AgentReady _ ->
+            Unconnected
+          _         ->
+            state
+      )
 

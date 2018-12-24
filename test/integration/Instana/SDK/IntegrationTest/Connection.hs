@@ -122,10 +122,10 @@ shouldReconnectAfterAgentRestart instana _ =
 
   -- send another span, should be rejected because, from the perspective
   -- of the agent stub, announce hasn't happen yet. At the same time, this
-  -- this failure should trigger a new connection handshake between the
-  -- monitored process and the agent, so after loosing this span  we can wait
-  -- for the connection handshake to happen again (and alls spans after that
-  -- should be processed again).
+  -- failure should trigger a new connection handshake between the monitored
+  -- process and the agent, so after loosing this span  we can wait for the
+  -- connection handshake to happen again (and alls spans after that should be
+  -- processed again).
   _ <- recordSpans instana "haskell.dummy.agent-restart.after-restart-1"
 
   -- wait for connection self healing

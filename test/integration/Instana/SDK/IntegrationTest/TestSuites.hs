@@ -1,6 +1,7 @@
 module Instana.SDK.IntegrationTest.TestSuites (allTests) where
 
 
+import           System.Exit                             as Exit
 import           System.Process                          as Process
 import           Test.HUnit
 
@@ -57,12 +58,13 @@ allTests = do
     "  Tried: " ++ show triedCount ++
     "  Errors: " ++ show errCount ++
     "  Failures: " ++ show failCount
-  if errCount > 0
-    then putStrLn "😱 There have been errors! 😱"
-    else
-      if failCount > 0
-        then putStrLn "😭 There have been test failures. 😭"
-        else putStrLn "🎉 All tests have passed. 🎉"
+  if errCount > 0 && failCount > 0 then
+    Exit.die "😱 😭 There have been errors and failures! 😱 😭"
+  else if errCount > 0 then
+    Exit.die "😱 There have been errors! 😱"
+  else if failCount > 0 then
+    Exit.die "😭 There have been test failures. 😭"
+  else putStrLn "🎉 All tests have passed. 🎉"
   return mergedResults
 
 

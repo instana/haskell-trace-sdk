@@ -173,7 +173,9 @@ postEntityData
         pidHasBeenAnnounced = elem pidStrWithoutPrefix knownPids
       if pidHasBeenAnnounced
         then do
-          liftIO $ debugM agentStubLogger $ show entityData
+          liftIO $
+            debugM agentStubLogger $
+              "accepting entity data " ++ show entityData
           stToServant $
             modifySTRef
               (Recorders.entityDataRecorder recorders)

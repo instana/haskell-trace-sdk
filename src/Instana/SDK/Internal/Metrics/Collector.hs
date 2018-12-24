@@ -26,13 +26,19 @@ import           Instana.SDK.Internal.Util                        ((|>))
 
 registerMetrics :: String -> ProcessInfo -> Int -> IO Metrics.Store
 registerMetrics translatedPid processInfo sdkStartTime = do
+  -- registerMetrics is executed once more after each connection loss/reconnect.
+  -- It should not be an actual problem, as the previous metrics store should
+  -- have been garbage collected.
+
   instanaMetricsStore <- Metrics.newStore
+
   -- register Instana specific metrics (mostly snapshot data)
   registerCustomMetrics
     instanaMetricsStore
     translatedPid
     processInfo
     sdkStartTime
+
   -- register all predefined GC metrics provided by ekg
   Metrics.registerGcMetrics instanaMetricsStore
   return instanaMetricsStore
