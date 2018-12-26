@@ -159,7 +159,7 @@ containsDiscoveryWithPid ::
   -> [DiscoveryRequest]
   -> Bool
 containsDiscoveryWithPid pid discoveries =
-  length matchingDiscoveries == 1
+  length matchingDiscoveries >= 1
   where
     matchingDiscoveries =
       List.filter

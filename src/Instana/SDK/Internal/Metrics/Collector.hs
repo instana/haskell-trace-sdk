@@ -20,13 +20,17 @@ import qualified Instana.SDK.Internal.AgentConnection.ProcessInfo as ProcessInfo
 import           Instana.SDK.Internal.Util                        ((|>))
 
 
-registerMetrics :: String -> ProcessInfo -> IO Metrics.Store
-registerMetrics translatedPid processInfo = do
+registerMetrics :: String -> ProcessInfo -> Int -> IO Metrics.Store
+registerMetrics translatedPid processInfo sdkStartTime = do
   instanaMetricsStore <- Metrics.newStore
+  -- register Instana specific metrics (mostly snapshot data)
+  registerCustomMetrics
+    instanaMetricsStore
+    translatedPid
+    processInfo
+    sdkStartTime
   -- register all predefined GC metrics provided by ekg
   Metrics.registerGcMetrics instanaMetricsStore
-  -- register more Instana specific metrics
-  registerCustomMetrics instanaMetricsStore translatedPid processInfo
   return instanaMetricsStore
 
 
@@ -34,8 +38,17 @@ sampleAll :: Metrics.Store -> IO Metrics.Sample
 sampleAll = Metrics.sampleAll
 
 
-registerCustomMetrics :: Metrics.Store -> String -> ProcessInfo -> IO ()
-registerCustomMetrics instanaMetricsStore translatedPid processInfo = do
+registerCustomMetrics ::
+  Metrics.Store
+  -> String
+  -> ProcessInfo
+  -> Int
+  -> IO ()
+registerCustomMetrics
+    instanaMetricsStore
+    translatedPid
+    processInfo
+    _ = do
   registerConstantMetric
     instanaMetricsStore
     "pid"
