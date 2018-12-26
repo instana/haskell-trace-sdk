@@ -98,6 +98,7 @@ mkAgentReadyState announceResponse metricsStore =
 -}
 data InternalContext = InternalContext
   { config          :: FinalConfig
+  , sdkStartTime    :: Int
   , httpManager     :: HttpClient.Manager
   , commandQueue    :: STM.TQueue Command
   , spanQueue       :: STM.TVar (Seq FullSpan)
