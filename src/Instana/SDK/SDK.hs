@@ -33,6 +33,7 @@ module Instana.SDK.SDK
     , startHttpEntry
     , startHttpExit
     , startRootEntry
+    , stopInstana
     , withConfiguredInstana
     , withEntry
     , withExit
@@ -175,6 +176,7 @@ initInstanaInternal conf = do
   threadId <- Concurrent.myThreadId
   currentSpans <- STM.newTVarIO $ Map.singleton threadId SpanStack.empty
   previousMetrics <- STM.newTVarIO $ HashMap.empty
+  threadIds <- STM.newTVarIO []
   -- HTTP.newManager is keep-alive by default (10 connections, we set it to 5)
   manager <- HTTP.newManager $
     HTTP.defaultManagerSettings
@@ -201,11 +203,21 @@ initInstanaInternal conf = do
         , InternalContext.fileDescriptor = fileDescriptor
         , InternalContext.currentSpans = currentSpans
         , InternalContext.previousMetrics = previousMetrics
+        , InternalContext.threadIds = threadIds
         }
   -- The worker thread will also try to establish the connection to the agent
   -- and only start its work when that was successful.
   Worker.spawnWorker context
   return context
+
+
+-- |Stops the Instana SDK. Usually you would initialise the SDK and never stop
+-- it again. But if, for any reason, you want to start over after you already
+-- initialized it previously, stop it first and only then initialize it once
+-- more.
+stopInstana :: MonadIO m => InstanaContext -> m ()
+stopInstana =
+  liftIO . Worker.stopWorker
 
 
 -- |Wraps an IO action in 'startRootEntry' and 'completeEntry'.

@@ -8,6 +8,7 @@ Description : Manages the SDKs background worker threads
 -}
 module Instana.SDK.Internal.Worker
     ( spawnWorker
+    , stopWorker
     ) where
 
 
@@ -16,11 +17,13 @@ import qualified Control.Concurrent.STM                           as STM
 import           Control.Exception                                (SomeException,
                                                                    catch)
 import           Control.Monad                                    (forever,
+                                                                   sequence,
                                                                    when)
 import qualified Data.Aeson                                       as Aeson
 import           Data.Foldable                                    (toList)
 import qualified Data.HashMap.Strict                              as HashMap
 import           Data.List                                        (map)
+import qualified Data.List                                        as List
 import           Data.Sequence                                    ((|>))
 import qualified Data.Sequence                                    as Seq
 import           Data.Text                                        (Text)
@@ -63,7 +66,8 @@ spawnWorker context = do
   --
   -- 1) Check if the connection to the agent is already/still up. If not, this
   --    thread will start to establish a connection to the agent.
-  _ <- Concurrent.forkIO $ ConnectLoop.initConnectLoop context
+  connectLoopThreadId <-
+    Concurrent.forkIO $ ConnectLoop.initConnectLoop context
 
   -- 2) Read commands (incoming spans) from the command queue and put arriving
   --    spans into the worker's local span buffer. This will happen regardless
@@ -71,19 +75,42 @@ spawnWorker context = do
   --    local buffer, we'll drain the buffer and, if connected, try to send the
   --    spans to the agent. If not connected, these spans will be dropped. This
   --    avoids excessive memory consumption at the expense of losing spans.
-  _ <- Concurrent.forkIO $ initReadLoop context
+  readLoopThreadId <- Concurrent.forkIO $ initReadLoop context
 
   -- 3) Drain the local span buffer once every second and try to send the
   --    buffered spans, if any. Again, sending the spans will only be attempted
   --    when connected, see above.
-  _ <- Concurrent.forkIO $ initDrainSpanBufferAfterTimeoutLoop context
+  drainSpanBufferThreadId <-
+    Concurrent.forkIO $ initDrainSpanBufferAfterTimeoutLoop context
 
   -- 4) Collect and send metrics, if connected.
-  _ <- Concurrent.forkIO $ collectAndSendMetricsLoop context
+  collectMetricsThreadId <- Concurrent.forkIO $ collectAndSendMetricsLoop context
 
   -- 5) Make sure full metrics instad of diffs get send every five minutes
-  _ <- Concurrent.forkIO $ resetPreviouslySendMetrics context
+  resetMetricsThreadId <- Concurrent.forkIO $ resetPreviouslySendMetrics context
+  STM.atomically $
+    STM.writeTVar
+      (InternalContext.threadIds context)
+      [ connectLoopThreadId
+      , readLoopThreadId
+      , drainSpanBufferThreadId
+      , collectMetricsThreadId
+      , resetMetricsThreadId
+      ]
+  return ()
 
+
+-- |Stops the SDK's worker. Usually you would spawn a single worker and never
+-- stop it again. But if, for any reason, you want to spawn a new worker after
+-- you already have spawned one previously, stop the old one first and only then
+-- spawn a new one.
+stopWorker :: InternalContext -> IO ()
+stopWorker context = do
+  debugM instanaLogger "Stopping the Instana Haskell SDK worker"
+  threadIds <-
+    STM.atomically $ STM.readTVar $ InternalContext.threadIds context
+  _ <- sequence $ List.map Concurrent.killThread threadIds
+  debugM instanaLogger "The Instana Haskell SDK worker has been stopped."
   return ()
 
 

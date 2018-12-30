@@ -60,8 +60,11 @@ runInternalTests suiteGeneratorInternal = do
         , InstanaSDK.agentPort = Just HttpHelper.agentStubPort
         , InstanaSDK.agentName = Suite.customAgentName opts
         }
-  results <- InstanaSDK.withConfiguredInstana config $
-    waitForInternalAgentConnectionAndRun suiteGeneratorInternal
+  instana <- InstanaSDK.initConfiguredInstana config
+  results <-
+    waitForInternalAgentConnectionAndRun
+      suiteGeneratorInternal
+      instana
   -- The withProcess call that starts the agent stub should also terminate it
   -- when the test suite is done or when an error occurs while running the test
   -- suite. On MacOS, this works. On Linux, the agent stub does not get
@@ -72,7 +75,10 @@ runInternalTests suiteGeneratorInternal = do
   -- first started agent stub instance would never be shut down. To make sure
   -- the agent stub instance gets shut down, we send an extra HTTP request to
   -- ask the agent stub to terminate itself.
+
+  -- Clean up: Shut down agent stub and stop the SDKs internal worker threads.
   _ <- TestHelper.shutDownAgentStub
+  _ <- InstanaSDK.stopInstana instana
   return results
 
 

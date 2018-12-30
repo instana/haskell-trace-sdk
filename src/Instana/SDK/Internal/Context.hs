@@ -106,6 +106,7 @@ data InternalContext = InternalContext
   , fileDescriptor  :: STM.TVar (Maybe CTypes.CInt)
   , currentSpans    :: STM.TVar (Map ThreadId SpanStack)
   , previousMetrics :: STM.TVar Metrics.Sample
+  , threadIds       :: STM.TVar [ThreadId]
   }
 
 
