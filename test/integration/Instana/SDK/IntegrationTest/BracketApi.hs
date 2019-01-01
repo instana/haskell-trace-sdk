@@ -6,29 +6,29 @@ module Instana.SDK.IntegrationTest.BracketApi
   ) where
 
 
-import           Control.Concurrent                     (threadDelay)
-import           Data.Aeson                             (Value, (.=))
+import           Data.Aeson                             ((.=))
 import qualified Data.Aeson                             as Aeson
+import           Data.ByteString.Lazy.Char8             as LBSC8
 import           Data.Maybe                             (isNothing)
+import qualified Network.HTTP.Client                    as HTTP
 import           Test.HUnit
 
 import           Instana.SDK.AgentStub.TraceRequest     (From (..))
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
+import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
-import           Instana.SDK.SDK                        (InstanaContext)
-import qualified Instana.SDK.SDK                        as InstanaSDK
 
 
-shouldRecordSpans :: InstanaContext -> String -> IO Test
-shouldRecordSpans instana pid =
+shouldRecordSpans ::  String -> IO Test
+shouldRecordSpans pid =
   applyLabel "shouldRecordSpans" $ do
     let
       from = Just $ From pid
     (result, spansResults) <-
       TestHelper.withSpanCreation
-        (recordSpans instana)
+        createRootEntry
         [ "haskell.dummy.root.entry"
         , "haskell.dummy.exit"
         ]
@@ -73,39 +73,20 @@ shouldRecordSpans instana pid =
               ]
 
 
-recordSpans :: InstanaContext -> IO String
-recordSpans instana = do
-  result <-
-    InstanaSDK.withRootEntry
-      instana
-      "haskell.dummy.root.entry"
-      (recordExit instana)
-  return $ result ++ "::entry done"
+createRootEntry :: IO String
+createRootEntry = do
+  response <- HttpHelper.doAppRequest "bracket/api/root" "POST" []
+  return $ LBSC8.unpack $ HTTP.responseBody response
 
 
-recordExit :: InstanaContext -> IO String
-recordExit instana =
-  InstanaSDK.withExit
-    instana
-    "haskell.dummy.exit"
-    simulateSimpleExitCall
-
-
-simulateSimpleExitCall :: IO String
-simulateSimpleExitCall = do
-  -- some time needs to pass, otherwise the exit span's duration will be 0
-  threadDelay $ 10 * 1000
-  return "exit done"
-
-
-shouldRecordNonRootEntry :: InstanaContext -> String -> IO Test
-shouldRecordNonRootEntry instana pid =
+shouldRecordNonRootEntry :: String -> IO Test
+shouldRecordNonRootEntry pid =
   applyLabel "shouldRecordNonRootEntry" $ do
     let
       from = Just $ From pid
     (result, spansResults) <-
       TestHelper.withSpanCreation
-        (recordNonRootEntry instana)
+        createNonRootEntry
         [ "haskell.dummy.entry"
         , "haskell.dummy.exit"
         ]
@@ -151,26 +132,20 @@ shouldRecordNonRootEntry instana pid =
               ]
 
 
-recordNonRootEntry :: InstanaContext -> IO String
-recordNonRootEntry instana = do
-  result <-
-    InstanaSDK.withEntry
-      instana
-      "trace-id"
-      "parent-id"
-      "haskell.dummy.entry"
-      (recordExit instana)
-  return $ result ++ "::entry done"
+createNonRootEntry :: IO String
+createNonRootEntry = do
+  response <- HttpHelper.doAppRequest "bracket/api/non-root" "POST" []
+  return $ LBSC8.unpack $ HTTP.responseBody response
 
 
-shouldMergeData :: InstanaContext -> String -> IO Test
-shouldMergeData instana pid =
+shouldMergeData :: String -> IO Test
+shouldMergeData pid =
   applyLabel "shouldMergeData" $ do
     let
       from = Just $ From pid
     (result, spansResults) <-
       TestHelper.withSpanCreation
-        (recordSpansWithData instana)
+        createSpansWithData
         [ "haskell.dummy.root.entry"
         , "haskell.dummy.exit"
         ]
@@ -243,56 +218,8 @@ shouldMergeData instana pid =
               ]
 
 
-recordSpansWithData :: InstanaContext -> IO String
-recordSpansWithData instana = do
-  entryCallResult <-
-    InstanaSDK.withRootEntry
-      instana
-      "haskell.dummy.root.entry"
-      (recordExitWithData instana)
-  return entryCallResult
-
-
-recordExitWithData :: InstanaContext -> IO String
-recordExitWithData instana = do
-  InstanaSDK.addData instana (someSpanData "entry")
-  exitCallResult <-
-    InstanaSDK.withExit
-      instana
-      "haskell.dummy.exit"
-      (simulateExitCall instana)
-  InstanaSDK.incrementErrorCount instana
-  InstanaSDK.addData instana (moreSpanData "entry")
-  return $ exitCallResult ++ "::entry done"
-
-
-simulateExitCall :: InstanaContext -> IO String
-simulateExitCall instana = do
-  InstanaSDK.addData instana (someSpanData "exit")
-  -- some time needs to pass, otherwise the exit span' duration will be 0
-  threadDelay $ 10 * 1000
-  InstanaSDK.addToErrorCount instana 2
-  InstanaSDK.addData instana (moreSpanData "exit")
-  InstanaSDK.addDataAt instana "nested.key1" ("nested.text.value1" :: String)
-  InstanaSDK.addDataAt instana "nested.key2" ("nested.text.value2" :: String)
-  InstanaSDK.addDataAt instana "nested.key3" (1604 :: Int)
-  return "exit done"
-
-
-someSpanData :: String -> Value
-someSpanData kind =
-   Aeson.object
-     [ "data1"     .= ("value1" :: String)
-     , "data2"     .= (42 :: Int)
-     , "startKind" .= kind
-     ]
-
-
-moreSpanData :: String -> Value
-moreSpanData kind =
-   Aeson.object
-     [ "data2"   .= (1302 :: Int)
-     , "data3"   .= ("value3" :: String)
-     , "endKind" .= kind
-     ]
+createSpansWithData :: IO String
+createSpansWithData = do
+  response <- HttpHelper.doAppRequest "bracket/api/with-data" "POST" []
+  return $ LBSC8.unpack $ HTTP.responseBody response
 

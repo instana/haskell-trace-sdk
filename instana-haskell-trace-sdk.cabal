@@ -279,12 +279,14 @@ executable instana-haskell-test-wai-server
       -Wall -threaded -rtsopts "-with-rtsopts=-T -N "
   build-depends:
       base >=4.7 && <5
+    , aeson
     , binary
     , bytestring
     , hslogger
     , http-client
     , http-types
     , instana-haskell-trace-sdk
+    , text
     , unix
     , wai
     , warp

@@ -22,11 +22,10 @@ import qualified Instana.SDK.AgentStub.LabelMetric       as LabelMetric
 import           Instana.SDK.IntegrationTest.HUnitExtra  (applyLabel,
                                                           assertAllIO, failIO)
 import qualified Instana.SDK.IntegrationTest.TestHelper  as TestHelper
-import           Instana.SDK.SDK                         (InstanaContext)
 
 
-shouldReportMetrics :: InstanaContext -> String -> IO Test
-shouldReportMetrics _ pid =
+shouldReportMetrics :: String -> IO Test
+shouldReportMetrics pid =
   applyLabel "shouldReportMetrics" $ do
     entityDataRequestsResult <- TestHelper.waitForEntityDataWithPid pid
     case entityDataRequestsResult of
@@ -43,11 +42,11 @@ shouldReportMetrics _ pid =
           [ assertLabelIs "pid" pid (EntityDataRequest.pid entityData)
           , assertLabelContains
               "executable path"
-              "instana-haskell-trace-sdk-integration-tests"
+              "instana-haskell-test-wai-server"
               (EntityDataRequest.executablePath entityData)
           , assertLabelIs
               "program name"
-              "instana-haskell-trace-sdk-integration-tests"
+              "instana-haskell-test-wai-server"
               (EntityDataRequest.programName entityData)
           , assertLabelIs
               "arguments"

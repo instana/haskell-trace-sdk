@@ -46,7 +46,7 @@ shouldCreateNonRootEntryWithBracketApi pid =
 shouldSuppressWithBracketApi :: IO Test
 shouldSuppressWithBracketApi =
   applyLabel "shouldSuppressWithBracketApi" $ do
-    runSuppressedTest "bracket/api"
+    runSuppressedTest "http/bracket/api"
 
 
 shouldCreateRootEntryWithLowLevelApi :: String -> IO Test
@@ -69,17 +69,17 @@ shouldCreateNonRootEntryWithLowLevelApi pid =
 shouldSuppressWithLowLevelApi :: IO Test
 shouldSuppressWithLowLevelApi =
   applyLabel "shouldSuppressWithLowLevelApi" $ do
-    runSuppressedTest "low/level/api"
+    runSuppressedTest "http/low/level/api"
 
 
 runBracketTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
 runBracketTest pid headers extraAsserts =
-  runTest pid "bracket/api?some=query&parameters=1" headers extraAsserts
+  runTest pid "http/bracket/api?some=query&parameters=1" headers extraAsserts
 
 
 runLowLevelTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
 runLowLevelTest pid headers extraAsserts =
-  runTest pid "low/level/api?some=query&parameters=2" headers extraAsserts
+  runTest pid "http/low/level/api?some=query&parameters=2" headers extraAsserts
 
 
 runTest :: String -> String -> [Header] -> (Span -> [Assertion]) -> IO Test
@@ -130,7 +130,7 @@ runSuppressedTest urlPath = do
         then
           failIO "spans have been recorded although they should have not"   else
           assertAllIO
-            [ assertEqual "result" "{\"reponse\": \"ok\"}" result
+            [ assertEqual "result" "{\"response\": \"ok\"}" result
             ]
 
 
@@ -159,7 +159,7 @@ nonRootEntryAsserts entrySpan =
 
 commonAsserts :: Span -> Span -> String -> Maybe From -> [Assertion]
 commonAsserts entrySpan exitSpan result from =
-  [ assertEqual "result" "{\"reponse\": \"ok\"}" result
+  [ assertEqual "result" "{\"response\": \"ok\"}" result
   , assertEqual "trace ID is consistent"
       (TraceRequest.t exitSpan)
       (TraceRequest.t entrySpan)
@@ -198,7 +198,7 @@ bracketAsserts entrySpan =
       [ "http"       .= (Aeson.object
           [ "method" .= ("GET" :: String)
           , "host"   .= ("127.0.0.1:1207" :: String)
-          , "url"    .= ("/bracket/api" :: String)
+          , "url"    .= ("/http/bracket/api" :: String)
           , "params" .= ("some=query&parameters=1" :: String)
           ]
         )
@@ -215,7 +215,7 @@ lowLevelAsserts entrySpan =
       [ "http"       .= (Aeson.object
           [ "method" .= ("GET" :: String)
           , "host"   .= ("127.0.0.1:1207" :: String)
-          , "url"    .= ("/low/level/api" :: String)
+          , "url"    .= ("/http/low/level/api" :: String)
           , "params" .= ("some=query&parameters=2" :: String)
           ]
         )

@@ -3,9 +3,16 @@ module Main where
 
 
 import           Control.Concurrent         (threadDelay)
+import           Control.Monad              (join)
 import           Control.Monad.IO.Class     (liftIO)
+import           Data.Aeson                 (Value, (.=))
+import qualified Data.Aeson                 as Aeson
 import qualified Data.Binary.Builder        as Builder
+import           Data.ByteString            (ByteString)
+import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as LBSC8
+import qualified Data.Maybe                 as Maybe
+import qualified Data.Text                  as T
 import           Instana.SDK.SDK            (InstanaContext)
 import qualified Instana.SDK.SDK            as InstanaSDK
 import qualified Network.HTTP.Client        as HTTP
@@ -40,12 +47,26 @@ application instana httpManager pid request respond = do
       root respond
     (_, ["ping"]) ->
       ping respond pid
+    ("POST", ["bracket", "api", "root"]) ->
+      bracketApiRootEntry instana respond
+    ("POST", ["bracket", "api", "non-root"]) ->
+      bracketApiNonRootEntry instana respond
+    ("POST", ["bracket", "api", "with-data"]) ->
+      bracketApiWithData instana respond
+    ("POST", ["low", "level", "api", "root"]) ->
+      lowLevelApiRootEntry instana respond
+    ("POST", ["low", "level", "api", "non-root"]) ->
+      lowLevelApiNonRootEntry instana respond
+    ("POST", ["low", "level", "api", "with-data"]) ->
+      lowLevelApiWithData instana respond
+    ("GET", ["http", "bracket", "api"]) ->
+      httpBracketApi instana httpManager request respond
+    ("GET", ["http", "low", "level", "api"]) ->
+      httpLowLevelApi instana httpManager request respond
+    ("POST", ["single"]) ->
+      createSingleSpan instana request respond
     ("POST", ["shutdown"]) ->
       shutDown respond
-    ("GET", ["bracket", "api"]) ->
-      bracketApi instana httpManager request respond
-    ("GET", ["low", "level", "api"]) ->
-      lowLevelApi instana httpManager request respond
     _ ->
       respond404 respond
 
@@ -54,11 +75,9 @@ root ::
   (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
 root respond =
-  respond $
-    Wai.responseLBS
-      HTTPTypes.status200
-      [("Content-Type", "text/plain")]
-      "Instana Haskell Trace SDK Integration Test Wai Dummy App"
+  respondWithPlainText
+    respond
+    "Instana Haskell Trace SDK Integration Test Wai Dummy App"
 
 
 ping ::
@@ -70,23 +89,183 @@ ping respond pid = do
     Wai.responseLBS HTTPTypes.status200 [] $ LBSC8.pack $ show pid
 
 
-shutDown ::
-  (Wai.Response -> IO Wai.ResponseReceived)
+bracketApiRootEntry ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-shutDown respond = do
-  liftIO $ infoM appLogger $ "Wai/Warp app shutdown requested"
-  _ <-liftIO $ Posix.exitImmediately Exit.ExitSuccess
-  respond $
-    Wai.responseBuilder HTTPTypes.status204 [] Builder.empty
+bracketApiRootEntry instana respond = do
+  result <-
+    InstanaSDK.withRootEntry
+      instana
+      "haskell.dummy.root.entry"
+      (withExit instana)
+  respondWithPlainText respond $ result ++ "::entry done"
 
 
-bracketApi ::
+bracketApiNonRootEntry ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+bracketApiNonRootEntry instana respond = do
+  result <-
+    InstanaSDK.withEntry
+      instana
+      "trace-id"
+      "parent-id"
+      "haskell.dummy.entry"
+      (withExit instana)
+  respondWithPlainText respond $ result ++ "::entry done"
+
+
+withExit :: InstanaContext -> IO String
+withExit instana =
+  InstanaSDK.withExit
+    instana
+    "haskell.dummy.exit"
+    simulateExitCall
+
+
+bracketApiWithData ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+bracketApiWithData instana respond = do
+  entryCallResult <-
+    InstanaSDK.withRootEntry
+      instana
+      "haskell.dummy.root.entry"
+      (withExitWithData instana)
+  respondWithPlainText respond $ entryCallResult
+
+
+withExitWithData :: InstanaContext -> IO String
+withExitWithData instana = do
+  InstanaSDK.addData instana (someSpanData "entry")
+  exitCallResult <-
+    InstanaSDK.withExit
+      instana
+      "haskell.dummy.exit"
+      (simulateExitCallWithData instana)
+  InstanaSDK.incrementErrorCount instana
+  InstanaSDK.addData instana (moreSpanData "entry")
+  return $ exitCallResult ++ "::entry done"
+
+
+simulateExitCallWithData :: InstanaContext -> IO String
+simulateExitCallWithData instana = do
+  InstanaSDK.addData instana (someSpanData "exit")
+  -- some time needs to pass, otherwise the exit span's duration will be 0
+  threadDelay $ 10 * 1000
+  InstanaSDK.addToErrorCount instana 2
+  InstanaSDK.addData instana (moreSpanData "exit")
+  InstanaSDK.addDataAt instana "nested.key1" ("nested.text.value1" :: String)
+  InstanaSDK.addDataAt instana "nested.key2" ("nested.text.value2" :: String)
+  InstanaSDK.addDataAt instana "nested.key3" (1604 :: Int)
+  return "exit done"
+
+
+lowLevelApiRootEntry ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+lowLevelApiRootEntry instana respond = do
+  InstanaSDK.startRootEntry
+    instana
+    "haskell.dummy.root.entry"
+  result <- doExitCall instana
+  InstanaSDK.completeEntry instana
+  respondWithPlainText respond result
+
+
+lowLevelApiNonRootEntry ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+lowLevelApiNonRootEntry instana respond = do
+  InstanaSDK.startEntry
+    instana
+    "trace-id"
+    "parent-id"
+    "haskell.dummy.entry"
+  result <- doExitCall instana
+  InstanaSDK.completeEntry instana
+  respondWithPlainText respond result
+
+
+doExitCall :: InstanaContext -> IO String
+doExitCall instana = do
+  InstanaSDK.startExit
+    instana
+    "haskell.dummy.exit"
+  result <- simulateExitCall
+  InstanaSDK.completeExit instana
+  return result
+
+
+lowLevelApiWithData ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+lowLevelApiWithData instana respond = do
+  InstanaSDK.startRootEntry
+    instana
+    "haskell.dummy.root.entry"
+  InstanaSDK.addData instana (someSpanData "entry")
+  result <- doExitCallWithData instana
+  InstanaSDK.incrementErrorCount instana
+  InstanaSDK.addData instana (moreSpanData "entry")
+  InstanaSDK.addDataAt
+    instana "nested.entry.key" ("nested.entry.value" :: String)
+  InstanaSDK.completeEntry instana
+  respondWithPlainText respond result
+
+
+doExitCallWithData :: InstanaContext -> IO String
+doExitCallWithData instana = do
+  InstanaSDK.startExit
+    instana
+    "haskell.dummy.exit"
+  InstanaSDK.addData instana (someSpanData "exit")
+  result <- simulateExitCall
+  InstanaSDK.incrementErrorCount instana
+  InstanaSDK.addData instana (moreSpanData "exit")
+  InstanaSDK.addDataAt instana "nested.exit.key" ("nested.exit.value" :: String)
+  InstanaSDK.completeExit instana
+  return result
+
+
+simulateExitCall :: IO String
+simulateExitCall = do
+  -- some time needs to pass, otherwise the exit span's duration will be 0
+  threadDelay $ 10 * 1000
+  return "exit done"
+
+
+someSpanData :: String -> Value
+someSpanData kind =
+   Aeson.object
+     [ "data1"     .= ("value1" :: String)
+     , "data2"     .= (42 :: Int)
+     , "startKind" .= kind
+     ]
+
+
+moreSpanData :: String -> Value
+moreSpanData kind =
+   Aeson.object
+     [ "data2"   .= (1302 :: Int)
+     , "data3"   .= ("value3" :: String)
+     , "endKind" .= kind
+     ]
+
+
+httpBracketApi ::
   InstanaContext
   -> HTTP.Manager
   -> Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-bracketApi instana httpManager requestIn respond =
+httpBracketApi instana httpManager requestIn respond =
   InstanaSDK.withHttpEntry instana requestIn "haskell.wai.server" $ do
     requestOut <-
       HTTP.parseUrlThrow $
@@ -102,16 +281,16 @@ bracketApi instana httpManager requestIn respond =
       Wai.responseBuilder
         HTTPTypes.status200
         [("Content-Type", "application/json; charset=UTF-8")]
-        "{\"reponse\": \"ok\"}"
+        "{\"response\": \"ok\"}"
 
 
-lowLevelApi ::
+httpLowLevelApi ::
   InstanaContext
   -> HTTP.Manager
   -> Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-lowLevelApi instana httpManager requestIn respond = do
+httpLowLevelApi instana httpManager requestIn respond = do
   InstanaSDK.startHttpEntry instana requestIn "haskell.wai.server"
   requestOut <-
     HTTP.parseUrlThrow $
@@ -124,9 +303,52 @@ lowLevelApi instana httpManager requestIn respond = do
     Wai.responseBuilder
       HTTPTypes.status200
       [("Content-Type", "application/json; charset=UTF-8")]
-      "{\"reponse\": \"ok\"}"
+      "{\"response\": \"ok\"}"
   InstanaSDK.completeEntry instana
   return result
+
+
+createSingleSpan ::
+  InstanaContext
+  -> Wai.Request
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+createSingleSpan instana requestIn respond = do
+  let
+    query = Wai.queryString requestIn
+    maybeMaybeSpanName = lookup ("spanName" :: ByteString) query
+    spanNameByteString =
+      Maybe.fromMaybe "haskell.test.span" $ join maybeMaybeSpanName
+    spanName = T.pack $ BS.unpack spanNameByteString
+  InstanaSDK.withRootEntry instana spanName $ do
+    threadDelay $ 1000 -- make sure there is a duration > 0
+  respond $
+    Wai.responseBuilder
+      HTTPTypes.status200
+      [("Content-Type", "application/json; charset=UTF-8")]
+      "{\"response\": \"ok\"}"
+
+
+shutDown ::
+  (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+shutDown respond = do
+  liftIO $ infoM appLogger $ "Wai/Warp app shutdown requested"
+  _ <-liftIO $ Posix.exitImmediately Exit.ExitSuccess
+  respond $
+    Wai.responseBuilder HTTPTypes.status204 [] Builder.empty
+
+
+respondWithPlainText ::
+  (Wai.Response -> IO Wai.ResponseReceived)
+  -> String
+  -> IO Wai.ResponseReceived
+respondWithPlainText respond content =
+  respond $
+    Wai.responseLBS
+      HTTPTypes.status200
+      [("Content-Type", "text/plain")]
+      (LBSC8.pack content)
 
 
 respond404 ::

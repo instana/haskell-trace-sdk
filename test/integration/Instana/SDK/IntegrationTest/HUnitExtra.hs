@@ -1,14 +1,10 @@
 module Instana.SDK.IntegrationTest.HUnitExtra
-  ( ConditionalSuite(..)
-  , addOneUntriedAsMarker
-  , applyLabel
+  ( applyLabel
   , assertAllIO
   , failIO
-  , isExclusive
   , mergeCounts
   , passIO
   , skip
-  , unwrapOrSkip
   ) where
 
 
@@ -60,30 +56,4 @@ addCounts c1 c2 =
     }
 
 
-data ConditionalSuite =
-    Run (IO Counts)
-  | Exclusive (IO Counts)
-  | Skip (IO Counts)
-
-
-isExclusive :: ConditionalSuite -> Bool
-isExclusive conditionalSuite =
-  case conditionalSuite of
-    Exclusive _ -> True
-    _           -> False
-
-
-unwrapOrSkip :: ConditionalSuite -> IO Counts
-unwrapOrSkip wrapped =
-  case wrapped of
-    Run suite       -> suite
-    Exclusive suite -> fmap addOneUntriedAsMarker suite
-    Skip _          -> do
-      putStrLn $ "Skipping a suite"
-      return $ Counts 1 0 0 0
-
-
-addOneUntriedAsMarker :: Counts -> Counts
-addOneUntriedAsMarker c =
-  c { cases = (cases c) + 1 }
 

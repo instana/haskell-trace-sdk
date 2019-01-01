@@ -8,13 +8,9 @@ module Instana.SDK.IntegrationTest.TestHelper
   , resetSpans
   , shutDownAgentStub
   , shutDownApp
-  , waitForEntityDataWithMyPid
   , waitForEntityDataWithPid
   , waitForExternalAgentConnection
-  , waitForInternalAgentConnection
-  , waitForDiscoveryWithMyPid
   , waitForDiscoveryWithPid
-  , waitForAgentReadyWithMyPid
   , waitForAgentReadyWithPid
   , waitForSpansMatching
   , withSpanCreation
@@ -29,7 +25,6 @@ import qualified Data.Maybe                              as Maybe
 import           Data.Text                               (Text)
 import qualified Data.Text                               as T
 import qualified Network.HTTP.Client                     as HTTP
-import qualified System.Posix.Process                    as PosixProcess
 
 import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
 import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
@@ -90,21 +85,20 @@ shutDownApp = do
     (\ (_ :: HTTP.HttpException) -> return ())
 
 
-waitForInternalAgentConnection :: Bool -> IO (Either String (DiscoveryRequest, String))
-waitForInternalAgentConnection pidTranslation = do
-  originalPid <- PosixProcess.getProcessID
-  let
-    pid = if pidTranslation then originalPid + 1 else originalPid
-  waitForAgentConnection $ show pid
-
-
-waitForExternalAgentConnection :: String -> IO (Either String (DiscoveryRequest, String))
+waitForExternalAgentConnection :: Bool -> Int -> IO (Either String (DiscoveryRequest, String))
 waitForExternalAgentConnection =
   waitForAgentConnection
 
 
-waitForAgentConnection :: String -> IO (Either String (DiscoveryRequest, String))
-waitForAgentConnection pid = do
+waitForAgentConnection ::
+  Bool
+  -> Int
+  -> IO (Either String (DiscoveryRequest, String))
+waitForAgentConnection pidTranslation untranslatedPid = do
+  let
+    translatedPid =
+      if pidTranslation then untranslatedPid + 1 else untranslatedPid
+    pid = show translatedPid
   discoveryWithPid <- waitForDiscoveryWithPid pid
   case discoveryWithPid of
     Left message1 -> do
@@ -127,12 +121,6 @@ waitForAgentConnection pid = do
         Right _ -> do
           putStrLn $ "\n✅ agent connection has been established"
           return discoveryWithPid
-
-
-waitForDiscoveryWithMyPid :: IO (Either String (DiscoveryRequest, String))
-waitForDiscoveryWithMyPid = do
-  pid <- PosixProcess.getProcessID
-  waitForDiscoveryWithPid $ show pid
 
 
 waitForDiscoveryWithPid :: String -> IO (Either String (DiscoveryRequest, String))
@@ -167,12 +155,6 @@ containsDiscoveryWithPid pid discoveries =
         discoveries
 
 
-waitForAgentReadyWithMyPid :: IO (Either String ())
-waitForAgentReadyWithMyPid = do
-  pid <- PosixProcess.getProcessID
-  waitForAgentReadyWithPid $ show pid
-
-
 waitForAgentReadyWithPid :: String -> IO (Either String ())
 waitForAgentReadyWithPid pidStr = do
   putStrFlush $ "⏱  waiting for agent ready request for pid " ++ pidStr
@@ -205,12 +187,6 @@ containsAgentReadyWithPid pid pidsFromResponse =
       List.filter
         (\p -> p == pid)
         pidsFromResponse
-
-
-waitForEntityDataWithMyPid :: IO (Either String [EntityDataRequest])
-waitForEntityDataWithMyPid = do
-  pid <- PosixProcess.getProcessID
-  waitForEntityDataWithPid $ show pid
 
 
 waitForEntityDataWithPid :: String -> IO (Either String [EntityDataRequest])

@@ -1,270 +1,143 @@
-module Instana.SDK.IntegrationTest.TestSuites (allTests) where
+module Instana.SDK.IntegrationTest.TestSuites (allSuites) where
 
 
-import           System.Exit                             as Exit
-import           System.Process                          as Process
-import           Test.HUnit
-
-import qualified Data.List                               as List
-import           Data.Maybe                              (isJust)
 import qualified Instana.SDK.IntegrationTest.BracketApi  as BracketApi
 import qualified Instana.SDK.IntegrationTest.Connection  as Connection
 import qualified Instana.SDK.IntegrationTest.HttpTracing as HttpTracing
-import           Instana.SDK.IntegrationTest.HUnitExtra  (ConditionalSuite (..),
-                                                          isExclusive,
-                                                          mergeCounts,
-                                                          unwrapOrSkip)
 import qualified Instana.SDK.IntegrationTest.LowLevelApi as LowLevelApi
 import qualified Instana.SDK.IntegrationTest.Metrics     as Metrics
-import qualified Instana.SDK.IntegrationTest.Runner      as TestRunner
-import           Instana.SDK.IntegrationTest.Suite       (Suite (Suite), SuiteGenerator (External, Internal))
+import           Instana.SDK.IntegrationTest.Suite       (ConditionalSuite (..),
+                                                          Suite (..))
 import qualified Instana.SDK.IntegrationTest.Suite       as Suite
 
 
-allTests :: IO Counts
-allTests = do
-  let
-    allTheTests =
-      [ testSpanRecording
-      , testConnectionEstablishment
-      , testConnectionLoss
-      , testAgentRestart
-      , testPidTranslation
-      , testCustomAgentName
-      , testHttpTracing
-      , testMetrics
-      ]
-    exlusiveSuite =
-      List.find isExclusive allTheTests
-    unwrapped =
-      case exlusiveSuite of
-        Just suite ->
-          [unwrapOrSkip suite]
-        Nothing ->
-          List.map unwrapOrSkip allTheTests
-  if isJust exlusiveSuite then
-    putStrLn $ "\n\nRunning one exclusive suite, ignoring all others."
-  else
-    putStrLn $ "\n\nRunning " ++ show (List.length unwrapped) ++ " test suite(s)..."
-  results <- sequence unwrapped
-  let
-    mergedResults = mergeCounts results
-    caseCount = cases mergedResults
-    triedCount = tried mergedResults
-    errCount = errors mergedResults
-    failCount = failures mergedResults
-  putStrLn $
-    "SUMMARY: Cases: " ++ show caseCount ++
-    "  Tried: " ++ show triedCount ++
-    "  Errors: " ++ show errCount ++
-    "  Failures: " ++ show failCount
-  if errCount > 0 && failCount > 0 then
-    Exit.die "😱 😭 There have been errors and failures! 😱 😭"
-  else if errCount > 0 then
-    Exit.die "😱 There have been errors! 😱"
-  else if failCount > 0 then
-    Exit.die "😭 There have been test failures. 😭"
-  else putStrLn "🎉 All tests have passed. 🎉"
-  return mergedResults
+allSuites :: [ConditionalSuite]
+allSuites =
+  [ testBracketApi
+  , testLowLevelApi
+  , testConnectionEstablishment
+  , testConnectionLoss
+  , testAgentRestart
+  , testPidTranslation
+  , testCustomAgentName
+  , testHttpTracing
+  , testMetrics
+  ]
 
 
-testSpanRecording :: ConditionalSuite
-testSpanRecording =
-  let
-    suiteGenerator =
-      Internal (\instana ->
-        [ Suite
-           { Suite.label = "Low Level API"
-           , Suite.tests = (\pid ->
-              [ LowLevelApi.shouldRecordSpans instana pid
-              , LowLevelApi.shouldRecordNonRootEntry instana pid
-              , LowLevelApi.shouldMergeData instana pid
-              ])
-           }
-        , Suite
-           { Suite.label = "Bracket API"
-           , Suite.tests = (\pid ->
-              [ BracketApi.shouldRecordSpans instana pid
-              , BracketApi.shouldRecordNonRootEntry instana pid
-              , BracketApi.shouldMergeData instana pid
-              ])
-           }
-        ]
-      , Suite.defaultOpts "Span Recording"
-      )
-  in
-    Run $
-      Process.withCreateProcess
-        (Process.shell "stack exec instana-haskell-agent-stub")
-        (TestRunner.runTestsIgnoringHandles suiteGenerator)
+testBracketApi :: ConditionalSuite
+testBracketApi =
+  Run $
+    Suite
+      { Suite.label = "Bracket API"
+      , Suite.tests = (\pid ->
+         [ BracketApi.shouldRecordSpans pid
+         , BracketApi.shouldRecordNonRootEntry pid
+         , BracketApi.shouldMergeData pid
+         ])
+      , Suite.options = Suite.defaultOptions
+      }
+
+
+testLowLevelApi :: ConditionalSuite
+testLowLevelApi =
+  Run $
+    Suite
+      { Suite.label = "Low Level API"
+      , Suite.tests = (\pid ->
+         [ LowLevelApi.shouldRecordSpans pid
+         , LowLevelApi.shouldRecordNonRootEntry pid
+         , LowLevelApi.shouldMergeData pid
+         ])
+      , Suite.options = Suite.defaultOptions
+      }
 
 
 testConnectionEstablishment :: ConditionalSuite
 testConnectionEstablishment =
-  let
-    suiteGenerator =
-      Internal (\_ ->
-        [ Suite
-           { Suite.label = "Initial Connection Establishment"
-           , Suite.tests = (\pid -> [
-               Connection.shouldRetryInitialConnectionEstablishment pid
-             ])
-           }
-        ]
-      , Suite.defaultOpts "Connection Establishment"
-      )
-  in
-    Run $
-      Process.withCreateProcess
-        (Process.shell
-          "STARTUP_DELAY=2500 stack exec instana-haskell-agent-stub"
-        )
-       (TestRunner.runTestsIgnoringHandles suiteGenerator)
+  Run $
+    Suite
+      { Suite.label = "Initial Connection Establishment"
+      , Suite.tests = (\pid -> [
+          Connection.shouldRetryInitialConnectionEstablishment pid
+        ])
+      , Suite.options = Suite.withStartupDelay
+      }
 
 
 testConnectionLoss :: ConditionalSuite
 testConnectionLoss =
-  let
-    suiteGenerator =
-      Internal (\instana ->
-        [ Suite
-          { Suite.label = "Connection Loss"
-          , Suite.tests = (\pid -> [
-              Connection.shouldReestablishLostConnection instana pid
-            ])
-          }
-        ]
-      , Suite.defaultOpts "Connection Loss"
-      )
-  in
-    Run $
-      Process.withCreateProcess
-        (Process.shell
-          "SIMULATE_CONNECTION_LOSS=true stack exec instana-haskell-agent-stub"
-        )
-       (TestRunner.runTestsIgnoringHandles suiteGenerator)
+  Run $
+    Suite
+      { Suite.label = "Connection Loss"
+      , Suite.tests = (\pid -> [
+          Connection.shouldReestablishLostConnection pid
+        ])
+      , Suite.options = Suite.withConnectionLoss
+      }
 
 
 testAgentRestart :: ConditionalSuite
 testAgentRestart =
-  let
-    suiteGenerator =
-      Internal (\instana ->
-        [ Suite
-            { Suite.label = "Agent Restart"
-            , Suite.tests = (\pid -> [
-                Connection.shouldReconnectAfterAgentRestart instana pid
-              ])
-            }
-        ]
-      , Suite.defaultOpts "Agent Restart"
-      )
-  in
-    Run $
-      Process.withCreateProcess
-        (Process.shell
-          "stack exec instana-haskell-agent-stub"
-        )
-       (TestRunner.runTestsIgnoringHandles suiteGenerator)
+  Run $
+    Suite
+      { Suite.label = "Agent Restart"
+      , Suite.tests = (\pid -> [
+          Connection.shouldReconnectAfterAgentRestart pid
+        ])
+      , Suite.options = Suite.defaultOptions
+      }
 
 
 testPidTranslation :: ConditionalSuite
 testPidTranslation =
-  let
-    suiteGenerator =
-      Internal (\instana ->
-        [ Suite
-           { Suite.label =  "PID transaltion"
-           , Suite.tests = (\pid -> [
-               Connection.shouldUseTranslatedPid instana pid
-             ])
-           }
-        ]
-      , Suite.withPidTranslation "PID Translation"
-      )
-  in
-    Run $
-      Process.withCreateProcess
-        (Process.shell
-          "SIMULATE_PID_TRANSLATION=why_not stack exec instana-haskell-agent-stub"
-        )
-       (TestRunner.runTestsIgnoringHandles suiteGenerator)
+  Run $
+    Suite
+      { Suite.label =  "PID translation"
+      , Suite.tests = (\pid -> [
+          Connection.shouldUseTranslatedPid pid
+        ])
+      , Suite.options = Suite.withPidTranslation
+      }
 
 
 testCustomAgentName :: ConditionalSuite
 testCustomAgentName =
-  let
-    suiteGenerator =
-      Internal (\_ ->
-        [ Suite
-          { Suite.label = "Custom Agent Name"
-          , Suite.tests = (\pid -> [
-              Connection.shouldUseCustomAgentName pid
-            ])
-          }
-        ]
-      , Suite.withCustomAgentName "Custom Agent Name" "Devil in Disguise"
-      )
-  in
-    Run $
-      Process.withCreateProcess
-        (Process.shell $
-          "AGENT_NAME=\"Devil in Disguise\" " ++
-          "stack exec instana-haskell-agent-stub"
-        )
-       (TestRunner.runTestsIgnoringHandles suiteGenerator)
+  Run $
+    Suite
+      { Suite.label = "Custom Agent Name"
+      , Suite.tests = (\pid -> [
+          Connection.shouldUseCustomAgentName pid
+        ])
+      , Suite.options = Suite.withCustomAgentName "Devil in Disguise"
+      }
 
 
 testHttpTracing :: ConditionalSuite
 testHttpTracing =
-  let
-    suiteGenerator =
-      External (
-        [ Suite
-            { Suite.label = "HTTP Tracing Headers"
-            , Suite.tests = (\pid -> [
-                HttpTracing.shouldCreateRootEntryWithBracketApi pid
-              , HttpTracing.shouldCreateNonRootEntryWithBracketApi pid
-              , HttpTracing.shouldSuppressWithBracketApi
-              , HttpTracing.shouldCreateRootEntryWithLowLevelApi pid
-              , HttpTracing.shouldCreateNonRootEntryWithLowLevelApi pid
-              , HttpTracing.shouldSuppressWithLowLevelApi
-              ])
-            }
-          ]
-        , Suite.defaultOpts "Http Tracing"
-        )
-  in
   Run $
-    Process.withCreateProcess
-      (Process.shell "stack exec instana-haskell-agent-stub")
-      (\_ _ _ _ ->
-        (Process.withCreateProcess
-          (Process.shell "INSTANA_LOG_LEVEL=TRACE INSTANA_LOG_LEVEL_STDOUT=TRACE stack exec instana-haskell-test-wai-server")
-          (TestRunner.runTestsIgnoringHandles suiteGenerator)
-        )
-      )
+    Suite
+      { Suite.label = "HTTP Tracing"
+      , Suite.tests = (\pid -> [
+          HttpTracing.shouldCreateRootEntryWithBracketApi pid
+        , HttpTracing.shouldCreateNonRootEntryWithBracketApi pid
+        , HttpTracing.shouldSuppressWithBracketApi
+        , HttpTracing.shouldCreateRootEntryWithLowLevelApi pid
+        , HttpTracing.shouldCreateNonRootEntryWithLowLevelApi pid
+        , HttpTracing.shouldSuppressWithLowLevelApi
+        ])
+      , Suite.options = Suite.defaultOptions
+      }
 
 
 testMetrics :: ConditionalSuite
 testMetrics =
-  let
-    suiteGenerator =
-      Internal (\instana ->
-        [ Suite
-           { Suite.label =  "Metrics"
-           , Suite.tests = (\pid -> [
-               Metrics.shouldReportMetrics instana pid
-             ])
-           }
-        ]
-      , Suite.withPidTranslation "Metrics"
-      )
-  in
-    Run $
-      Process.withCreateProcess
-        (Process.shell
-          "SIMULATE_PID_TRANSLATION=yes_please stack exec instana-haskell-agent-stub"
-        )
-       (TestRunner.runTestsIgnoringHandles suiteGenerator)
+  Run $
+    Suite
+      { Suite.label =  "Metrics"
+      , Suite.tests = (\pid -> [
+          Metrics.shouldReportMetrics pid
+        ])
+      , Suite.options = Suite.withPidTranslation
+      }
 
