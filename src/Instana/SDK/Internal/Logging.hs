@@ -125,7 +125,12 @@ createFileHandler :: String -> Priority -> IO (GenericHandler Handle)
 createFileHandler pid logLevel = do
   systemTempDir <- getTemporaryDirectory
   let
-    logPath = systemTempDir ++ "instana-haskell-sdk." ++ pid ++ ".log"
+    systemTempDir' =
+      case last systemTempDir of
+        '/'  -> systemTempDir
+        '\\' -> systemTempDir
+        _    -> systemTempDir ++ "/"
+    logPath = systemTempDir' ++ "instana-haskell-sdk." ++ pid ++ ".log"
   instanaFileHandler <- fileHandler logPath logLevel
   let
     formattedInstanaFileHandler = withFormatter instanaFileHandler
