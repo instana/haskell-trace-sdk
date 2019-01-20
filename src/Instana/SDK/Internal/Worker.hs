@@ -30,7 +30,6 @@ import qualified Network.HTTP.Types.Status                        as HttpTypes
 import           System.Log.Logger                                (debugM,
                                                                    warningM)
 import qualified System.Metrics                                   as Metrics
-import qualified System.Metrics.Json                              as Metrics.Json
 
 import qualified Instana.SDK.Internal.AgentConnection.ConnectLoop as ConnectLoop
 import           Instana.SDK.Internal.AgentConnection.Paths       (haskellEntityDataPathPrefix,
@@ -47,6 +46,7 @@ import qualified Instana.SDK.Internal.FullSpan                    as FullSpan
 import           Instana.SDK.Internal.Logging                     (instanaLogger)
 import qualified Instana.SDK.Internal.Metrics.Collector           as MetricsCollector
 import qualified Instana.SDK.Internal.Metrics.Compression         as MetricsCompression
+import qualified Instana.SDK.Internal.Metrics.Json                as MetricsJson
 import qualified Instana.SDK.Internal.URL                         as URL
 import           Instana.SDK.Span.EntrySpan                       (EntrySpan (..))
 import qualified Instana.SDK.Span.EntrySpan                       as EntrySpan
@@ -361,7 +361,7 @@ collectAndSendMetrics context translatedPidStr _ metricsStore = do
   let
     compressedMetrics =
       MetricsCompression.compressSample previousMetrics sampledMetrics
-    metricsAsJson = Metrics.Json.Sample compressedMetrics
+    metricsAsJson = MetricsJson.Sample compressedMetrics
     config = InternalContext.config context
     metricsEndpointUrl =
       URL.mkHttp

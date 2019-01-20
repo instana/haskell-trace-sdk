@@ -3,117 +3,40 @@ module Instana.SDK.AgentStub.EntityDataRequest where
 
 
 import           Data.Aeson
-import qualified Data.Aeson                          as Aeson
+import qualified Data.Aeson   as Aeson
+import           Data.Text    (Text)
 import           GHC.Generics
-
-import           Instana.SDK.AgentStub.CounterMetric (CounterMetric)
-import           Instana.SDK.AgentStub.LabelMetric   (LabelMetric)
 
 
 -- Example entity data JSON:
 -- {
---   "executablePath": {
---     "type": "l",
---     "val": "/opt/very/important/service/bin/exec"
---   },
---   "arguments": {
---     "type": "l",
---     "val": ""
---   },
---   "programName": {
---     "type": "l",
---     "val": "instana-haskell-trace-sdk-integration-tests"
---   },
---   "pid": {
---     "type": "l",
---     "val": "30114"
---   },
---   "sensorVersion": {
---     "type": "l",
---     "val": "0.1.0.0"
---   },
---   "startTime": {
---     "type": "c",
---     "val": 1545569786526
---   },
+--   "executablePath": "/opt/very/important/service/bin/exec",
+--   "arguments": ""
+--   "programName": "instana-haskell-trace-sdk-integration-tests"
+--   "pid": "30114"
+--   "sensorVersion": "0.1.0.0"
+--   "startTime": 1545569786526
 --   "rts": {
 --     "gc": {
---       "gc_cpu_ms": {
---         "type": "c",
---         "val": 35
---       },
---       "mutator_wall_ms": {
---         "type": "c",
---         "val": 8743
---       },
---       "mutator_cpu_ms": {
---         "type": "c",
---         "val": 155
---       },
---       "gc_wall_ms": {
---         "type": "c",
---         "val": 8
---       },
---       "wall_ms": {
---         "type": "c",
---         "val": 8751
---       },
---       "bytes_copied": {
---         "type": "c",
---         "val": 2225552
---       },
---       "max_bytes_used": {
---         "type": "g",
---         "val": 2279960
---       },
---       "max_bytes_slop": {
---         "type": "g",
---         "val": 110376
---       },
---       "num_bytes_usage_samples": {
---         "type": "c",
---         "val": 3
---       },
---       "peak_megabytes_allocated": {
---         "type": "g",
---         "val": 12
---       },
---       "cpu_ms": {
---         "type": "c",
---         "val": 190
---       },
---       "current_bytes_used": {
---         "type": "g",
---         "val": 3151432
---       },
---       "bytes_allocated": {
---         "type": "c",
---         "val": 122542896
---       },
---       "par_max_bytes_copied": {
---         "type": "g",
---         "val": 1311424
---       },
---       "current_bytes_slop": {
---         "type": "g",
---         "val": 96696
---       },
---       "cumulative_bytes_used": {
---         "type": "c",
---         "val": 3993064
---       },
---       "num_gcs": {
---         "type": "c",
---         "val": 31
---       },
---       "par_tot_bytes_copied": {
---         "type": "g",
---         "val": 2225552
---       },
---       "par_avg_bytes_copied": {
---         "type": "g",
---         "val": 2225552
---       }
+--       "gc_cpu_ms": 35
+--       "mutator_wall_ms": 8743
+--       "mutator_cpu_ms": 155
+--       "gc_wall_ms": 8
+--       "wall_ms": 8751
+--       "bytes_copied": 2225552
+--       "max_bytes_used": 2279960
+--       "max_bytes_slop": 110376
+--       "num_bytes_usage_samples": 3
+--       "peak_megabytes_allocated": 12
+--       "cpu_ms": 190
+--       "current_bytes_used": 3151432
+--       "bytes_allocated": 122542896
+--       "par_max_bytes_copied": 1311424
+--       "current_bytes_slop": 96696
+--       "cumulative_bytes_used": 3993064
+--       "num_gcs": 31
+--       "par_tot_bytes_copied": 2225552
+--       "par_avg_bytes_copied": 2225552
 --     }
 --   }
 -- }
@@ -121,13 +44,13 @@ import           Instana.SDK.AgentStub.LabelMetric   (LabelMetric)
 
 data EntityDataRequest =
   EntityDataRequest
-    { pid            :: Maybe LabelMetric
-    , executablePath :: Maybe LabelMetric
+    { pid            :: Maybe Text
+    , executablePath :: Maybe Text
     -- arguments are concatenated, separate by one space character
-    , arguments      :: Maybe LabelMetric
-    , programName    :: Maybe LabelMetric
-    , startTime      :: Maybe CounterMetric
-    , sensorVersion  :: Maybe LabelMetric
+    , arguments      :: Maybe Text
+    , programName    :: Maybe Text
+    , startTime      :: Maybe Int
+    , sensorVersion  :: Maybe Text
     , rts            :: Maybe RtsData
     } deriving (Eq, Show, Generic)
 

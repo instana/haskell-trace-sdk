@@ -9,15 +9,12 @@ import qualified Data.Aeson                              as Aeson
 import qualified Data.HashMap.Strict                     as HashMap
 import qualified Data.List                               as List
 import           Data.Maybe                              (isJust)
+import           Data.Text                               (Text)
 import qualified Data.Text                               as T
 import           Test.HUnit
 
-import           Instana.SDK.AgentStub.CounterMetric     (CounterMetric)
-import qualified Instana.SDK.AgentStub.CounterMetric     as CounterMetric
 import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
 import qualified Instana.SDK.AgentStub.EntityDataRequest as EntityDataRequest
-import           Instana.SDK.AgentStub.LabelMetric       (LabelMetric (LabelMetric))
-import qualified Instana.SDK.AgentStub.LabelMetric       as LabelMetric
 
 import           Instana.SDK.IntegrationTest.HUnitExtra  (applyLabel,
                                                           assertAllIO, failIO)
@@ -98,7 +95,7 @@ shouldReportMetrics pid =
 assertLabelIs ::
   String
   -> String
-  -> Maybe LabelMetric
+  -> Maybe Text
   -> Assertion
 assertLabelIs testLabel expectedValue labelMetric =
   assertEqual testLabel (label expectedValue) labelMetric
@@ -107,34 +104,32 @@ assertLabelIs testLabel expectedValue labelMetric =
 assertLabelContains ::
   String
   -> String
-  -> Maybe LabelMetric
+  -> Maybe Text
   -> Assertion
 assertLabelContains testLabel expectedValue labelMetric =
   if isJust labelMetric then
     let
-      Just (LabelMetric labelContent) = labelMetric
+      Just labelContent = labelMetric
     in
     assertBool testLabel (T.isInfixOf (T.pack expectedValue) labelContent)
   else
     assertFailure $ testLabel ++ " - label metric is Nothing"
 
 
-label :: String -> Maybe LabelMetric
+label :: String -> Maybe Text
 label s =
-  Just $ LabelMetric
-    { LabelMetric.val = T.pack s
-    }
+  Just $ T.pack s
 
 
 assertCounterSatisfies ::
   String
   -> (Int -> Bool)
-  -> Maybe CounterMetric
+  -> Maybe Int
   -> Assertion
 assertCounterSatisfies testLabel predicate counterMetric =
   case counterMetric of
     Just metric ->
-      assertBool testLabel (predicate $ CounterMetric.val metric)
+      assertBool testLabel (predicate $ metric)
     Nothing ->
       assertFailure $ testLabel ++ " - counter metric is Nothing"
 

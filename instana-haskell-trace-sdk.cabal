@@ -39,7 +39,6 @@ library
     , containers
     , directory
     , ekg-core
-    , ekg-json
     , exceptions
     , hslogger
     , http-client
@@ -91,6 +90,7 @@ library
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Metrics.Collector
       Instana.SDK.Internal.Metrics.Compression
+      Instana.SDK.Internal.Metrics.Json
       Instana.SDK.Internal.Retry
       Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
@@ -202,12 +202,9 @@ executable instana-haskell-agent-stub
   other-modules:
       Instana.SDK.AgentStub.API
     , Instana.SDK.AgentStub.Config
-      Instana.SDK.AgentStub.CounterMetric
     , Instana.SDK.AgentStub.DiscoveryRequest
     , Instana.SDK.AgentStub.DiscoveryResponse
     , Instana.SDK.AgentStub.EntityDataRequest
-    , Instana.SDK.AgentStub.GaugeMetric
-    , Instana.SDK.AgentStub.LabelMetric
     , Instana.SDK.AgentStub.Logging
     , Instana.SDK.AgentStub.Main
     , Instana.SDK.AgentStub.Recorders
@@ -246,11 +243,8 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , unix
     , unordered-containers
   other-modules:
-      Instana.SDK.AgentStub.CounterMetric
-    , Instana.SDK.AgentStub.DiscoveryRequest
+      Instana.SDK.AgentStub.DiscoveryRequest
     , Instana.SDK.AgentStub.EntityDataRequest
-    , Instana.SDK.AgentStub.GaugeMetric
-    , Instana.SDK.AgentStub.LabelMetric
     , Instana.SDK.AgentStub.TraceRequest
     , Instana.SDK.IntegrationTest.BracketApi
     , Instana.SDK.IntegrationTest.Connection

@@ -30,8 +30,6 @@ import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
 import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
 import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
 import qualified Instana.SDK.AgentStub.EntityDataRequest as EntityDataRequest
-import           Instana.SDK.AgentStub.LabelMetric       (LabelMetric (LabelMetric))
-import qualified Instana.SDK.AgentStub.LabelMetric       as LabelMetric
 import           Instana.SDK.AgentStub.TraceRequest      (Span)
 import qualified Instana.SDK.AgentStub.TraceRequest      as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper  as HttpHelper
@@ -223,8 +221,7 @@ containsEntityDataRequestsWithPid pid entityDataRequests =
         (\edr ->
           (edr
             |> EntityDataRequest.pid
-            |> Maybe.fromMaybe (LabelMetric "no PID available")
-            |> LabelMetric.val
+            |> Maybe.fromMaybe "no PID available"
             |> T.unpack
           ) == pid
         )
