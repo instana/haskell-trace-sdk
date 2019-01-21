@@ -28,7 +28,7 @@ shouldEncodeIntComponents =
     encoded = BS.unpack . Aeson.encode $ idFromInts
   in
     TestCase $
-      assertEqual "encoded" "\"00000000000030390000000000010932\"" encoded
+      assertEqual "encoded" "\"0000303900010932\"" encoded
 
 
 shouldEncodeIntComponents2 :: Test
@@ -37,11 +37,11 @@ shouldEncodeIntComponents2 =
     -- minimum for Int type as per
     -- http://hackage.haskell.org/package/base-4.11.1.0/docs/Data-Int.html
     -- is from -2^29 to 29-1 -> -536870912 to 536870911
-    idFromInts = Id.createFromIntsForTest [-536870912, 536870911, 536870911, 536870911]
+    idFromInts = Id.createFromIntsForTest [-536870912, 536870911]
     encoded = BS.unpack . Aeson.encode $ idFromInts
   in
     TestCase $
-      assertEqual "encoded" "\"200000001fffffff1fffffff1fffffff\"" encoded
+      assertEqual "encoded" "\"200000001fffffff\"" encoded
 
 
 shouldEncodeStringId :: Test
@@ -71,7 +71,7 @@ shouldGenerate =
       generated <- Id.generate
       let
         encoded = BS.unpack . Aeson.encode $ generated
-      -- every encoded ID must be 32 chars wide + 2 chars for leading and
+      -- every encoded ID must be 16 chars wide + 2 chars for leading and
       -- trailing "
-      assertEqual "generated" 34 (length encoded)
+      assertEqual "generated" 18 (length encoded)
 

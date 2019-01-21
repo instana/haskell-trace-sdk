@@ -32,10 +32,10 @@ import qualified System.Random         as Random
 
 -- |Represents an ID (trace ID, span ID).
 data Id =
-    -- |a representation of a 128 bit ID with just enough Int components to
-    -- reach 128 bits (used when generating new random IDs)
+    -- |a representation of a 64 bit ID with just enough Int components to
+    -- reach 64 bits (used when generating new random IDs)
     IntComponents [Int]
-    -- |a representation of a 128 bit ID as a plain string (used when
+    -- |a representation of a 64 bit ID as a plain string (used when
     -- deserializing IDs, for example when reading HTTP headers)
   | IdString String
   deriving (Eq, Generic, Show)
@@ -58,7 +58,7 @@ appendAsHex noOfComponents accumulator intValue =
   appendPaddedHex accumulator intValue
   where
     toHex = (flip showHex) "" . abs
-    padding = 128 `div` noOfComponents `div` 4
+    padding = 64 `div` noOfComponents `div` 4
     toPaddedHex = leftPad padding . toHex
     appendPaddedHex = flip ((++) . toPaddedHex)
 
@@ -76,10 +76,10 @@ generate = do
   -- implementation. It is guaranteed to cover the range from -2^29 to 2^29 - 1.
   -- On modern systems it is often -2^63 to 2^63 - 1.
   --
-  -- We need 128 bits, so we actually need to generate multiple Ints (usually
+  -- We need 64 bits, so we actually need to generate multiple Ints (usually
   -- two) and stitch them together during JSON decoding.
   let
-    requiredNumberOfIntComponents = 128 `div` bitsPerInt
+    requiredNumberOfIntComponents = 64 `div` bitsPerInt
   (randomInts :: [Int]) <-
     replicateM requiredNumberOfIntComponents Random.randomIO
   return $ IntComponents $ randomInts
