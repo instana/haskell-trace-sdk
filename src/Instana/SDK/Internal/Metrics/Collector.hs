@@ -21,7 +21,6 @@ import qualified System.SysInfo                                   as SysInfo
 
 import           Instana.SDK.Internal.AgentConnection.ProcessInfo (ProcessInfo)
 import qualified Instana.SDK.Internal.AgentConnection.ProcessInfo as ProcessInfo
-import           Instana.SDK.Internal.Metrics.Json                ()
 import           Instana.SDK.Internal.Util                        ((|>))
 
 

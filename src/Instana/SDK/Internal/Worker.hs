@@ -19,7 +19,6 @@ import           Control.Monad                                    (forever,
                                                                    when)
 import qualified Data.Aeson                                       as Aeson
 import           Data.Foldable                                    (toList)
-import qualified Data.HashMap.Strict                              as HashMap
 import           Data.List                                        (map)
 import           Data.Sequence                                    ((|>))
 import qualified Data.Sequence                                    as Seq
@@ -46,7 +45,8 @@ import qualified Instana.SDK.Internal.FullSpan                    as FullSpan
 import           Instana.SDK.Internal.Logging                     (instanaLogger)
 import qualified Instana.SDK.Internal.Metrics.Collector           as MetricsCollector
 import qualified Instana.SDK.Internal.Metrics.Compression         as MetricsCompression
-import qualified Instana.SDK.Internal.Metrics.Json                as MetricsJson
+import qualified Instana.SDK.Internal.Metrics.Deltas              as Deltas
+import qualified Instana.SDK.Internal.Metrics.Sample              as Sample
 import qualified Instana.SDK.Internal.URL                         as URL
 import           Instana.SDK.Span.EntrySpan                       (EntrySpan (..))
 import qualified Instana.SDK.Span.EntrySpan                       as EntrySpan
@@ -322,9 +322,9 @@ resetPreviouslySendMetrics context = do
     delayMicroSeconds = 5 * 60 * 1000 * 1000 -- once every five minutes
   forever $ do
     catch
-      (STM.atomically $ STM.writeTVar
-         (InternalContext.previousMetrics context)
-         HashMap.empty
+      (STM.atomically $ STM.modifyTVar
+         (InternalContext.previousMetricsSample context)
+         Sample.markForReset
       )
       (\e -> warningM instanaLogger $ show (e :: SomeException))
     Concurrent.threadDelay delayMicroSeconds
@@ -355,13 +355,17 @@ collectAndSendMetrics ::
   -> Metrics.Store
   -> IO ()
 collectAndSendMetrics context translatedPidStr _ metricsStore = do
-  previousMetrics <-
-    STM.atomically $ STM.readTVar $ InternalContext.previousMetrics context
+  previousSample <-
+    STM.atomically $ STM.readTVar $ InternalContext.previousMetricsSample context
+  now <- round . (* 1000) <$> getPOSIXTime
   sampledMetrics <- MetricsCollector.sampleAll metricsStore
   let
+    currentSample = Sample.timedSampleFromEkgSample sampledMetrics now
+    enrichedSample = Deltas.enrichWithDeltas previousSample currentSample
     compressedMetrics =
-      MetricsCompression.compressSample previousMetrics sampledMetrics
-    metricsAsJson = MetricsJson.Sample compressedMetrics
+      MetricsCompression.compressSample
+        (Sample.sample previousSample)
+        (Sample.sample enrichedSample)
     config = InternalContext.config context
     metricsEndpointUrl =
       URL.mkHttp
@@ -373,7 +377,9 @@ collectAndSendMetrics context translatedPidStr _ metricsStore = do
     request =
       defaultRequestSettings
         { HTTP.method = "POST"
-        , HTTP.requestBody = HTTP.RequestBodyLBS $ Aeson.encode metricsAsJson
+        , HTTP.requestBody =
+            HTTP.RequestBodyLBS $
+              Aeson.encode $ Sample.SampleJson compressedMetrics
         , HTTP.requestHeaders =
           [ ("Accept", "application/json")
           , ("Content-Type", "application/json; charset=UTF-8'")
@@ -400,8 +406,8 @@ collectAndSendMetrics context translatedPidStr _ metricsStore = do
       _ <- HTTP.httpLbs request $ InternalContext.httpManager context
       _ <- STM.atomically $
              STM.writeTVar
-               (InternalContext.previousMetrics context)
-               sampledMetrics
+               (InternalContext.previousMetricsSample context)
+               enrichedSample
       return ()
     )
     (\(e :: HTTP.HttpException) -> do

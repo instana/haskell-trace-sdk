@@ -43,56 +43,56 @@ module Instana.SDK.SDK
     ) where
 
 
-import           Control.Concurrent             (ThreadId)
-import qualified Control.Concurrent             as Concurrent
-import           Control.Concurrent.STM         (STM)
-import qualified Control.Concurrent.STM         as STM
-import           Control.Monad.IO.Class         (MonadIO, liftIO)
-import           Data.Aeson                     (Value, (.=))
-import qualified Data.Aeson                     as Aeson
-import qualified Data.ByteString.Char8          as BSC8
-import qualified Data.HashMap.Strict            as HashMap
-import qualified Data.List                      as List
-import qualified Data.Map.Strict                as Map
-import qualified Data.Maybe                     as Maybe
-import qualified Data.Sequence                  as Seq
-import           Data.Text                      (Text)
-import qualified Data.Text                      as T
-import           Data.Time.Clock.POSIX          (getPOSIXTime)
-import qualified Network.HTTP.Client            as HTTP
-import qualified Network.HTTP.Types             as HTTPTypes
-import qualified Network.Socket                 as Socket
-import qualified Network.Wai                    as Wai
-import           System.Log.Logger              (warningM)
-import qualified System.Posix.Process           as Process
+import           Control.Concurrent                  (ThreadId)
+import qualified Control.Concurrent                  as Concurrent
+import           Control.Concurrent.STM              (STM)
+import qualified Control.Concurrent.STM              as STM
+import           Control.Monad.IO.Class              (MonadIO, liftIO)
+import           Data.Aeson                          (Value, (.=))
+import qualified Data.Aeson                          as Aeson
+import qualified Data.ByteString.Char8               as BSC8
+import qualified Data.List                           as List
+import qualified Data.Map.Strict                     as Map
+import qualified Data.Maybe                          as Maybe
+import qualified Data.Sequence                       as Seq
+import           Data.Text                           (Text)
+import qualified Data.Text                           as T
+import           Data.Time.Clock.POSIX               (getPOSIXTime)
+import qualified Network.HTTP.Client                 as HTTP
+import qualified Network.HTTP.Types                  as HTTPTypes
+import qualified Network.Socket                      as Socket
+import qualified Network.Wai                         as Wai
+import           System.Log.Logger                   (warningM)
+import qualified System.Posix.Process                as Process
 
 import           Instana.SDK.Config
-import           Instana.SDK.Internal.Command   (Command)
-import qualified Instana.SDK.Internal.Command   as Command
-import           Instana.SDK.Internal.Config    (FinalConfig)
-import qualified Instana.SDK.Internal.Config    as InternalConfig
-import           Instana.SDK.Internal.Context   (ConnectionState (..), InternalContext (InternalContext))
-import qualified Instana.SDK.Internal.Context   as InternalContext
-import qualified Instana.SDK.Internal.Id        as Id
-import           Instana.SDK.Internal.Logging   (instanaLogger)
-import qualified Instana.SDK.Internal.Logging   as Logging
-import qualified Instana.SDK.Internal.Secrets   as Secrets
-import           Instana.SDK.Internal.SpanStack (SpanStack)
-import qualified Instana.SDK.Internal.SpanStack as SpanStack
-import           Instana.SDK.Internal.Util      ((|>))
-import qualified Instana.SDK.Internal.Worker    as Worker
-import           Instana.SDK.Span.EntrySpan     (EntrySpan (..))
-import qualified Instana.SDK.Span.EntrySpan     as EntrySpan
-import           Instana.SDK.Span.ExitSpan      (ExitSpan (ExitSpan))
-import qualified Instana.SDK.Span.ExitSpan      as ExitSpan
-import           Instana.SDK.Span.NonRootEntry  (NonRootEntry (NonRootEntry))
-import qualified Instana.SDK.Span.NonRootEntry  as NonRootEntry
-import           Instana.SDK.Span.RootEntry     (RootEntry (RootEntry))
-import qualified Instana.SDK.Span.RootEntry     as RootEntry
-import           Instana.SDK.Span.Span          (Span (..), SpanKind (..))
-import qualified Instana.SDK.Span.Span          as Span
-import           Instana.SDK.TracingHeaders     (TracingHeaders (TracingHeaders))
-import qualified Instana.SDK.TracingHeaders     as TracingHeaders
+import           Instana.SDK.Internal.Command        (Command)
+import qualified Instana.SDK.Internal.Command        as Command
+import           Instana.SDK.Internal.Config         (FinalConfig)
+import qualified Instana.SDK.Internal.Config         as InternalConfig
+import           Instana.SDK.Internal.Context        (ConnectionState (..), InternalContext (InternalContext))
+import qualified Instana.SDK.Internal.Context        as InternalContext
+import qualified Instana.SDK.Internal.Id             as Id
+import           Instana.SDK.Internal.Logging        (instanaLogger)
+import qualified Instana.SDK.Internal.Logging        as Logging
+import qualified Instana.SDK.Internal.Metrics.Sample as Sample
+import qualified Instana.SDK.Internal.Secrets        as Secrets
+import           Instana.SDK.Internal.SpanStack      (SpanStack)
+import qualified Instana.SDK.Internal.SpanStack      as SpanStack
+import           Instana.SDK.Internal.Util           ((|>))
+import qualified Instana.SDK.Internal.Worker         as Worker
+import           Instana.SDK.Span.EntrySpan          (EntrySpan (..))
+import qualified Instana.SDK.Span.EntrySpan          as EntrySpan
+import           Instana.SDK.Span.ExitSpan           (ExitSpan (ExitSpan))
+import qualified Instana.SDK.Span.ExitSpan           as ExitSpan
+import           Instana.SDK.Span.NonRootEntry       (NonRootEntry (NonRootEntry))
+import qualified Instana.SDK.Span.NonRootEntry       as NonRootEntry
+import           Instana.SDK.Span.RootEntry          (RootEntry (RootEntry))
+import qualified Instana.SDK.Span.RootEntry          as RootEntry
+import           Instana.SDK.Span.Span               (Span (..), SpanKind (..))
+import qualified Instana.SDK.Span.Span               as Span
+import           Instana.SDK.TracingHeaders          (TracingHeaders (TracingHeaders))
+import qualified Instana.SDK.TracingHeaders          as TracingHeaders
 
 
 {-| A container for all the things the Instana SDK needs to do its work.
@@ -162,10 +162,7 @@ withInstanaInternal conf fn = do
 
 initInstanaInternal :: FinalConfig -> IO InstanaContext
 initInstanaInternal conf = do
-  -- sdkStartTime will be used to approximate the process start time on
-  -- non-Linux platforms where System.SysInfo is not available. The assumption
-  -- is that the SDK is initialized right at the start of the process.
-  sdkStartTime <- round . (* 1000) <$> getPOSIXTime
+  now <- round . (* 1000) <$> getPOSIXTime
   pid <- Process.getProcessID
   Logging.initLogger $ show pid
   commandQueue <- STM.newTQueueIO
@@ -174,7 +171,7 @@ initInstanaInternal conf = do
   fileDescriptor <- STM.newTVarIO $ Nothing
   threadId <- Concurrent.myThreadId
   currentSpans <- STM.newTVarIO $ Map.singleton threadId SpanStack.empty
-  previousMetrics <- STM.newTVarIO $ HashMap.empty
+  previousMetricsSample <- STM.newTVarIO $ Sample.empty now
   -- HTTP.newManager is keep-alive by default (10 connections, we set it to 5)
   manager <- HTTP.newManager $
     HTTP.defaultManagerSettings
@@ -193,14 +190,18 @@ initInstanaInternal conf = do
     context =
       InternalContext
         { InternalContext.config = conf
-        , InternalContext.sdkStartTime = sdkStartTime
+         -- sdkStartTime will be used to approximate the process start time on
+         -- non-Linux platforms where System.SysInfo is not available. The
+         -- assumption is that the SDK is initialized right at the start of the
+         -- process.
+        , InternalContext.sdkStartTime = now
         , InternalContext.httpManager = manager
         , InternalContext.commandQueue = commandQueue
         , InternalContext.spanQueue = spanQueue
         , InternalContext.connectionState = connectionState
         , InternalContext.fileDescriptor = fileDescriptor
         , InternalContext.currentSpans = currentSpans
-        , InternalContext.previousMetrics = previousMetrics
+        , InternalContext.previousMetricsSample = previousMetricsSample
         }
   -- The worker thread will also try to establish the connection to the agent
   -- and only start its work when that was successful.

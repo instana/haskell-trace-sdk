@@ -9,16 +9,21 @@ module Instana.SDK.Internal.Metrics.Compression
   ) where
 
 
-import qualified Data.HashMap.Strict as HashMap
-import qualified System.Metrics      as Metrics
+import qualified Data.HashMap.Strict                 as HashMap
+
+import           Instana.SDK.Internal.Metrics.Sample (InstanaMetricValue,
+                                                      InstanaSample)
 
 
-compressSample :: Metrics.Sample -> Metrics.Sample -> Metrics.Sample
+compressSample :: InstanaSample -> InstanaSample -> InstanaSample
 compressSample previous next =
   HashMap.differenceWith dropUnchanged next previous
 
 
-dropUnchanged :: Metrics.Value -> Metrics.Value -> Maybe Metrics.Value
+dropUnchanged ::
+  InstanaMetricValue
+  -> InstanaMetricValue
+  -> Maybe InstanaMetricValue
 dropUnchanged nextValue previousValue =
   if nextValue == previousValue then
     Nothing

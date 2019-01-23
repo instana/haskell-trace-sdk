@@ -30,6 +30,7 @@ import qualified Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse as A
 import           Instana.SDK.Internal.Command                               (Command)
 import           Instana.SDK.Internal.Config                                (FinalConfig)
 import           Instana.SDK.Internal.FullSpan                              (FullSpan)
+import           Instana.SDK.Internal.Metrics.Sample                        (TimedSample)
 import           Instana.SDK.Internal.SpanStack                             (SpanStack)
 
 
@@ -97,15 +98,15 @@ mkAgentReadyState announceResponse metricsStore =
 {-| A container for all the things the Instana SDK needs to do its work.
 -}
 data InternalContext = InternalContext
-  { config          :: FinalConfig
-  , sdkStartTime    :: Int
-  , httpManager     :: HttpClient.Manager
-  , commandQueue    :: STM.TQueue Command
-  , spanQueue       :: STM.TVar (Seq FullSpan)
-  , connectionState :: STM.TVar ConnectionState
-  , fileDescriptor  :: STM.TVar (Maybe CTypes.CInt)
-  , currentSpans    :: STM.TVar (Map ThreadId SpanStack)
-  , previousMetrics :: STM.TVar Metrics.Sample
+  { config                :: FinalConfig
+  , sdkStartTime          :: Int
+  , httpManager           :: HttpClient.Manager
+  , commandQueue          :: STM.TQueue Command
+  , spanQueue             :: STM.TVar (Seq FullSpan)
+  , connectionState       :: STM.TVar ConnectionState
+  , fileDescriptor        :: STM.TVar (Maybe CTypes.CInt)
+  , currentSpans          :: STM.TVar (Map ThreadId SpanStack)
+  , previousMetricsSample :: STM.TVar TimedSample
   }
 
 

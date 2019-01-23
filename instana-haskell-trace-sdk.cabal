@@ -90,7 +90,8 @@ library
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Metrics.Collector
       Instana.SDK.Internal.Metrics.Compression
-      Instana.SDK.Internal.Metrics.Json
+      Instana.SDK.Internal.Metrics.Deltas
+      Instana.SDK.Internal.Metrics.Sample
       Instana.SDK.Internal.Retry
       Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
@@ -155,7 +156,8 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.ConfigTest
       Instana.SDK.Internal.IdTest
       Instana.SDK.Internal.LoggingTest
-      Instana.SDK.Internal.MetricsCompressionTest
+      Instana.SDK.Internal.Metrics.CompressionTest
+      Instana.SDK.Internal.Metrics.DeltasTest
       Instana.SDK.Internal.SecretsTest
       Instana.SDK.Internal.SpanStackTest
       Instana.SDK.Internal.SpanTest
@@ -164,11 +166,13 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Metrics.Compression
+      Instana.SDK.Internal.Metrics.Deltas
       Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
       Instana.SDK.Span.Span
       -- dependencies of modules under test
       Instana.SDK.Config
+      Instana.SDK.Internal.Metrics.Sample
       Instana.SDK.Internal.Util
       Instana.SDK.Span.EntrySpan
       Instana.SDK.Span.ExitSpan
