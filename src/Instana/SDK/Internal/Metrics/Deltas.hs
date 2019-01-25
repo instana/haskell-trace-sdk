@@ -4,7 +4,8 @@ Module      : Instana.SDK.Internal.Metrics.Delta
 Description : Computes deltas between two metrics samples.
 -}
 module Instana.SDK.Internal.Metrics.Deltas
-  ( enrichWithDeltas
+  ( deltaKeyList
+  , enrichWithDeltas
   ) where
 
 
@@ -18,8 +19,8 @@ import           Instana.SDK.Internal.Metrics.Sample (InstanaMetricValue,
 import qualified Instana.SDK.Internal.Metrics.Sample as Sample
 
 
-whitelist :: [Text]
-whitelist =
+deltaKeyList :: [Text]
+deltaKeyList =
   [ "rts.gc.bytes_allocated"
   , "rts.gc.num_gcs"
   , "rts.gc.num_bytes_usage_samples"
@@ -63,7 +64,7 @@ addDeltaToSample ::
   -> HashMap Text InstanaMetricValue
   -> HashMap Text InstanaMetricValue
 addDeltaToSample deltaT previousMetrics metricKey currentMetricValue currentMetrics  =
-  if not (elem metricKey whitelist) then
+  if not (elem metricKey deltaKeyList) then
     currentMetrics
   else
     let

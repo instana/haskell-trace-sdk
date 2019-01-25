@@ -66,27 +66,16 @@ shouldReportMetrics pid =
               -- metric that is always present, should be good enough.
               [
               -- Counters:
-                "bytes_allocated"
-              , "bytes_allocated_delta"
-              , "num_gcs"
+                "bytes_allocated_delta"
               , "num_gcs_delta"
-              , "num_bytes_usage_samples"
               , "num_bytes_usage_samples_delta"
-              , "cumulative_bytes_used"
               , "cumulative_bytes_used_delta"
-              , "bytes_copied"
               , "bytes_copied_delta"
-              , "mutator_cpu_ms"
               , "mutator_cpu_ms_delta"
-              , "mutator_wall_ms"
               , "mutator_wall_ms_delta"
-              , "gc_cpu_ms"
               , "gc_cpu_ms_delta"
-              , "gc_wall_ms"
               , "gc_wall_ms_delta"
-              , "cpu_ms"
               , "cpu_ms_delta"
-              , "wall_ms"
               , "wall_ms_delta"
               -- Gauges:
               , "max_bytes_used"
