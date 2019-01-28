@@ -82,6 +82,7 @@ library
       Instana.SDK.Internal.AgentConnection.Json.Util
       Instana.SDK.Internal.AgentConnection.Paths
       Instana.SDK.Internal.AgentConnection.ProcessInfo
+      Instana.SDK.Internal.AgentConnection.SchedFile
       Instana.SDK.Internal.Command
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.Context
@@ -153,6 +154,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , unordered-containers
   other-modules:
       -- the actual tests
+      Instana.SDK.Internal.AgentConnection.SchedFileTest
       Instana.SDK.Internal.ConfigTest
       Instana.SDK.Internal.IdTest
       Instana.SDK.Internal.LoggingTest
@@ -163,6 +165,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.SpanTest
       -- modules under test
       Instana.SDK.Internal.Config
+      Instana.SDK.Internal.AgentConnection.SchedFile
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Metrics.Compression

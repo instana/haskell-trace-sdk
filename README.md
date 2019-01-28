@@ -145,7 +145,7 @@ If required, the Instana Haskell SDK can produce logs via [hslogger](http://hack
 
 #### Logging Related Environment Variables
 
-* `INSTANA_LOG_LEVEL`: Sets the log level for SDK's log file. The log file will be written to the system's temporary directory (in particular, whatever `System.Directory.getTemporaryDirectory` returns) as `instana-haskell-sdk.{pid}.log`.
+* `INSTANA_LOG_LEVEL`: Sets the log level for the SDK's log file. The log file will be written to the system's temporary directory (in particular, whatever `System.Directory.getTemporaryDirectory` returns) as `instana-haskell-sdk.{pid}.log`.
 * `INSTANA_LOG_LEVEL_STDOUT`: Sets the level for emitting log messages to stdout.
 * `INSTANA_OVERRIDE_HSLOGGER_ROOT_HANDLER`: Controls whether the SDK sets an hslogger at the root logger level, see below.
 

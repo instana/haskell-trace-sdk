@@ -52,10 +52,16 @@ announce context processInfo = do
         (InternalConfig.agentHost config)
         (InternalConfig.agentPort config)
         haskellDiscoveryPath
-    pidStr = ProcessInfo.pidString processInfo
+    nonContainerPid = ProcessInfo.pidString processInfo
+    (pidStr, pidFromParentNS) =
+       case ProcessInfo.parentNsPid processInfo of
+         Just parentPid ->
+           (parentPid, parentPid == nonContainerPid)
+         Nothing ->
+           (nonContainerPid, False)
     maybeFileDescriptorString = show <$> fileDescriptor
     maybeInodeLinkPath =
-      (\fdStr -> "/proc/" ++ pidStr ++ "/fd/" ++ fdStr) <$>
+      (\fdStr -> "/proc/" ++ nonContainerPid ++ "/fd/" ++ fdStr) <$>
         maybeFileDescriptorString
   discoveryRequestBase <- HTTP.parseUrlThrow $ show discoveryUrl
   inode <-
@@ -78,12 +84,13 @@ announce context processInfo = do
   let
     haskellProcess =
       Aeson.object
-        [ "pid"       .= pidStr
-        , "progName"  .= ProcessInfo.programName processInfo
-        , "execPath"  .= ProcessInfo.executablePath processInfo
-        , "args"      .= ProcessInfo.arguments processInfo
-        , "fd"        .= maybeFileDescriptorString
-        , "inode"     .= inode
+        [ "pid"             .= pidStr
+        , "pidFromParentNS" .= pidFromParentNS
+        , "progName"        .= ProcessInfo.programName processInfo
+        , "execPath"        .= ProcessInfo.executablePath processInfo
+        , "args"            .= ProcessInfo.arguments processInfo
+        , "fd"              .= maybeFileDescriptorString
+        , "inode"           .= inode
         ]
 
     announceRequest = discoveryRequestBase
