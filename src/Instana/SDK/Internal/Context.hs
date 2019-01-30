@@ -4,7 +4,8 @@ Module      : Instana.SDK.Internal.Context
 Description : The Instana context holds everything that the SDK needs in terms of state.
 -}
 module Instana.SDK.Internal.Context
-  ( InternalContext(..)
+  ( AgentConnection(..)
+  , InternalContext(..)
   , ConnectionState(..)
   , isAgentConnectionEstablished
   , mkAgentReadyState
@@ -43,7 +44,7 @@ data ConnectionState =
     -- |Agent host lookup is complete, the process has not been announced yet.
   | Unannounced (String, Int)
     -- |Announce was successful, waiting for the agent to signal readyness.
-  | Announced
+  | Announced (String, Int)
     -- |Agent has signaled that it is ready to accept data.
   | AgentReady Ready
   deriving (Eq, Show, Generic)
@@ -71,8 +72,12 @@ instance Show Ready where
 data AgentConnection =
   AgentConnection
     {
+      -- |the host of the agent we are connected to
+      agentHost :: String
+      -- |the port of the agent we are connected to
+    , agentPort :: Int
       -- |the PID of the monitored process
-      pid       :: String
+    , pid       :: String
       -- |the agent's UUID
     , agentUuid :: Text
     }
@@ -80,11 +85,17 @@ data AgentConnection =
 
 
 -- |Creates a "ready" connection state from an AnnounceResponse.
-mkAgentReadyState :: AnnounceResponse -> Metrics.Store -> ConnectionState
-mkAgentReadyState announceResponse metricsStore =
+mkAgentReadyState ::
+  (String, Int)
+  -> AnnounceResponse
+  -> Metrics.Store
+  -> ConnectionState
+mkAgentReadyState (host_, port_) announceResponse metricsStore =
   let
     agentConnection = AgentConnection
-      { pid          = show $ AnnounceResponse.pid announceResponse
+      { agentHost    = host_
+      , agentPort    = port_
+      , pid          = show $ AnnounceResponse.pid announceResponse
       , agentUuid    = AnnounceResponse.agentUuid announceResponse
       }
   in
@@ -164,19 +175,19 @@ mapConnectionState fn state =
 
 
 -- |Executes an IO action only when the connection to the agent has been
--- established. The action receives the PID, the agent UUID and the internal
--- metrics store as parameters (basically everything that is only available with
--- an established agent connection).
+-- established. The action receives the agent host/port, PID, the agent UUID and
+-- the internal metrics store as parameters (basically everything that is only
+-- available with an established agent connection).
 whenConnected ::
   InternalContext
-  -> (String -> Text -> Metrics.Store -> IO ())
+  -> (AgentConnection -> Metrics.Store -> IO ())
   -> IO ()
 whenConnected context action = do
   state <- STM.atomically $ STM.readTVar $ connectionState context
   whenConnectedState
     state
     (\(Ready agentConnection metricsStore) ->
-      action (pid agentConnection) (agentUuid agentConnection) metricsStore
+      action agentConnection metricsStore
     )
 
 
@@ -189,7 +200,7 @@ whenConnectedState state action = do
       return ()
     Unannounced _ ->
       return ()
-    Announced ->
+    Announced _ ->
       return ()
     AgentReady ready -> do
       action ready

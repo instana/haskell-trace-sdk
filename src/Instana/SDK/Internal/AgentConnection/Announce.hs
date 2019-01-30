@@ -26,7 +26,6 @@ import           Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse (Ann
 import           Instana.SDK.Internal.AgentConnection.Paths
 import           Instana.SDK.Internal.AgentConnection.ProcessInfo           (ProcessInfo)
 import qualified Instana.SDK.Internal.AgentConnection.ProcessInfo           as ProcessInfo
-import qualified Instana.SDK.Internal.Config                                as InternalConfig
 import           Instana.SDK.Internal.Context                               (ConnectionState (..),
                                                                              InternalContext)
 import qualified Instana.SDK.Internal.Context                               as InternalContext
@@ -42,16 +41,34 @@ announce ::
   -> IO ()
 announce context processInfo = do
   debugM instanaLogger "Starting to announce process to agent."
+  connectionState <-
+      STM.atomically $ STM.readTVar $ InternalContext.connectionState context
+  case connectionState of
+    Unannounced hostAndPort ->
+      announceToAgent context hostAndPort processInfo
+    _ -> do
+      warningM instanaLogger $
+        "Reached illegal state in announce, agent host lookup did not " ++
+        "yield a host and port. Connection state is " ++ show connectionState ++
+        ". Will retry later."
+      STM.atomically $ STM.writeTVar
+        (InternalContext.connectionState context)
+        Unconnected
+      return ()
+
+
+announceToAgent ::
+  InternalContext
+  -> (String, Int)
+  -> ProcessInfo
+  -> IO ()
+announceToAgent context (host, port) processInfo = do
   fileDescriptor <-
-      STM.atomically $ STM.readTVar $ InternalContext.fileDescriptor context
+    STM.atomically $ STM.readTVar $ InternalContext.fileDescriptor context
   let
     manager = InternalContext.httpManager context
-    config = InternalContext.config context
     discoveryUrl =
-      URL.mkHttp
-        (InternalConfig.agentHost config)
-        (InternalConfig.agentPort config)
-        haskellDiscoveryPath
+      URL.mkHttp host port haskellDiscoveryPath
     nonContainerPid = ProcessInfo.pidString processInfo
     (pidStr, pidFromParentNS) =
        case ProcessInfo.parentNsPid processInfo of
@@ -124,11 +141,12 @@ announce context processInfo = do
     let
       Just announceResponse = maybeAnnounceResponse
     STM.atomically $
-      STM.writeTVar (InternalContext.connectionState context) Announced
+      STM.writeTVar (InternalContext.connectionState context) $
+        Announced (host, port)
     debugM instanaLogger $
       "Haskell process " ++ pidStr ++
-      " has been successfully announced to agent, now waiting for the agent " ++
-      "to be ready to accept data."
+      " has been successfully announced to agent at " ++ show (host, port) ++
+      ", now waiting for the agent to be ready to accept data."
 
     -- transition to next phase of sensor-agent handshake
     AgentReady.waitUntilAgentIsReadyToAcceptData

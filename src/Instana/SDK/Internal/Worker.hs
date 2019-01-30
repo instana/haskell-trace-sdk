@@ -22,7 +22,6 @@ import           Data.Foldable                                    (toList)
 import           Data.List                                        (map)
 import           Data.Sequence                                    ((|>))
 import qualified Data.Sequence                                    as Seq
-import           Data.Text                                        (Text)
 import           Data.Time.Clock.POSIX                            (getPOSIXTime)
 import qualified Network.HTTP.Client                              as HTTP
 import qualified Network.HTTP.Types.Status                        as HttpTypes
@@ -35,7 +34,8 @@ import           Instana.SDK.Internal.AgentConnection.Paths       (haskellEntity
                                                                    haskellTracePluginPath)
 import           Instana.SDK.Internal.Command                     (Command (..))
 import qualified Instana.SDK.Internal.Config                      as InternalConfig
-import           Instana.SDK.Internal.Context                     (ConnectionState (..),
+import           Instana.SDK.Internal.Context                     (AgentConnection (..),
+                                                                   ConnectionState (..),
                                                                    InternalContext)
 import qualified Instana.SDK.Internal.Context                     as InternalContext
 import           Instana.SDK.Internal.FullSpan                    (FullSpan (FullSpan),
@@ -230,26 +230,24 @@ drainSpanBuffer context = do
 sendSpansToAgent ::
   InternalContext
   -> [FullSpan]
-  -> String
-  -> Text
+  -> AgentConnection
   -> Metrics.Store
   -> IO ()
-sendSpansToAgent context spans pid _ _ = do
+sendSpansToAgent context spans agentConnection _ = do
   let
-    config = InternalContext.config context
+    agentHost = InternalContext.agentHost agentConnection
+    agentPort = InternalContext.agentPort agentConnection
+    translatedPidStr = InternalContext.pid agentConnection
     traceEndpointUrl =
       (show $
-        URL.mkHttp
-          (InternalConfig.agentHost config)
-          (InternalConfig.agentPort config)
-          haskellTracePluginPath
-      ) ++ "." ++ pid
+        URL.mkHttp agentHost agentPort haskellTracePluginPath
+      ) ++ "." ++ translatedPidStr
     -- combine actual span data with static per-process data (e.g. PID)
     spansWithPid = map
       (\fullSpan ->
         FullSpanWithPid {
           FullSpan.fullSpan = fullSpan
-        , FullSpan.pid      = pid
+        , FullSpan.pid      = translatedPidStr
         }
       ) spans
   defaultRequestSettings <- HTTP.parseUrlThrow traceEndpointUrl
@@ -350,11 +348,10 @@ collectAndSendMetricsWhenConnected context =
 
 collectAndSendMetrics ::
   InternalContext
-  -> String
-  -> Text
+  -> AgentConnection
   -> Metrics.Store
   -> IO ()
-collectAndSendMetrics context translatedPidStr _ metricsStore = do
+collectAndSendMetrics context agentConnection metricsStore = do
   previousSample <-
     STM.atomically $ STM.readTVar $ InternalContext.previousMetricsSample context
   now <- round . (* 1000) <$> getPOSIXTime
@@ -366,11 +363,14 @@ collectAndSendMetrics context translatedPidStr _ metricsStore = do
       MetricsCompression.compressSample
         (Sample.sample previousSample)
         (Sample.sample enrichedSample)
-    config = InternalContext.config context
+
+    agentHost = InternalContext.agentHost agentConnection
+    agentPort = InternalContext.agentPort agentConnection
+    translatedPidStr = InternalContext.pid agentConnection
     metricsEndpointUrl =
       URL.mkHttp
-        (InternalConfig.agentHost config)
-        (InternalConfig.agentPort config)
+        agentHost
+        agentPort
         (haskellEntityDataPathPrefix ++ translatedPidStr)
   defaultRequestSettings <- HTTP.parseUrlThrow $ show metricsEndpointUrl
   let

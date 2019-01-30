@@ -23,7 +23,6 @@ import qualified Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse as A
 import           Instana.SDK.Internal.AgentConnection.Json.Util             (emptyResponseDecoder)
 import           Instana.SDK.Internal.AgentConnection.Paths                 (haskellEntityDataPathPrefix)
 import           Instana.SDK.Internal.AgentConnection.ProcessInfo           (ProcessInfo)
-import qualified Instana.SDK.Internal.Config                                as InternalConfig
 import           Instana.SDK.Internal.Context                               (ConnectionState (..),
                                                                              InternalContext)
 import qualified Instana.SDK.Internal.Context                               as InternalContext
@@ -47,19 +46,48 @@ waitUntilAgentIsReadyToAcceptData
     processInfo
     announceResponse = do
   debugM instanaLogger "Waiting until the agent is ready to accept data."
+  connectionState <-
+      STM.atomically $ STM.readTVar $ InternalContext.connectionState context
+  case connectionState of
+    Announced hostAndPort ->
+      waitForAgent
+        context
+        hostAndPort
+        originalPidStr
+        processInfo
+        announceResponse
+    _ -> do
+      warningM instanaLogger $
+        "Reached illegal state in agent ready, announce did not " ++
+        "yield a host and port. Connection state is " ++ show connectionState ++
+        ". Will retry later."
+      STM.atomically $ STM.writeTVar
+        (InternalContext.connectionState context)
+        Unconnected
+      return ()
+
+
+waitForAgent ::
+  InternalContext
+  -> (String, Int)
+  -> String
+  -> ProcessInfo
+  -> AnnounceResponse
+  -> IO ()
+waitForAgent
+    context
+    (host, port)
+    originalPidStr
+    processInfo
+    announceResponse = do
   let
     translatedPidStr = show $ AnnounceResponse.pid announceResponse
     pidTranslationStr =
       if translatedPidStr == originalPidStr
       then translatedPidStr
       else "(" ++ originalPidStr ++ " => " ++ translatedPidStr ++ ")"
-
-    config = InternalContext.config context
     acceptDataUrl =
-      URL.mkHttp
-        (InternalConfig.agentHost config)
-        (InternalConfig.agentPort config)
-        (haskellEntityDataPathPrefix ++ translatedPidStr)
+      URL.mkHttp host port (haskellEntityDataPathPrefix ++ translatedPidStr)
   agentReadyRequestBase <- HTTP.parseUrlThrow $ show acceptDataUrl
   let
     acceptDataRequest = agentReadyRequestBase
@@ -96,7 +124,10 @@ waitUntilAgentIsReadyToAcceptData
           (InternalContext.sdkStartTime context)
       let
          state =
-           InternalContext.mkAgentReadyState announceResponse metricsStore
+           InternalContext.mkAgentReadyState
+             (host, port)
+             announceResponse
+             metricsStore
       STM.atomically $
         STM.writeTVar (InternalContext.connectionState context) state
       infoM instanaLogger $
