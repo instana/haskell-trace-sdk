@@ -35,6 +35,7 @@ import           Instana.SDK.Span.ExitSpan  (ExitSpan)
 import qualified Instana.SDK.Span.ExitSpan  as ExitSpan
 
 
+-- |The span kind (entry, exit or intermediate).
 data SpanKind =
     -- |The monitored componenent receives a call.
     EntryKind
@@ -46,6 +47,7 @@ data SpanKind =
   deriving (Eq, Generic, Show)
 
 
+-- |A span.
 data Span =
     Entry EntrySpan
   | Exit ExitSpan

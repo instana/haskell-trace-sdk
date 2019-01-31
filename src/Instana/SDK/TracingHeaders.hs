@@ -20,18 +20,22 @@ import           GHC.Generics
 import qualified Network.HTTP.Types.Header as HTTPHeader
 
 
+-- |X-INSTANA-T
 traceIdHeaderName :: HTTPHeader.HeaderName
 traceIdHeaderName = "X-INSTANA-T"
 
 
+-- |X-INSTANA-S
 spanIdHeaderName :: HTTPHeader.HeaderName
 spanIdHeaderName = "X-INSTANA-S"
 
 
+-- |X-INSTANA-L
 levelHeaderName :: HTTPHeader.HeaderName
 levelHeaderName = "X-INSTANA-L"
 
 
+-- |Tracing level.
 data TracingLevel =
     -- |Record calls.
     Trace
@@ -40,16 +44,19 @@ data TracingLevel =
   deriving (Eq, Generic, Show)
 
 
+-- |Converts a string into the tracing level.
 stringToTracingLevel :: String -> TracingLevel
 stringToTracingLevel s =
   if s == "0" then Suppress else Trace
 
 
+-- |Converts a string into the tracing level.
 maybeStringToTracingLevel :: Maybe String -> TracingLevel
 maybeStringToTracingLevel s =
   if s == Just "0" then Suppress else Trace
 
 
+-- |Converts tracing level into a string.
 tracingLevelToString :: TracingLevel -> String
 tracingLevelToString l =
   case l of

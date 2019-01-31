@@ -7,6 +7,7 @@ module Instana.SDK.Internal.Util
   ) where
 
 
+-- |Elm-style function application.
 (|>) :: a -> (a -> b) -> b
 (|>) =
   flip ($)

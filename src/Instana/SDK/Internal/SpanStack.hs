@@ -18,6 +18,14 @@ module Instana.SDK.Internal.SpanStack
   , suppress
   ) where
 
+import           GHC.Generics
+
+import           Instana.SDK.Internal.Util  ((|>))
+import           Instana.SDK.Span.EntrySpan (EntrySpan)
+import           Instana.SDK.Span.ExitSpan  (ExitSpan)
+import           Instana.SDK.Span.Span      (Span (..), SpanKind (..))
+
+--
 -- Implementation Note
 -- ===================
 --
@@ -36,14 +44,6 @@ module Instana.SDK.Internal.SpanStack
 -- * no current span, currently not tracing
 -- * an active entry span but not exit
 -- * a non-active entry and an active exit
-
-
-import           GHC.Generics
-
-import           Instana.SDK.Internal.Util  ((|>))
-import           Instana.SDK.Span.EntrySpan (EntrySpan)
-import           Instana.SDK.Span.ExitSpan  (ExitSpan)
-import           Instana.SDK.Span.Span      (Span (..), SpanKind (..))
 
 
 {-|The stack of currently open spans in one thread.

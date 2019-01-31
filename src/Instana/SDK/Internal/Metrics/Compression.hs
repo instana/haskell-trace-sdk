@@ -29,6 +29,8 @@ dummyMapWithKeysEligibleForDeltaComputation =
      dummyValue = IntegralValue 0
 
 
+-- |Removes metric values that are identical in the both samples, also removes
+-- original values for which deltas have been computed.
 compressSample :: InstanaSample -> InstanaSample -> InstanaSample
 compressSample previous next =
   let

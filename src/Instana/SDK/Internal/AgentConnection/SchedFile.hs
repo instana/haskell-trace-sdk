@@ -14,6 +14,7 @@ import           Text.Regex.TDFA.String    (Regex)
 import qualified Text.Regex.TDFA.String    as RegexString
 
 
+-- |Parses a /proc/{pid}/sched file to get the PID in the parent namespace.
 parsePidFromSchedFile :: String -> Maybe String
 parsePidFromSchedFile schedFileContent =
   let

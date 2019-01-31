@@ -29,6 +29,7 @@ import qualified Text.Regex.TDFA.String    as RegexString
 import           Instana.SDK.Internal.Util ((|>))
 
 
+-- |The available secret matcher modes.
 data MatcherMode =
     Equals
   | EqualsIgnoreCase
@@ -110,11 +111,13 @@ parseSecretsConfig object =
           return $ NoneMatcher
 
 
+-- |The default matcher.
 defaultSecretsMatcher :: SecretsMatcher
 defaultSecretsMatcher =
   ContainsIgnoreCaseMatcher ["key", "pass", "secret"]
 
 
+-- |Returns true if and only if the given text matches the given matcher.
 isSecret :: SecretsMatcher -> Text -> Bool
 isSecret (EqualsMatcher secretsList) potentialSecret =
   elem potentialSecret secretsList

@@ -10,14 +10,17 @@ The Instana Haskell Trace SDK is a labor of love from some of our engineers and 
 What The Haskell Trace SDK Is And What It Is Not
 ------------------------------------------------
 
-The Instana Haskell Trace SDK does not support automatic instrumentation/tracing in the way we support it in most other languages. Instead, the SDK enables you to create spans manually, much like the [Instana Trace SDK for Java](https://docs.instana.io/core_concepts/tracing/java_trace_sdk/) does. Besides offering a convenient API to create spans, the Haskell Trace SDK also takes care of establishing a connection to the Instana Agent and sending spans to the agent in an efficient way, that does not impede the performance of your production code.
+The Instana Haskell Trace SDK does not support automatic instrumentation/tracing in the way we support it in most other languages. Instead, the SDK enables you to create spans manually, much like the [Instana Trace SDK for Java](https://docs.instana.io/core_concepts/tracing/java_trace_sdk/) does. Besides offering a convenient API to create spans, the Haskell Trace SDK also takes care of establishing a connection to the Instana Agent and sending spans to the agent in an efficient way, that does not impede the performance of your production code. Last but not least, it collects runtime metrics and reports them to Instana.
 
 Installation
 ------------
 
-**NOTE: Currently, the `instana-haskell-trace-sdk` has not been published on Hackage yet, so adding it to your dependencies will not work yet. It will be published soon. Stay tuned!**
+To use the Instana Haskell Trace SDK in your application, add `instana-haskell-trace-sdk` to your dependencies (for example to the `build-depends` section of your cabal file). If you are using [stack](https://docs.haskellstack.org/en/stable/README/) you might need to add the SDK (with the version number you want to use) to the `extra-deps` section in your `stack.yaml` file:
 
-<s>To use the Instana Haskell Trace SDK in your application, add `instana-haskell-trace-sdk` to your dependencies (for example to the `build-depends` section of your cabal file).</s>
+```
+extra-deps:
+- instana-haskell-trace-sdk-0.1.0.0
+```
 
 Usage
 -----
@@ -39,7 +42,7 @@ main = do
   -- ... initialize more things
 ```
 
-The value `instana :: Instana.SDK.SDK.InstanaContext` that is returned by `InstanaSDK.initInstana` is required for all further calls, that is, for creating spans that will be send to the agent. The SDK will try to connect to an agent (asynchronous, in a a separate thread) as soon as it receives the `initInstana` call.
+The value `instana :: Instana.SDK.InstanaContext` that is returned by `InstanaSDK.initInstana` is required for all further calls, that is, for creating spans that will be send to the agent. The SDK will try to connect to an agent (asynchronous, in a a separate thread) as soon as it receives the `initInstana` call.
 
 The SDK can be configured via environment variables or directly in the code by passing configuration parameters to the initialization function, or both.
 
@@ -115,13 +118,17 @@ All functions starting with `with` accept (among other parameters) an IO action.
 
 * `withRootEntry`: Creates an entry span that is the root of a trace (it has no parent span).
 * `withEntry`: Creates an entry span that has a parent span.
+* `withHttpEntry`: A convenience function that examines an HTTP request for Instana tracing headers and creates an entry span.
 * `withExit`: Creates an exit span. This can only be called inside a `withRootEntry` or an `withEntry` call, as an exit span needs an entry span as its parent.
+* `withHttpExit`: Creates an exit span for a given HTTP client request.
 
 #### Low Level API/Explicit Start And Complete
 
 * `startRootEntry`: Starts an entry span that is the beginning of a trace (has no parent span). You will need to call `completeEntry` at some point.
 * `startEntry`: Starts an entry span. You will need to call `completeEntry` at some point.
+* `startHttpEntry`: Starts an entry span for an incoming HTTP request.
 * `startExit`: Starts an exit span. You need to call `completeExit`/`completeExitWithData` at some point with the partial exit span value that is returned by this function.
+* `startHttpExit`: Starts an exit span for an outgoing HTTP request.
 * `completeEntry`: Finalizes an entry span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
 * `completeExit`: Finalizes an exit span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
 

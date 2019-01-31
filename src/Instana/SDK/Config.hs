@@ -19,7 +19,7 @@ module Instana.SDK.Config
 import           GHC.Generics
 
 
-{-| Configuration for a the Instana SDK. Please use the 'defaultConfig'
+{-| Configuration for the Instana SDK. Please use the 'defaultConfig'
 function and then modify individual settings via record syntax For more
 information, see <http://www.yesodweb.com/book/settings-types>.
 -}

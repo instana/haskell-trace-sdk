@@ -32,25 +32,28 @@ import           GHC.Generics
 import qualified System.Metrics      as Metrics
 
 
+-- |A collection of metric values.
 type InstanaSample = HashMap Text InstanaMetricValue
 
 
+-- |A single metric value.
 data InstanaMetricValue =
+  -- |A string metric value.
     StringValue     Text
+  -- |An integral metric value.
   | IntegralValue   Int
+  -- |A fractional metric value.
   | FractionalValue Double
   deriving (Eq, Generic, Show)
 
 
--- instance A.ToJSON InstanaMetricValue where
---   toJSON = encodeValue
-
-
+-- |Converts an ekg-core sample into an Instana sample.
 ekgSampleToInstanaSample :: Metrics.Sample -> InstanaSample
 ekgSampleToInstanaSample =
   HashMap.map ekgValueToInstanaValue
 
 
+-- |Converts an ekg-core metric value into an Instana metric value.
 ekgValueToInstanaValue :: Metrics.Value -> InstanaMetricValue
 ekgValueToInstanaValue ekgValue =
   case ekgValue of
@@ -72,6 +75,7 @@ data TimedSample =
     } deriving (Eq, Generic, Show)
 
 
+-- |Creates an empty sample with a timestamp.
 empty :: Int -> TimedSample
 empty t =
   TimedSample {
@@ -81,6 +85,7 @@ empty t =
   }
 
 
+-- |Creates a sample with a timestamp.
 mkTimedSample :: InstanaSample -> Int -> TimedSample
 mkTimedSample sampledMetrics t =
   TimedSample {
@@ -90,20 +95,24 @@ mkTimedSample sampledMetrics t =
   }
 
 
+-- |Creates a sample with a timestamp from an ekg-core sample.
 timedSampleFromEkgSample :: Metrics.Sample -> Int -> TimedSample
 timedSampleFromEkgSample sampledMetrics =
   mkTimedSample (ekgSampleToInstanaSample sampledMetrics)
 
 
+-- |Marks the sample for a reset on the next metric collection tick.
 markForReset :: TimedSample -> TimedSample
 markForReset timedSample =
   timedSample { resetNext = True }
 
 
+-- |Checks if the sample is marked for reset.
 isMarkedForReset :: TimedSample -> Bool
 isMarkedForReset = resetNext
 
 
+-- |Encodes a sample to JSON.
 encodeSample :: InstanaSample -> A.Value
 encodeSample metrics =
     buildOne metrics $ A.emptyObject
@@ -138,19 +147,22 @@ typeMismatch expected actual =
         A.Null     -> "Null"
 
 
--- | Encodes a single metric value to JSON
+-- |Encodes a single metric value to JSON
 encodeValue :: InstanaMetricValue -> A.Value
 encodeValue (IntegralValue   n) = Aeson.toJSON n
 encodeValue (FractionalValue f) = Aeson.toJSON f
 encodeValue (StringValue     s) = Aeson.toJSON s
 
 
+-- |A type wrapper to convert a sample to JSON.
 newtype SampleJson = SampleJson InstanaSample
     deriving Show
 
 instance A.ToJSON SampleJson where
     toJSON (SampleJson s) = encodeSample s
 
+
+-- |A type wrapper to convert a metric value to JSON.
 newtype ValueJson = ValueJson InstanaMetricValue
     deriving Show
 

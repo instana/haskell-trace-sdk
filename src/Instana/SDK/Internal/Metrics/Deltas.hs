@@ -19,6 +19,8 @@ import           Instana.SDK.Internal.Metrics.Sample (InstanaMetricValue,
 import qualified Instana.SDK.Internal.Metrics.Sample as Sample
 
 
+-- |All metric keys from ekg-core that are eligible for being turned into deltas
+-- (difference in value/second since the last metric collection).
 deltaKeyList :: [Text]
 deltaKeyList =
   [ "rts.gc.bytes_allocated"
@@ -37,6 +39,7 @@ deltaKeyList =
   ]
 
 
+-- |Calculates deltas and adds them to the sample.
 enrichWithDeltas :: TimedSample -> TimedSample -> TimedSample
 enrichWithDeltas previousSample currentSample =
   let
