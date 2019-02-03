@@ -6,17 +6,19 @@ import qualified Data.ByteString.Lazy.Char8             as LBSC8
 import           Data.List                              as List
 import qualified Data.Maybe                             as Maybe
 import qualified Network.HTTP.Client                    as HTTP
+import           System.Environment                     (lookupEnv)
 import           System.Exit                            as Exit
+import           System.Log.Logger                      (infoM)
 import           System.Process                         as Process
 import           Test.HUnit
 
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (mergeCounts)
+import           Instana.SDK.IntegrationTest.Logging    (testLogger)
 import           Instana.SDK.IntegrationTest.Suite      (ConditionalSuite (..),
                                                          Suite)
 import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
-import           Instana.SDK.IntegrationTest.Util       (putStrFlush)
 
 
 {-| Runs a collection of test suites.
@@ -34,13 +36,13 @@ runSuites allSuites = do
       else
         (List.map runConditionalSuite allSuites, 0)
   if not (null exlusiveSuites) then
-    putStrLn $
-      "\n\nRunning only " ++
+    infoM testLogger  $
+      "Running only " ++
       show (List.length exlusiveSuites) ++
       " suite(s) marked as exclusive, ignoring all others."
   else
-    putStrLn $
-      "\n\nRunning " ++ show (List.length allSuites) ++ " test suite(s)."
+    infoM testLogger $
+      "Running " ++ show (List.length allSuites) ++ " test suite(s)."
   results <- sequence actions
   let
     mergedResults = mergeCounts results
@@ -48,7 +50,7 @@ runSuites allSuites = do
     triedCount = tried mergedResults
     errCount = errors mergedResults
     failCount = failures mergedResults
-  putStrLn $
+  infoM testLogger $
     "SUMMARY: Cases: " ++ show caseCount ++
     "  Tried: " ++ show triedCount ++
     "  Errors: " ++ show errCount ++
@@ -59,7 +61,7 @@ runSuites allSuites = do
     Exit.die "😱 There have been errors! 😱"
   else if failCount > 0 then
     Exit.die "😭 There have been test failures. 😭"
-  else putStrLn "🎉 All tests have passed. 🎉"
+  else infoM testLogger "🎉 All tests have passed. 🎉"
   return mergedResults
 
 
@@ -82,51 +84,37 @@ runSuite :: Suite -> IO Counts
 runSuite suite = do
   let
     suiteLabel = Suite.label suite
-  putStrFlush $ "\nExecuting test suite: " ++ suiteLabel ++ "\n\n"
+  infoM testLogger $ "Executing test suite: " ++ suiteLabel
 
+  logLevelEnvVar <- lookupEnv logLevelKey
   let
     options = Suite.options suite
-    customAgentName = Suite.customAgentName options
+    logLevel = Maybe.fromMaybe "INFO" logLevelEnvVar
     agentStubCommand =
-      (if Suite.usePidTranslation options
-        then "SIMULATE_PID_TRANSLATION=true "
-        else ""
-      ) ++
-      (if Maybe.isJust customAgentName
-        then
-          let
-            Just agentName = customAgentName
-          in
-          "AGENT_NAME=\"" ++ agentName ++ "\" "
-        else ""
-      ) ++
-      (if Suite.startupDelay options
-        then "STARTUP_DELAY=2500 "
-        else ""
-      ) ++
-      (if Suite.simulateConnectionLoss options
-        then "SIMULATE_CONNECTION_LOSS=true "
-        else ""
-      )
-      ++ "stack exec instana-haskell-agent-stub"
-
+      buildCommand
+        [ ("SIMULATE_PID_TRANSLATION",
+             booleanEnv $ Suite.usePidTranslation options)
+        , ("AGENT_NAME", Suite.customAgentName options)
+        , ("STARTUP_DELAY",
+            (if Suite.startupDelay options then Just "2500" else Nothing))
+        , ("SIMULATE_CONNECTION_LOSS",
+             booleanEnv $ Suite.simulateConnectionLoss options)
+        , ("LOG_LEVEL", Just logLevel)
+        ]
+        "stack exec instana-haskell-agent-stub"
     appCommand =
-      (if Maybe.isJust customAgentName
-        then
-          let
-            Just agentName = customAgentName
-          in
-           "INSTANA_AGENT_NAME=\"" ++ agentName ++ "\" "
-        else ""
-      ) ++
-      "INSTANA_LOG_LEVEL=INFO " ++
-      "stack exec instana-haskell-test-wai-server"
+      buildCommand
+        [ ("APP_LOG_LEVEL", Just logLevel)
+        , ("INSTANA_AGENT_NAME", Suite.customAgentName options)
+        , ("INSTANA_LOG_LEVEL", Just logLevel)
+        ]
+        "stack exec instana-haskell-test-wai-server"
 
-  putStrLn $ "Running: " ++ agentStubCommand
+  infoM testLogger $ "Running: " ++ agentStubCommand
   Process.withCreateProcess
     (Process.shell agentStubCommand)
     (\_ _ _ _ -> do
-      putStrLn $ "Running: " ++ appCommand
+      infoM testLogger $ "Running: " ++ appCommand
       Process.withCreateProcess
         (Process.shell appCommand)
         (\_ _ _ _ -> runTests suite)
@@ -135,15 +123,15 @@ runSuite suite = do
 
 runTests :: Suite -> IO Counts
 runTests suite = do
-  putStrFlush "⏱  waiting for agent stub to come up"
+  infoM testLogger "⏱  waiting for agent stub to come up"
   _ <- HttpHelper.retryRequestRecovering TestHelper.pingAgentStub
-  putStrLn "\n✅ agent stub is up"
-  putStrFlush "⏱  waiting for app to come up"
+  infoM testLogger "✅ agent stub is up"
+  infoM testLogger "⏱  waiting for app to come up"
   appPingResponse <- HttpHelper.retryRequestRecovering TestHelper.pingApp
   let
     appPingBody = HTTP.responseBody appPingResponse
     appPid = (read (LBSC8.unpack appPingBody) :: Int)
-  putStrLn $ "\n✅ app is up, PID is " ++ (show appPid)
+  infoM testLogger $ "✅ app is up, PID is " ++ (show appPid)
   results <-
     waitForAgentConnectionAndRun suite appPid
   -- The withProcess calls that starts the agent stub and the external app
@@ -205,4 +193,33 @@ wrapSuite pid suite = do
   -- sequence all tests into one action
   tests <- sequence testsWithReset
   return $ TestLabel label $ TestList tests
+
+
+buildCommand :: [(String, Maybe String)] -> String -> String
+buildCommand envVars command =
+  let
+    envVarsString =
+      foldl
+        (\cmd (key, var) ->
+          case var of
+            Just v  -> cmd ++ " " ++ key ++ "=\"" ++ v ++ "\""
+            Nothing -> cmd
+        )
+        ""
+        envVars
+  in
+    if null envVarsString then
+      command
+    else
+      envVarsString ++ " " ++ command
+
+
+booleanEnv :: Bool -> Maybe String
+booleanEnv b =
+  if b then Just "true" else Nothing
+
+
+-- |Environment variable for the log level
+logLevelKey :: String
+logLevelKey = "TEST_LOG_LEVEL"
 

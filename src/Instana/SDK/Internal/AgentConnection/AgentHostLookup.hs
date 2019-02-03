@@ -118,6 +118,7 @@ tryHost context host port = do
     expectedServerHeader = InternalConfig.agentName config
     manager = InternalContext.httpManager context
     agentRootUrl = URL.mkHttp host port ""
+  debugM instanaLogger $ "Trying to reach agent at " ++ show agentRootUrl
   agentRootRequest <- HTTP.parseUrlThrow $ show agentRootUrl
   let
     agentRootAction = HTTP.httpLbs agentRootRequest manager

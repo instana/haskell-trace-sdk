@@ -33,9 +33,40 @@ retryDelay :: Int
 retryDelay = 100 * 1000
 
 
--- 5 seconds
+-- Time to wait for a particular HTTP response: 7.5 seconds.
+--
+-- We need > 5 seconds, in particular on Travis. Reason:
+-- 1) The agent stub and the app under test are started more or less
+--    simultaneously
+-- 2) The agent stub might not yet be up when the Instana SDK in the app under
+--    test starts to look for an agent (which is a perfectly normal situation
+--    and should shouldn't not be a problem as the SDK will retry with to find
+--    an agent to connect to with fibonacci backoff).
+-- 3) When this happens, the first attempt to talk to 127.0.0.1:1302 fails.
+-- 4) Next, the SDK attempts to talk to an agent over the default gateway.
+-- 5) This never happens locally (at least not on MacOS), as there is no
+--    /sbin/ip executable present
+-- 6) On Travis (or more generally on most Linux systems), the SDK actually
+--    tries the default gateway because that executable _is_ present. It will
+--    also find a default gateway (let's say, for example, 10.20.0.1).
+-- 7) That host is reachable so an HTTP request to 10.20.0.1:1302 is attempted
+--    (1302 is the configured agent port in the integration tests).
+-- 8) If something exists at 10.20.0.1:1302 it never sends a response. Or there
+--    is nothing there but somehow the request does not fail immediately.
+--    Either way, trying this HTTP request eats up around 5 seconds. Why 5
+--    seconds? 5 seconds is:
+--    a) the timeout the SDK sets itself (see Instana/SDK/SDK.hs, value for
+--       HTTP.managerResponseTimeout),
+--    b) also the standard HTTP client timeout (see
+--    https://hackage.haskell.org/package/http-client-0.1.0.0/docs/Network-HTTP-Client-Manager.html - managerResponseTimeout).
+-- 9) When the HTTP client timeout is up and the HTTP call to 10.20.0.1 has
+--    finally failed, the SDK realizes it can't talk to the default gateway. It
+--    would probably try the configured host (127.0.0.1:1302) again soon, and
+--    then find the agent stub there, unless this timeout here kicks in earlier.
+--
+-- Thus, we need more than 5 seconds.
 maxRetryDelay :: Int
-maxRetryDelay = 5 * 1000 * 1000
+maxRetryDelay = 7500 * 1000
 
 
 agentStubHost :: String

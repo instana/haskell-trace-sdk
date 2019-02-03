@@ -8,8 +8,11 @@ module Instana.SDK.IntegrationTest.HUnitExtra
   ) where
 
 
-import qualified Data.List  as List
+import qualified Data.List                           as List
+import           System.Log.Logger                   (infoM)
 import           Test.HUnit
+
+import           Instana.SDK.IntegrationTest.Logging (testLogger)
 
 
 failIO :: String -> IO Test
@@ -35,7 +38,7 @@ applyLabel label testIO = do
 
 skip :: String -> IO Test -> IO Test
 skip label _ = do
-  putStrLn $ "Skipped: " ++ label
+  infoM testLogger $ "Skipped: " ++ label
   return $ TestLabel label $ TestList []
 
 

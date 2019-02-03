@@ -19,6 +19,7 @@ import qualified Network.HTTP.Client        as HTTP
 import qualified Network.HTTP.Types         as HTTPTypes
 import qualified Network.Wai                as Wai
 import qualified Network.Wai.Handler.Warp   as Warp
+import           System.Environment         (lookupEnv)
 import qualified System.Exit                as Exit
 import           System.IO                  (Handle, stdout)
 import           System.Log.Formatter
@@ -384,9 +385,15 @@ runApp httpManager instana = do
 
 initLogging :: IO ()
 initLogging = do
-  updateGlobalLogger appLogger $ setLevel INFO
-  appFileHandler <- fileHandler "wai-warp-app.log" INFO
-  appStreamHandler <- streamHandler stdout INFO
+  logLevelEnvVar <- lookupEnv "APP_LOG_LEVEL"
+  let
+    logLevel =
+      case logLevelEnvVar of
+        Just "DEBUG" -> DEBUG
+        _            -> INFO
+  updateGlobalLogger appLogger $ setLevel logLevel
+  appFileHandler <- fileHandler "wai-warp-app.log" logLevel
+  appStreamHandler <- streamHandler stdout logLevel
   let
     formattedAppFileHandler = withFormatter appFileHandler
     formattedAppStreamHandler = withFormatter appStreamHandler

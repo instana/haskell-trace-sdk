@@ -25,6 +25,7 @@ import qualified Data.Maybe                              as Maybe
 import           Data.Text                               (Text)
 import qualified Data.Text                               as T
 import qualified Network.HTTP.Client                     as HTTP
+import           System.Log.Logger                       (infoM)
 
 import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
 import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
@@ -33,7 +34,8 @@ import qualified Instana.SDK.AgentStub.EntityDataRequest as EntityDataRequest
 import           Instana.SDK.AgentStub.TraceRequest      (Span)
 import qualified Instana.SDK.AgentStub.TraceRequest      as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper  as HttpHelper
-import           Instana.SDK.IntegrationTest.Util        (putStrFlush, (|>))
+import           Instana.SDK.IntegrationTest.Logging     (testLogger)
+import           Instana.SDK.IntegrationTest.Util        ((|>))
 
 
 withSpanCreation ::
@@ -100,7 +102,7 @@ waitForAgentConnection pidTranslation untranslatedPid = do
   discoveryWithPid <- waitForDiscoveryWithPid pid
   case discoveryWithPid of
     Left message1 -> do
-      putStrLn $
+      infoM testLogger $
         "❗️ Could not establish agent connection " ++
         "(discovery failed): " ++ message1
       return $ Left $
@@ -110,28 +112,28 @@ waitForAgentConnection pidTranslation untranslatedPid = do
       agentReady <- waitForAgentReadyWithPid pid
       case agentReady of
         Left message2 -> do
-          putStrLn $
+          infoM testLogger $
             "❗️ Could not establish agent connection " ++
             "(agent ready failed): " ++ message2
           return $ Left $
             "Could not establish agent connection " ++
             "(agent ready failed): " ++ message2
         Right _ -> do
-          putStrLn $ "\n✅ agent connection has been established"
+          infoM testLogger $ "✅ agent connection has been established"
           return discoveryWithPid
 
 
 waitForDiscoveryWithPid :: String -> IO (Either String (DiscoveryRequest, String))
 waitForDiscoveryWithPid pidStr = do
-  putStrFlush $ "⏱  waiting for discovery request for pid " ++ pidStr
+  infoM testLogger $ "⏱  waiting for discovery request for pid " ++ pidStr
   discoveries <-
     HttpHelper.retryRequest (containsDiscoveryWithPid pidStr) getDiscoveries
   case discoveries of
     Left message -> do
-      putStrLn $ "\n❗️ recorded discovery request could not be obtained"
+      infoM testLogger $ "❗️ recorded discovery request could not be obtained"
       return $ Left message
     Right ds -> do
-      putStrLn "\n✅ recorded discovery request obtained"
+      infoM testLogger "✅ recorded discovery request obtained"
       return $ Right $ (head ds, pidStr)
 
 
@@ -155,17 +157,17 @@ containsDiscoveryWithPid pid discoveries =
 
 waitForAgentReadyWithPid :: String -> IO (Either String ())
 waitForAgentReadyWithPid pidStr = do
-  putStrFlush $ "⏱  waiting for agent ready request for pid " ++ pidStr
+  infoM testLogger $ "⏱  waiting for agent ready request for pid " ++ pidStr
   agentReadyPids <-
     HttpHelper.retryRequest
       (containsAgentReadyWithPid pidStr)
       getAgentReadyPids
   case agentReadyPids of
     Left message -> do
-      putStrLn $ "\n❗️ recorded agent ready request could not be obtained"
+      infoM testLogger $ "❗️ recorded agent ready request could not be obtained"
       return $ Left message
     Right _ -> do
-      putStrLn $ "\n✅ recorded agent ready request obtained"
+      infoM testLogger $ "✅ recorded agent ready request obtained"
       return $ Right ()
 
 
@@ -189,7 +191,7 @@ containsAgentReadyWithPid pid pidsFromResponse =
 
 waitForEntityDataWithPid :: String -> IO (Either String [EntityDataRequest])
 waitForEntityDataWithPid pidStr = do
-  putStrFlush $
+  infoM testLogger $
     "⏱  waiting for entity data for pid " ++ pidStr ++ " to be collected"
   entityDataRequests <-
     HttpHelper.retryRequest
@@ -197,10 +199,10 @@ waitForEntityDataWithPid pidStr = do
       getEntityDataRequests
   case entityDataRequests of
     Left message -> do
-      putStrLn $ "\n❗️ recorded entity data request(s) could not be obtained"
+      infoM testLogger $ "❗️ recorded entity data request(s) could not be obtained"
       return $ Left message
     Right _ -> do
-      putStrLn $ "\n✅ recorded entity data request(s) have been obtained"
+      infoM testLogger $ "✅ recorded entity data request(s) have been obtained"
       return entityDataRequests
 
 
@@ -230,9 +232,9 @@ containsEntityDataRequestsWithPid pid entityDataRequests =
 
 waitForSpansMatching :: [Text] -> IO (Either String [Span])
 waitForSpansMatching expectedNames = do
-  putStrFlush "⏱  waiting for spans to be processed"
+  infoM testLogger "⏱  waiting for spans to be processed"
   spans <- HttpHelper.retryRequest (hasMatchingSpans expectedNames) getSpans
-  putStrLn "\n✅ spans have been processed"
+  infoM testLogger "✅ spans have been processed"
   return spans
 
 

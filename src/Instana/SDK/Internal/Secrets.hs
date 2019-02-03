@@ -55,6 +55,7 @@ instance FromJSON MatcherMode where
           fail $ "unknown secrets matcher mode: " ++ (T.unpack matcherModeText)
 
 
+-- |Secrets matcher for each mode.
 data SecretsMatcher =
     EqualsMatcher [Text]
   | EqualsIgnoreCaseMatcher [Text]

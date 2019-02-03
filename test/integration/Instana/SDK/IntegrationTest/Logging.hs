@@ -1,5 +1,5 @@
-module Instana.SDK.AgentStub.Logging
-  ( agentStubLogger
+module Instana.SDK.IntegrationTest.Logging
+  ( testLogger
   , initLogging
   ) where
 
@@ -15,8 +15,8 @@ import           System.Log.Logger         (Priority (..), rootLoggerName,
                                             updateGlobalLogger)
 
 
-agentStubLogger :: String
-agentStubLogger = "AgentStub"
+testLogger :: String
+testLogger = "IntegrationTest"
 
 
 initLogging :: IO ()
@@ -27,14 +27,14 @@ initLogging = do
       case logLevelEnvVar of
         Just "DEBUG" -> DEBUG
         _            -> INFO
-  updateGlobalLogger agentStubLogger $ setLevel logLevel
+  updateGlobalLogger testLogger $ setLevel logLevel
   updateGlobalLogger rootLoggerName $ setLevel logLevel
-  agentStubFileHandler <- fileHandler "agent-stub.log" logLevel
-  agentStubStreamHandler <- streamHandler stdout logLevel
+  testFileHandler <- fileHandler "integration-test.log" logLevel
+  testStreamHandler <- streamHandler stdout logLevel
   let
-    formattedAgentStubFileHandler = withFormatter agentStubFileHandler
-    formattedAgentStubStreamHandler = withFormatter agentStubStreamHandler
-  updateGlobalLogger agentStubLogger $
+    formattedAgentStubFileHandler = withFormatter testFileHandler
+    formattedAgentStubStreamHandler = withFormatter testStreamHandler
+  updateGlobalLogger testLogger $
     setHandlers [ formattedAgentStubFileHandler ]
   updateGlobalLogger rootLoggerName $
     setHandlers [ formattedAgentStubStreamHandler ]
@@ -44,5 +44,5 @@ withFormatter :: GenericHandler Handle -> GenericHandler Handle
 withFormatter handler = setFormatter handler formatter
     where
       timeFormat = "%F %H:%M:%S.%4q %z"
-      formatter = tfLogFormatter timeFormat "<$time $loggername $pid $prio> $msg"
+      formatter = tfLogFormatter timeFormat "$time $msg"
 

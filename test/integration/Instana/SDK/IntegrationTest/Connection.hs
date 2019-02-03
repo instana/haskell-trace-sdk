@@ -42,7 +42,7 @@ shouldReestablishLostConnection _ =
     threadDelay $ 2000 * 1000
 
     -- 1500 ms: agent stub will switch into "connection loss simulation" mode
-    --          (that is, spans will be rejected)
+    --          (that is, spans and entity data will be rejected)
 
     -- 2000 ms: send span 2, will be rejected
     recordSpan "haskell.dummy.connectionloss.entry-2"

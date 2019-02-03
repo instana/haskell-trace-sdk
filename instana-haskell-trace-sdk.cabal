@@ -258,6 +258,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , Instana.SDK.IntegrationTest.HUnitExtra
     , Instana.SDK.IntegrationTest.HttpHelper
     , Instana.SDK.IntegrationTest.HttpTracing
+    , Instana.SDK.IntegrationTest.Logging
     , Instana.SDK.IntegrationTest.LowLevelApi
     , Instana.SDK.IntegrationTest.Metrics
     , Instana.SDK.IntegrationTest.Runner
