@@ -44,7 +44,10 @@ shouldReestablishLostConnection _ =
     -- 1500 ms: agent stub will switch into "connection loss simulation" mode
     --          (that is, spans and entity data will be rejected)
 
-    -- 2000 ms: send span 2, will be rejected
+    -- 2000 ms: send span 2, will be rejected, unless an entity data request
+    -- happened since 1500 ms and already triggered the reestablishing of the
+    -- connection. Otherwise this span will trigger a reconnection (but get lost
+    -- in the process).
     recordSpan "haskell.dummy.connectionloss.entry-2"
     threadDelay $ 2000 * 1000
 
@@ -71,12 +74,6 @@ shouldReestablishLostConnection _ =
             TestHelper.getSpanByName
               "haskell.dummy.connectionloss.entry-1"
               spans
-          -- What about entry-2? Do we expect it to have been buffered and
-          -- resend? Do we expect it to be dropped? Right now, it is dropped.
-          maybeSpan2 =
-            TestHelper.getSpanByName
-              "haskell.dummy.connectionloss.entry-2"
-              spans
           maybeSpan3 =
             TestHelper.getSpanByName
               "haskell.dummy.connectionloss.entry-3"
@@ -85,12 +82,10 @@ shouldReestablishLostConnection _ =
         then
           failIO "expected span before connection loss has not been recorded"
         else
-          if isNothing maybeSpan3
-          then
-            failIO "expected span after connection loss has not been recorded"
-          else
-            return $ TestCase $
-              assertBool "expected span 2 to be dropped" (isNothing maybeSpan2)
+          return $ TestCase $
+            assertBool
+              "expected span after connection loss has not been recorded"
+              (isJust maybeSpan3)
 
 
 recordSpan :: String -> IO ()
