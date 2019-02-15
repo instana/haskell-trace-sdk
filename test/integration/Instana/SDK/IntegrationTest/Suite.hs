@@ -30,6 +30,7 @@ data SuiteOptions =
     , customAgentName        :: Maybe String
     , startupDelay           :: Bool
     , simulateConnectionLoss :: Bool
+    , appUnderTest           :: String
     }
 
 
@@ -40,6 +41,7 @@ defaultOptions =
     , customAgentName        = Nothing
     , startupDelay           = False
     , simulateConnectionLoss = False
+    , appUnderTest           = "instana-haskell-test-wai-server"
     }
 
 

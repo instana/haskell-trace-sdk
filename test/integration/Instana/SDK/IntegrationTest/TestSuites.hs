@@ -1,14 +1,15 @@
 module Instana.SDK.IntegrationTest.TestSuites (allSuites) where
 
 
-import qualified Instana.SDK.IntegrationTest.BracketApi  as BracketApi
-import qualified Instana.SDK.IntegrationTest.Connection  as Connection
-import qualified Instana.SDK.IntegrationTest.HttpTracing as HttpTracing
-import qualified Instana.SDK.IntegrationTest.LowLevelApi as LowLevelApi
-import qualified Instana.SDK.IntegrationTest.Metrics     as Metrics
-import           Instana.SDK.IntegrationTest.Suite       (ConditionalSuite (..),
-                                                          Suite (..))
-import qualified Instana.SDK.IntegrationTest.Suite       as Suite
+import qualified Instana.SDK.IntegrationTest.BracketApi    as BracketApi
+import qualified Instana.SDK.IntegrationTest.Connection    as Connection
+import qualified Instana.SDK.IntegrationTest.HttpTracing   as HttpTracing
+import qualified Instana.SDK.IntegrationTest.LowLevelApi   as LowLevelApi
+import qualified Instana.SDK.IntegrationTest.Metrics       as Metrics
+import           Instana.SDK.IntegrationTest.Suite         (ConditionalSuite (..),
+                                                            Suite (..))
+import qualified Instana.SDK.IntegrationTest.Suite         as Suite
+import qualified Instana.SDK.IntegrationTest.WaiMiddleware as WaiMiddleware
 
 
 allSuites :: [ConditionalSuite]
@@ -21,6 +22,7 @@ allSuites =
   , testPidTranslation
   , testCustomAgentName
   , testHttpTracing
+  , testWaiMiddleware
   , testMetrics
   ]
 
@@ -127,6 +129,24 @@ testHttpTracing =
         , HttpTracing.shouldSuppressWithLowLevelApi
         ])
       , Suite.options = Suite.defaultOptions
+      }
+
+
+testWaiMiddleware :: ConditionalSuite
+testWaiMiddleware =
+  Run $
+    Suite
+      { Suite.label = "WAI Middleware"
+      , Suite.tests = (\pid -> [
+          WaiMiddleware.shouldCreateRootEntry pid
+        , WaiMiddleware.shouldCreateNonRootEntry pid
+        , WaiMiddleware.shouldSuppress
+        ])
+      , Suite.options =
+          Suite.defaultOptions {
+            Suite.appUnderTest =
+              "instana-haskell-test-wai-with-middleware-server"
+          }
       }
 
 

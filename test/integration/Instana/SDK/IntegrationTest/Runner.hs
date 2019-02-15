@@ -108,7 +108,7 @@ runSuite suite = do
         , ("INSTANA_AGENT_NAME", Suite.customAgentName options)
         , ("INSTANA_LOG_LEVEL", Just logLevel)
         ]
-        "stack exec instana-haskell-test-wai-server"
+        "stack exec " ++ Suite.appUnderTest options
 
   infoM testLogger $ "Running: " ++ agentStubCommand
   Process.withCreateProcess

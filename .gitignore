@@ -2,4 +2,5 @@
 agent-stub.log
 example-app.log
 integration-test.log
+wai-warp-app-with-middleware.log
 wai-warp-app.log

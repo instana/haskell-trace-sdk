@@ -112,6 +112,17 @@ runApp instana = do
 
 ### Creating Spans
 
+#### Trace HTTP Entries Automatically
+
+You can let the SDK automatically create entry spans for all incoming HTTP requests in a WAI application by using it as a WAI middleware plug-in. Note that exit spans still need to be created manually via the withExit or startExit/stopExit functions (see below).
+
+```
+import qualified Instana.Wai.Middleware.Entry as InstanaWaiMiddleware
+
+main = do
+  Warp.run 3000 $ InstanaWaiMiddleware.traceHttpEntries instana $ app
+```
+
 #### Bracket Style (High Level API)
 
 All functions starting with `with` accept (among other parameters) an IO action. The SDK will start a span before, then execute the given IO action and complete the span afterwards. Using this style is recommended over the low level API that requires you to start and complete spans yourself.

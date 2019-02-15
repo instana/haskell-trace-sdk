@@ -56,7 +56,7 @@ pingAgentStub = do
 
 pingApp :: IO (HTTP.Response LBS.ByteString)
 pingApp = do
-  HttpHelper.doAppRequest "ping" "GET" []
+  HttpHelper.doAppRequest "ping" "GET" [("X-INSTANA-L", "0")]
 
 
 shutDownAgentStub :: IO ()
@@ -75,7 +75,7 @@ shutDownAgentStub = do
 shutDownApp :: IO ()
 shutDownApp = do
   catch
-    ( HttpHelper.doAppRequest "shutdown" "POST" []
+    ( HttpHelper.doAppRequest "shutdown" "POST" [("X-INSTANA-L", "0")]
       >> return ()
     )
     -- Ignore all exceptions for the shutdown request. Either the app has
