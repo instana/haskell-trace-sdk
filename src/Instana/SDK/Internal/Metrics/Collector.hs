@@ -24,6 +24,9 @@ import qualified Instana.SDK.Internal.AgentConnection.ProcessInfo as ProcessInfo
 import           Instana.SDK.Internal.Util                        ((|>))
 
 
+{-| Creates the ekg metric store and registers all relevant metrics for regular
+collection.
+-}
 registerMetrics :: String -> ProcessInfo -> Int -> IO Metrics.Store
 registerMetrics translatedPid processInfo sdkStartTime = do
   -- registerMetrics is executed once more after each connection loss/reconnect.
@@ -44,10 +47,14 @@ registerMetrics translatedPid processInfo sdkStartTime = do
   return instanaMetricsStore
 
 
+{-| Collects the current value for all registered metrics.
+-}
 sampleAll :: Metrics.Store -> IO Metrics.Sample
 sampleAll = Metrics.sampleAll
 
 
+{-| Registers custom metrics (not included in the ekg default metrics).
+-}
 registerCustomMetrics ::
   Metrics.Store
   -> String

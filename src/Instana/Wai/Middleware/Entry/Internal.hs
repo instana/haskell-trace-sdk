@@ -1,3 +1,10 @@
+{-|
+Module      : Instana.Wai.Middleware.Entry.Internal
+Description : Internals of the WAI Instana Tracing Middleware
+
+Automatically creates entry spans for all incoming HTTP requests in a WAI
+application.
+-}
 module Instana.Wai.Middleware.Entry.Internal
   ( traceHttpEntries
   ) where
