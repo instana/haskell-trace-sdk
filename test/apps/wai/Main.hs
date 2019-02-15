@@ -267,7 +267,7 @@ httpBracketApi ::
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
 httpBracketApi instana httpManager requestIn respond =
-  InstanaSDK.withHttpEntry instana requestIn "haskell.wai.server" $ do
+  InstanaSDK.withHttpEntry instana requestIn $ do
     requestOut <-
       HTTP.parseUrlThrow $
         "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
@@ -292,7 +292,7 @@ httpLowLevelApi ::
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
 httpLowLevelApi instana httpManager requestIn respond = do
-  InstanaSDK.startHttpEntry instana requestIn "haskell.wai.server"
+  InstanaSDK.startHttpEntry instana requestIn
   requestOut <-
     HTTP.parseUrlThrow $
       "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"

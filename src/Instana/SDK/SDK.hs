@@ -247,11 +247,11 @@ withHttpEntry ::
   MonadIO m =>
   InstanaContext
   -> Wai.Request
-  -> Text
   -> m a
   -> m a
-withHttpEntry context request spanName io = do
+withHttpEntry context request io = do
   let
+    spanName = "haskell.wai.server"
     tracingHeaders = readHttpTracingHeaders request
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
@@ -425,10 +425,10 @@ startHttpEntry ::
   MonadIO m =>
   InstanaContext
   -> Wai.Request
-  -> Text
   -> m ()
-startHttpEntry context request spanName = do
+startHttpEntry context request = do
   let
+    spanName = "haskell.wai.server"
     tracingHeaders = readHttpTracingHeaders request
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders

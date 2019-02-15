@@ -91,7 +91,7 @@ runTest pid urlPath headers extraAsserts = do
     from = Just $ From pid
   spansResults <-
     TestHelper.waitForSpansMatching
-      [ "haskell.wai.server" , "haskell.http.client" ]
+      [ "haskell.wai.server", "haskell.http.client" ]
   case spansResults of
     Left failure ->
       failIO $ "Could not load recorded spans from agent stub: " ++ failure
