@@ -1,5 +1,5 @@
 name:           instana-haskell-trace-sdk
-version:        0.1.0.0
+version:        0.2.0.0
 synopsis:       SDK for adding custom Instana tracing support to Haskell applications.
 description:    Please also see the README on Github at <https://github.com/instana/haskell-trace-sdk#readme>
 homepage:       https://www.instana.com/

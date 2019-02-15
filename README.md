@@ -19,7 +19,7 @@ To use the Instana Haskell Trace SDK in your application, add `instana-haskell-t
 
 ```
 extra-deps:
-- instana-haskell-trace-sdk-0.1.0.0
+- instana-haskell-trace-sdk-0.2.0.0
 ```
 
 Usage

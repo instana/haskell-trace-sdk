@@ -1,5 +1,5 @@
 name:                instana-haskell-trace-sdk
-version:             0.1.0.0
+version:             0.2.0.0
 github:              "instana/haskell-trace-sdk"
 license:             BSD3
 author:              "Bastian Krol"
