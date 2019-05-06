@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Instana.SDK.IntegrationTest.TestHelper
-  ( getSpanByName
+  ( getSpanByRegisteredName
+  , getSpanBySdkName
+  , hasRegisteredSpanName
+  , hasSdkSpanName
   , pingAgentStub
   , pingApp
   , resetDiscoveries
@@ -12,7 +15,8 @@ module Instana.SDK.IntegrationTest.TestHelper
   , waitForExternalAgentConnection
   , waitForDiscoveryWithPid
   , waitForAgentReadyWithPid
-  , waitForSpansMatching
+  , waitForRegisteredSpansMatching
+  , waitForSdkSpansMatching
   , withSpanCreation
   ) where
 
@@ -44,7 +48,7 @@ withSpanCreation ::
   -> IO (a, Either String [Span])
 withSpanCreation createSpanAction expectedSpans = do
   result <- createSpanAction
-  spansResults <- waitForSpansMatching expectedSpans
+  spansResults <- waitForSdkSpansMatching expectedSpans
   resetSpans
   return (result, spansResults)
 
@@ -230,16 +234,35 @@ containsEntityDataRequestsWithPid pid entityDataRequests =
         entityDataRequests
 
 
-waitForSpansMatching :: [Text] -> IO (Either String [Span])
-waitForSpansMatching expectedNames = do
+waitForSdkSpansMatching :: [Text] -> IO (Either String [Span])
+waitForSdkSpansMatching expectedNames = do
   infoM testLogger "⏱  waiting for spans to be processed"
-  spans <- HttpHelper.retryRequest (hasMatchingSpans expectedNames) getSpans
+  spans <- HttpHelper.retryRequest (hasMatchingSdkSpans expectedNames) getSpans
   infoM testLogger "✅ spans have been processed"
   return spans
 
 
-hasMatchingSpans :: [Text] -> [Span] -> Bool
-hasMatchingSpans expectedNames spans =
+hasMatchingSdkSpans :: [Text] -> [Span] -> Bool
+hasMatchingSdkSpans expectedNames spans =
+  let
+     namesFromResponse = List.map TraceRequest.readSdkName spans
+     justExpectedNames = List.map Just expectedNames
+     intersection = List.intersect namesFromResponse justExpectedNames
+   in
+     length intersection == length expectedNames
+
+
+waitForRegisteredSpansMatching :: [Text] -> IO (Either String [Span])
+waitForRegisteredSpansMatching expectedNames = do
+  infoM testLogger "⏱  waiting for spans to be processed"
+  spans <-
+    HttpHelper.retryRequest (hasMatchingRegisteredSpans expectedNames) getSpans
+  infoM testLogger "✅ spans have been processed"
+  return spans
+
+
+hasMatchingRegisteredSpans :: [Text] -> [Span] -> Bool
+hasMatchingRegisteredSpans expectedNames spans =
   let
      namesFromResponse = List.map TraceRequest.n spans
      intersection = List.intersect namesFromResponse expectedNames
@@ -247,14 +270,32 @@ hasMatchingSpans expectedNames spans =
      length intersection == length expectedNames
 
 
+getSpanByRegisteredName :: Text -> [Span] -> Maybe Span
+getSpanByRegisteredName name =
+  List.find (hasRegisteredSpanName name)
+
+
+hasRegisteredSpanName :: Text -> Span -> Bool
+hasRegisteredSpanName name span_ =
+   TraceRequest.n span_ == name
+
+
+getSpanBySdkName :: Text -> [Span] -> Maybe Span
+getSpanBySdkName name =
+  List.find (hasSdkSpanName name)
+
+
+hasSdkSpanName :: Text -> Span -> Bool
+hasSdkSpanName name span_ =
+  let
+    sdkName = TraceRequest.readSdkName span_
+  in
+    sdkName == Just name
+
+
 getSpans :: IO (Either String [Span])
 getSpans =
   HttpHelper.requestAgentStubAndParse "stub/spans" "GET"
-
-
-getSpanByName :: Text -> [Span] -> Maybe Span
-getSpanByName name =
-  List.find (\s -> TraceRequest.n s == name)
 
 
 -- |Will also reset agent ready requests and entity data requests (basically

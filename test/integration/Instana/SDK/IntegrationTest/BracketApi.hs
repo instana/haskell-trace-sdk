@@ -38,8 +38,8 @@ shouldRecordSpans pid =
       Right spans -> do
         let
           maybeRootEntrySpan =
-            TestHelper.getSpanByName "haskell.dummy.root.entry" spans
-          maybeExitSpan = TestHelper.getSpanByName "haskell.dummy.exit" spans
+            TestHelper.getSpanBySdkName "haskell.dummy.root.entry" spans
+          maybeExitSpan = TestHelper.getSpanBySdkName "haskell.dummy.exit" spans
         if isNothing maybeRootEntrySpan || isNothing maybeExitSpan
           then
             failIO "expected spans have not been recorded"
@@ -95,8 +95,8 @@ shouldRecordNonRootEntry pid =
         failIO $ "Could not load recorded spans from agent stub: " ++ failure
       Right spans -> do
         let
-          maybeEntrySpan = TestHelper.getSpanByName "haskell.dummy.entry" spans
-          maybeExitSpan = TestHelper.getSpanByName "haskell.dummy.exit" spans
+          maybeEntrySpan = TestHelper.getSpanBySdkName "haskell.dummy.entry" spans
+          maybeExitSpan = TestHelper.getSpanBySdkName "haskell.dummy.exit" spans
         if isNothing maybeEntrySpan || isNothing maybeExitSpan
           then
             failIO "expected spans have not been recorded"
@@ -155,8 +155,8 @@ shouldMergeData pid =
       Right spans -> do
         let
           maybeRootEntrySpan =
-            TestHelper.getSpanByName "haskell.dummy.root.entry" spans
-          maybeExitSpan = TestHelper.getSpanByName "haskell.dummy.exit" spans
+            TestHelper.getSpanBySdkName "haskell.dummy.root.entry" spans
+          maybeExitSpan = TestHelper.getSpanBySdkName "haskell.dummy.exit" spans
         if isNothing maybeRootEntrySpan || isNothing maybeExitSpan
           then
             failIO "expected spans have not been recorded"
@@ -183,38 +183,53 @@ shouldMergeData pid =
               , assertEqual "entry error" 1 (TraceRequest.ec rootEntrySpan)
               , assertEqual "entry from" from $ TraceRequest.f rootEntrySpan
               , assertEqual "entry data"
-                  ( Aeson.object
-                    [ "data1"     .= ("value1" :: String)
-                    , "data2"     .= (1302 :: Int)
-                    , "startKind" .= ("entry" :: String)
-                    , "data2"     .= (1302 :: Int)
-                    , "data3"     .= ("value3" :: String)
-                    , "endKind"   .= ("entry" :: String)
-                    ]
-                  )
-                  (TraceRequest.spanData rootEntrySpan)
+                ( Aeson.object
+                  [ "sdk"    .= (Aeson.object
+                    [ "name" .= ("haskell.dummy.root.entry" :: String)
+                    , "type" .= ("entry" :: String)
+                    , "custom" .= (Aeson.object
+                      [ "tags" .= (Aeson.object
+                        [ "data1"     .= ("value1" :: String)
+                        , "data2"     .= (1302 :: Int)
+                        , "startKind" .= ("entry" :: String)
+                        , "data2"     .= (1302 :: Int)
+                        , "data3"     .= ("value3" :: String)
+                        , "endKind"   .= ("entry" :: String)
+                        ])
+                      ])
+                    ])
+                  ]
+                )
+                (TraceRequest.spanData rootEntrySpan)
               , assertBool "exit timestamp" $ TraceRequest.ts exitSpan > 0
               , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
               , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
               , assertEqual "exit error" 2 (TraceRequest.ec exitSpan)
               , assertEqual "exit from" from $ TraceRequest.f exitSpan
               , assertEqual "exit data"
-                  ( Aeson.object
-                    [ "data1"     .= ("value1" :: String)
-                    , "data2"     .= (1302 :: Int)
-                    , "startKind" .= ("exit" :: String)
-                    , "data2"     .= (1302 :: Int)
-                    , "data3"     .= ("value3" :: String)
-                    , "endKind"   .= ("exit" :: String)
-                    , "nested"    .= (Aeson.object
-                        [ "key1" .= ("nested.text.value1" :: String)
-                        , "key2" .= ("nested.text.value2" :: String)
-                        , "key3" .= (1604 :: Integer)
-                        ]
-                      )
-                    ]
-                  )
-                  (TraceRequest.spanData exitSpan)
+                ( Aeson.object
+                  [ "sdk"    .= (Aeson.object
+                    [ "name" .= ("haskell.dummy.exit" :: String)
+                    , "type" .= ("exit" :: String)
+                    , "custom" .= (Aeson.object
+                      [ "tags" .= (Aeson.object
+                        [ "data1"     .= ("value1" :: String)
+                        , "data2"     .= (1302 :: Int)
+                        , "startKind" .= ("exit" :: String)
+                        , "data2"     .= (1302 :: Int)
+                        , "data3"     .= ("value3" :: String)
+                        , "endKind"   .= ("exit" :: String)
+                        , "nested"    .= (Aeson.object
+                            [ "key1" .= ("nested.text.value1" :: String)
+                            , "key2" .= ("nested.text.value2" :: String)
+                            , "key3" .= (1604 :: Integer)
+                            ])
+                        ])
+                      ])
+                    ])
+                  ]
+                )
+                (TraceRequest.spanData exitSpan)
               ]
 
 

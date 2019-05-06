@@ -24,14 +24,15 @@ allTests =
     , TestLabel "shouldAddIntDeeplyNested" shouldAddIntDeeplyNested
     , TestLabel "shouldAddDoubleDeeplyNested" shouldAddDoubleDeeplyNested
     , TestLabel "shouldAddBooleanDeeplyNested" shouldAddBooleanDeeplyNested
-    , TestLabel "shouldAddMultiple" shouldAddMultiple
+    , TestLabel "shouldAddMultipleRegistered" shouldAddMultipleRegistered
+    , TestLabel "shouldAddMultipleTags" shouldAddMultipleTags
     ]
 
 
 shouldAddStringNotNested :: Test
 shouldAddStringNotNested =
   let
-    span_ = Span.addDataAt "path" ("value" :: String) $ entrySpan
+    span_ = Span.addRegisteredDataAt "path" ("value" :: String) $ entrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -46,7 +47,7 @@ shouldAddStringNested :: Test
 shouldAddStringNested =
   let
     span_ =
-      Span.addDataAt
+      Span.addRegisteredDataAt
         "nested.path"
         ("value" :: String) $
           entrySpan
@@ -66,7 +67,7 @@ shouldAddStringDeeplyNested :: Test
 shouldAddStringDeeplyNested =
   let
     span_ =
-      Span.addDataAt
+      Span.addRegisteredDataAt
         "really.deeply.nested.path"
         ("deeplyNestedValue" :: String) $
           entrySpan
@@ -90,7 +91,7 @@ shouldAddIntDeeplyNested :: Test
 shouldAddIntDeeplyNested =
   let
     span_ =
-      Span.addDataAt
+      Span.addRegisteredDataAt
         "really.deeply.nested.path"
         (42 :: Int) $
           entrySpan
@@ -114,7 +115,7 @@ shouldAddDoubleDeeplyNested :: Test
 shouldAddDoubleDeeplyNested =
   let
     span_ =
-      Span.addDataAt
+      Span.addRegisteredDataAt
         "really.deeply.nested.path"
         (28.08 :: Double) $
           entrySpan
@@ -137,7 +138,7 @@ shouldAddDoubleDeeplyNested =
 shouldAddBooleanDeeplyNested :: Test
 shouldAddBooleanDeeplyNested =
   let
-    span_ = Span.addDataAt "really.deeply.nested.path" True $ entrySpan
+    span_ = Span.addRegisteredDataAt "really.deeply.nested.path" True $ entrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -154,16 +155,16 @@ shouldAddBooleanDeeplyNested =
       spanData
 
 
-shouldAddMultiple :: Test
-shouldAddMultiple =
+shouldAddMultipleRegistered :: Test
+shouldAddMultipleRegistered =
   let
     span_ =
-      Span.addDataAt "nested.key3" (12.07 :: Double) $
-      Span.addDataAt "nested.key2" (2 :: Int) $
-      Span.addDataAt "nested.key1" ("value.n.1" :: String) $
-      Span.addDataAt "key3" (16.04 :: Double) $
-      Span.addDataAt "key2" (13 :: Int) $
-      Span.addDataAt "key1" ("value1" :: String) $
+      Span.addRegisteredDataAt "nested.key3" (12.07 :: Double) $
+      Span.addRegisteredDataAt "nested.key2" (2 :: Int) $
+      Span.addRegisteredDataAt "nested.key1" ("value.n.1" :: String) $
+      Span.addRegisteredDataAt "key3" (16.04 :: Double) $
+      Span.addRegisteredDataAt "key2" (13 :: Int) $
+      Span.addRegisteredDataAt "key1" ("value1" :: String) $
       entrySpan
     spanData = Span.spanData span_
   in
@@ -177,6 +178,41 @@ shouldAddMultiple =
           [ "key1" .= ("value.n.1" :: String)
           , "key2" .= (2 :: Int)
           , "key3" .= (12.07 :: Double)
+          ])
+        ]
+      )
+      spanData
+
+
+shouldAddMultipleTags :: Test
+shouldAddMultipleTags =
+  let
+    span_ =
+      Span.addTagAt "nested.key3" (12.07 :: Double) $
+      Span.addTagAt "nested.key2" (2 :: Int) $
+      Span.addTagAt "nested.key1" ("value.n.1" :: String) $
+      Span.addTagAt "key3" (16.04 :: Double) $
+      Span.addTagAt "key2" (13 :: Int) $
+      Span.addTagAt "key1" ("value1" :: String) $
+      entrySpan
+    spanData = Span.spanData span_
+  in
+  TestCase $
+    assertEqual "add deeply nested"
+      (Aeson.object
+        [ "sdk" .= (Aeson.object
+          [ "custom" .= (Aeson.object
+            [ "tags" .= (Aeson.object
+              [ "key1" .= ("value1" :: String)
+              , "key2" .= (13 :: Int)
+              , "key3" .= (16.04 :: Double)
+              , "nested" .= (Aeson.object
+                [ "key1" .= ("value.n.1" :: String)
+                , "key2" .= (2 :: Int)
+                , "key3" .= (12.07 :: Double)
+                ])
+              ])
+            ])
           ])
         ]
       )

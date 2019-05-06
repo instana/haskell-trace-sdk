@@ -72,6 +72,7 @@ library
       Instana.SDK.Span.NonRootEntry
       Instana.SDK.Span.RootEntry
       Instana.SDK.Span.Span
+      Instana.SDK.Span.SpanType
       Instana.SDK.TracingHeaders
       Instana.Wai.Middleware.Entry
   other-modules:
@@ -206,6 +207,7 @@ executable instana-haskell-agent-stub
     , time
     , transformers
     , unix
+    , unordered-containers
     , wai
     , warp
   other-modules:

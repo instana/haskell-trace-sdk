@@ -2,11 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-|
 Module      : Instana.SDK.Span.Span
-Description : A type class for spans (entries and exits)
+Description : A type for spans (entries, exits or intermediates).
 -}
 module Instana.SDK.Span.Span
   ( Span (Entry, Exit)
-  , SpanKind (EntryKind, ExitKind)
+  , SpanKind (EntryKind, ExitKind, IntermediateKind)
   , traceId
   , spanId
   , spanKind
@@ -16,8 +16,10 @@ module Instana.SDK.Span.Span
   , errorCount
   , addToErrorCount
   , spanData
-  , addData
-  , addDataAt
+  , addRegisteredData
+  , addRegisteredDataAt
+  , addTag
+  , addTagAt
   ) where
 
 
@@ -128,17 +130,35 @@ spanData span_ =
     Exit exit   -> ExitSpan.spanData exit
 
 
--- |Add a value to the span's data section.
-addData :: Value -> Span -> Span
-addData value span_ =
+-- |Add a value to the span's custom tags section. This should be used for SDK
+-- spans instead of addRegisteredData.
+addTag :: Value -> Span -> Span
+addTag value span_ =
+  addRegisteredDataAt "sdk.custom.tags" value span_
+
+
+-- |Add a value to the given path to the span's custom tags section. This should
+-- be used for SDK spans instead of addRegisteredDataAt.
+addTagAt :: Aeson.ToJSON a => Text -> a -> Span -> Span
+addTagAt path value span_ =
+  addRegisteredDataAt (T.concat ["sdk.custom.tags.", path]) value span_
+
+
+
+-- |Add a value to the span's data section. This should only be used for
+-- registered spans, not for SDK spans. For SDK spans, you should use addTag
+-- instead.
+addRegisteredData :: Value -> Span -> Span
+addRegisteredData value span_ =
   case span_ of
     Entry entry -> Entry $ EntrySpan.addData value entry
     Exit exit   -> Exit $ ExitSpan.addData value exit
 
 
--- |Add a value at the given path to the span's data section.
-addDataAt :: Aeson.ToJSON a => Text -> a -> Span -> Span
-addDataAt path value span_ =
+-- |Add a value at the given path to the span's data section. For SDK spans, you
+-- should use addTagAt instead.
+addRegisteredDataAt :: Aeson.ToJSON a => Text -> a -> Span -> Span
+addRegisteredDataAt path value span_ =
   let
     pathSegments = T.splitOn "." path
     newData = List.foldr
@@ -150,5 +170,5 @@ addDataAt path value span_ =
       (Aeson.toJSON value)
       pathSegments
   in
-  addData newData span_
+  addRegisteredData newData span_
 
