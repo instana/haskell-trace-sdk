@@ -11,9 +11,11 @@ of the 'withRootEntry', 'withEntry', 'withExit' functions for tracing.
 module Instana.SDK.SDK
     ( Config
     , InstanaContext
-    , addData
-    , addDataAt
+    , addRegisteredData
+    , addRegisteredDataAt
     , addHttpTracingHeaders
+    , addTag
+    , addTagAt
     , addToErrorCount
     , agentHost
     , agentName
@@ -91,6 +93,8 @@ import           Instana.SDK.Span.RootEntry          (RootEntry (RootEntry))
 import qualified Instana.SDK.Span.RootEntry          as RootEntry
 import           Instana.SDK.Span.Span               (Span (..), SpanKind (..))
 import qualified Instana.SDK.Span.Span               as Span
+import           Instana.SDK.Span.SpanType           (SpanType (RegisteredSpan))
+import qualified Instana.SDK.Span.SpanType           as SpanType
 import           Instana.SDK.TracingHeaders          (TracingHeaders (TracingHeaders))
 import qualified Instana.SDK.TracingHeaders          as TracingHeaders
 
@@ -213,11 +217,11 @@ initInstanaInternal conf = do
 withRootEntry ::
   MonadIO m =>
   InstanaContext
-  -> Text
+  -> SpanType
   -> m a
   -> m a
-withRootEntry context spanName io = do
-  startRootEntry context spanName
+withRootEntry context spanType io = do
+  startRootEntry context spanType
   result <- io
   completeEntry context
   return result
@@ -229,11 +233,11 @@ withEntry ::
   InstanaContext
   -> String
   -> String
-  -> Text
+  -> SpanType
   -> m a
   -> m a
-withEntry context traceId parentId spanName io = do
-  startEntry context traceId parentId spanName
+withEntry context traceId parentId spanType io = do
+  startEntry context traceId parentId spanType
   result <- io
   completeEntry context
   return result
@@ -251,7 +255,7 @@ withHttpEntry ::
   -> m a
 withHttpEntry context request io = do
   let
-    spanName = "haskell.wai.server"
+    spanType = (RegisteredSpan SpanType.HaskellWaiServer)
     tracingHeaders = readHttpTracingHeaders request
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
@@ -262,9 +266,9 @@ withHttpEntry context request io = do
         io' = addDataFromRequest context request io
       case (traceId, spanId) of
         (Just t, Just s) ->
-          withEntry context t s spanName io'
+          withEntry context t s spanType io'
         _                ->
-          withRootEntry context spanName io'
+          withRootEntry context spanType io'
     TracingHeaders.Suppress -> do
       liftIO $ pushSpan
         context
@@ -301,7 +305,7 @@ addHttpData context request = do
       Wai.requestHeaderHost request
       |> fmap BSC8.unpack
       |> Maybe.fromMaybe ""
-  addData
+  addRegisteredData
     context
     (Aeson.object [ "http" .=
       Aeson.object
@@ -318,11 +322,11 @@ addHttpData context request = do
 withExit ::
   MonadIO m =>
   InstanaContext
-  -> Text
+  -> SpanType
   -> m a
   -> m a
-withExit context spanName io = do
-  startExit context spanName
+withExit context spanType io = do
+  startExit context spanType
   result <- io
   completeExit context
   return result
@@ -349,9 +353,9 @@ withHttpExit context request io = do
 startRootEntry ::
   MonadIO m =>
   InstanaContext
-  -> Text
+  -> SpanType
   -> m ()
-startRootEntry context spanName = do
+startRootEntry context spanType = do
   liftIO $ do
     timestamp <- round . (* 1000) <$> getPOSIXTime
     traceId <- Id.generate
@@ -360,10 +364,10 @@ startRootEntry context spanName = do
         RootEntrySpan $
           RootEntry
             { RootEntry.spanAndTraceId = traceId
-            , RootEntry.spanName       = spanName
+            , RootEntry.spanName       = SpanType.spanName spanType
             , RootEntry.timestamp      = timestamp
             , RootEntry.errorCount     = 0
-            , RootEntry.spanData       = emptyValue
+            , RootEntry.spanData       = SpanType.initialData EntryKind spanType
             }
     pushSpan
       context
@@ -385,9 +389,9 @@ startEntry ::
   InstanaContext
   -> String
   -> String
-  -> Text
+  -> SpanType
   -> m ()
-startEntry context traceId parentId spanName = do
+startEntry context traceId parentId spanType = do
   liftIO $ do
     timestamp <- round . (* 1000) <$> getPOSIXTime
     spanId <- Id.generate
@@ -398,10 +402,10 @@ startEntry context traceId parentId spanName = do
             { NonRootEntry.traceId    = Id.fromString traceId
             , NonRootEntry.spanId     = spanId
             , NonRootEntry.parentId   = Id.fromString parentId
-            , NonRootEntry.spanName   = spanName
+            , NonRootEntry.spanName   = SpanType.spanName spanType
             , NonRootEntry.timestamp  = timestamp
             , NonRootEntry.errorCount = 0
-            , NonRootEntry.spanData   = emptyValue
+            , NonRootEntry.spanData   = SpanType.initialData EntryKind spanType
             }
     pushSpan
       context
@@ -428,7 +432,7 @@ startHttpEntry ::
   -> m ()
 startHttpEntry context request = do
   let
-    spanName = "haskell.wai.server"
+    spanType = (RegisteredSpan SpanType.HaskellWaiServer)
     tracingHeaders = readHttpTracingHeaders request
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
@@ -437,10 +441,10 @@ startHttpEntry context request = do
     TracingHeaders.Trace ->
       case (traceId, spanId) of
         (Just t, Just s) -> do
-          startEntry context t s spanName
+          startEntry context t s spanType
           addHttpData context request
         _                -> do
-          startRootEntry context spanName
+          startRootEntry context spanType
           addHttpData context request
     TracingHeaders.Suppress -> do
       liftIO $ pushSpan
@@ -460,9 +464,9 @@ startHttpEntry context request = do
 startExit ::
   MonadIO m =>
   InstanaContext
-  -> Text
+  -> SpanType
   -> m ()
-startExit context spanName = do
+startExit context spanType = do
   liftIO $ do
     suppressed <- isSuppressed context
     if suppressed then
@@ -478,10 +482,10 @@ startExit context spanName = do
               ExitSpan
                 { ExitSpan.parentSpan  = parent
                 , ExitSpan.spanId      = spanId
-                , ExitSpan.spanName    = spanName
+                , ExitSpan.spanName    = SpanType.spanName spanType
                 , ExitSpan.timestamp   = timestamp
                 , ExitSpan.errorCount  = 0
-                , ExitSpan.spanData    = emptyValue
+                , ExitSpan.spanData    = SpanType.initialData ExitKind spanType
                 }
           pushSpan
             context
@@ -498,12 +502,12 @@ startExit context spanName = do
             )
         Just (Exit ex) -> do
           warningM instanaLogger $
-            "Cannot start exit span \"" ++ show spanName ++
+            "Cannot start exit span \"" ++ show spanType ++
             "\" since there is already an active exit span " ++
             "in progress: " ++ show ex
         Nothing -> do
           warningM instanaLogger $
-            "Cannot start exit span \"" ++ show spanName ++
+            "Cannot start exit span \"" ++ show spanType ++
             "\" since there is no active entry span " ++
             "(actually, there is no active span at all)."
           return ()
@@ -531,7 +535,7 @@ startHttpExit context request = do
                 res
                   |> HTTP.responseStatus
                   |> HTTPTypes.statusCode
-            addData context
+            addRegisteredData context
               (Aeson.object [ "http" .=
                 Aeson.object
                   [ "status" .= status
@@ -547,8 +551,8 @@ startHttpExit context request = do
     path = BSC8.unpack $ HTTP.path request
     url = protocol ++ host ++ port ++ path
 
-  startExit context "haskell.http.client"
-  addData
+  startExit context (RegisteredSpan SpanType.HaskellHttpClient)
+  addRegisteredData
     context
     (Aeson.object [ "http" .=
       Aeson.object
@@ -657,7 +661,45 @@ addToErrorCount context increment =
     (\span_ -> Span.addToErrorCount increment span_)
 
 
--- |Adds additional custom data to the currently active span. Call this
+-- |Adds additional custom tags to the currently active span. Call this
+-- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry.
+-- The given path can be a nested path, with path fragments separated by dots,
+-- like "http.url". This will result in
+-- "data": {
+--   ...
+--   "sdk": {
+--     "custom": {
+--       "tags": {
+--         "http": {
+--           "url": "..."
+--         },
+--       },
+--     },
+--   },
+--   ...
+-- }
+--
+-- This should be used for SDK spans instead of addRegisteredDataAt.
+addTagAt :: (MonadIO m, Aeson.ToJSON a) => InstanaContext -> Text -> a -> m ()
+addTagAt context path value =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addTagAt path value span_)
+
+
+-- |Adds additional custom tags to the currently active span. Call this
+-- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
+-- called multiple times, data from multiple calls will be merged.
+--
+-- This should be used for SDK spans instead of addRegisteredData.
+addTag :: MonadIO m => InstanaContext -> Value -> m ()
+addTag context value =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addTag value span_)
+
+
+-- |Adds additional meta data to the currently active registered span. Call this
 -- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
 -- inside the IO action given to with withEntry/withExit/withRootEntry.
 -- The given path can be a nested path, with path fragments separated by dots,
@@ -669,20 +711,31 @@ addToErrorCount context increment =
 --   },
 --   ...
 -- }
-addDataAt :: (MonadIO m, Aeson.ToJSON a) => InstanaContext -> Text -> a -> m ()
-addDataAt context path value =
+--
+-- Note that this should only be used for registered spans, not for SDK spans.
+-- Use addTagAt for SDK spans instead.
+addRegisteredDataAt ::
+  (MonadIO m, Aeson.ToJSON a) =>
+  InstanaContext
+  -> Text
+  -> a
+  -> m ()
+addRegisteredDataAt context path value =
   liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addDataAt path value span_)
+    (\span_ -> Span.addRegisteredDataAt path value span_)
 
 
--- |Adds additional custom data to the currently active span. Call this
+-- |Adds additional data to the currently active registered span. Call this
 -- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
 -- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
 -- called multiple times, data from multiple calls will be merged.
-addData :: MonadIO m => InstanaContext -> Value -> m ()
-addData context value =
+--
+-- Note that this should only be used for registered spans, not for SDK spans.
+-- Use addTag for SDK spans instead.
+addRegisteredData :: MonadIO m => InstanaContext -> Value -> m ()
+addRegisteredData context value =
   liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addData value span_)
+    (\span_ -> Span.addRegisteredData value span_)
 
 
 -- |Reads the Instana tracing headers
@@ -882,9 +935,4 @@ mapCurrentSpan fn stack =
   Maybe.fromMaybe
     SpanStack.empty
     ((SpanStack.mapTop fn) <$> stack)
-
-
--- |Provides an empty Aeson value.
-emptyValue :: Value
-emptyValue = Aeson.object []
 

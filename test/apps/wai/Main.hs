@@ -15,6 +15,7 @@ import qualified Data.Maybe                 as Maybe
 import qualified Data.Text                  as T
 import           Instana.SDK.SDK            (InstanaContext)
 import qualified Instana.SDK.SDK            as InstanaSDK
+import qualified Instana.SDK.Span.SpanType  as SpanType
 import qualified Network.HTTP.Client        as HTTP
 import qualified Network.HTTP.Types         as HTTPTypes
 import qualified Network.Wai                as Wai
@@ -141,27 +142,27 @@ bracketApiWithData instana respond = do
 
 withExitWithData :: InstanaContext -> IO String
 withExitWithData instana = do
-  InstanaSDK.addData instana (someSpanData "entry")
+  InstanaSDK.addTag instana (someSpanData "entry")
   exitCallResult <-
     InstanaSDK.withExit
       instana
       "haskell.dummy.exit"
       (simulateExitCallWithData instana)
   InstanaSDK.incrementErrorCount instana
-  InstanaSDK.addData instana (moreSpanData "entry")
+  InstanaSDK.addTag instana (moreSpanData "entry")
   return $ exitCallResult ++ "::entry done"
 
 
 simulateExitCallWithData :: InstanaContext -> IO String
 simulateExitCallWithData instana = do
-  InstanaSDK.addData instana (someSpanData "exit")
+  InstanaSDK.addTag instana (someSpanData "exit")
   -- some time needs to pass, otherwise the exit span's duration will be 0
   threadDelay $ 10 * 1000
   InstanaSDK.addToErrorCount instana 2
-  InstanaSDK.addData instana (moreSpanData "exit")
-  InstanaSDK.addDataAt instana "nested.key1" ("nested.text.value1" :: String)
-  InstanaSDK.addDataAt instana "nested.key2" ("nested.text.value2" :: String)
-  InstanaSDK.addDataAt instana "nested.key3" (1604 :: Int)
+  InstanaSDK.addTag instana (moreSpanData "exit")
+  InstanaSDK.addTagAt instana "nested.key1" ("nested.text.value1" :: String)
+  InstanaSDK.addTagAt instana "nested.key2" ("nested.text.value2" :: String)
+  InstanaSDK.addTagAt instana "nested.key3" (1604 :: Int)
   return "exit done"
 
 
@@ -211,11 +212,11 @@ lowLevelApiWithData instana respond = do
   InstanaSDK.startRootEntry
     instana
     "haskell.dummy.root.entry"
-  InstanaSDK.addData instana (someSpanData "entry")
+  InstanaSDK.addTag instana (someSpanData "entry")
   result <- doExitCallWithData instana
   InstanaSDK.incrementErrorCount instana
-  InstanaSDK.addData instana (moreSpanData "entry")
-  InstanaSDK.addDataAt
+  InstanaSDK.addTag instana (moreSpanData "entry")
+  InstanaSDK.addTagAt
     instana "nested.entry.key" ("nested.entry.value" :: String)
   InstanaSDK.completeEntry instana
   respondWithPlainText respond result
@@ -226,11 +227,11 @@ doExitCallWithData instana = do
   InstanaSDK.startExit
     instana
     "haskell.dummy.exit"
-  InstanaSDK.addData instana (someSpanData "exit")
+  InstanaSDK.addTag instana (someSpanData "exit")
   result <- simulateExitCall
   InstanaSDK.incrementErrorCount instana
-  InstanaSDK.addData instana (moreSpanData "exit")
-  InstanaSDK.addDataAt instana "nested.exit.key" ("nested.exit.value" :: String)
+  InstanaSDK.addTag instana (moreSpanData "exit")
+  InstanaSDK.addTagAt instana "nested.exit.key" ("nested.exit.value" :: String)
   InstanaSDK.completeExit instana
   return result
 
@@ -320,8 +321,8 @@ createSingleSpan instana requestIn respond = do
     maybeMaybeSpanName = lookup ("spanName" :: ByteString) query
     spanNameByteString =
       Maybe.fromMaybe "haskell.test.span" $ join maybeMaybeSpanName
-    spanName = T.pack $ BS.unpack spanNameByteString
-  InstanaSDK.withRootEntry instana spanName $ do
+    spanType = SpanType.SdkSpan $ T.pack $ BS.unpack spanNameByteString
+  InstanaSDK.withRootEntry instana spanType $ do
     threadDelay $ 1000 -- make sure there is a duration > 0
   respond $
     Wai.responseBuilder

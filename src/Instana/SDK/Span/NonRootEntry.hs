@@ -28,8 +28,9 @@ data NonRootEntry =
     , spanId     :: Id
       -- |The ID of the parent span
     , parentId   :: Id
-      -- |The span name/type, e.g. a short string like "yesod", "servant",
-      -- "rpc-server", ...
+      -- |The span name/type, e.g. a short string like "haskell.wai.server",
+      -- "haskell.http.client". For SDK spans this is always "sdk", the actual
+      -- name is then in span.data.sdk.name.
     , spanName   :: Text
       -- |The time the span started
     , timestamp  :: Int

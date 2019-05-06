@@ -59,7 +59,7 @@ runTest pid urlPath headers extraAsserts = do
     result = LBSC8.unpack $ HTTP.responseBody response
     from = Just $ From pid
   spansResults <-
-    TestHelper.waitForSpansMatching
+    TestHelper.waitForRegisteredSpansMatching
       [ "haskell.wai.server", "haskell.http.client" ]
   case spansResults of
     Left failure ->
@@ -67,8 +67,9 @@ runTest pid urlPath headers extraAsserts = do
     Right spans -> do
       let
         maybeEntrySpan =
-          TestHelper.getSpanByName "haskell.wai.server" spans
-        maybeExitSpan = TestHelper.getSpanByName "haskell.http.client" spans
+          TestHelper.getSpanByRegisteredName "haskell.wai.server" spans
+        maybeExitSpan =
+          TestHelper.getSpanByRegisteredName "haskell.http.client" spans
       if isNothing maybeEntrySpan || isNothing maybeExitSpan
         then
           failIO "expected spans have not been recorded"
@@ -90,7 +91,7 @@ runSuppressedTest urlPath = do
   -- wait a second, then check that no spans have been recorded
   threadDelay $ 10 * 1000
   spansResults <-
-    TestHelper.waitForSpansMatching []
+    TestHelper.waitForRegisteredSpansMatching []
   case spansResults of
     Left failure ->
       failIO $ "Could not load recorded spans from agent stub: " ++ failure

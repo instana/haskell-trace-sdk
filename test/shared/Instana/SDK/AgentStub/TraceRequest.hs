@@ -4,9 +4,11 @@
 module Instana.SDK.AgentStub.TraceRequest where
 
 
-import           Data.Aeson   (FromJSON, ToJSON, Value, (.:), (.=))
-import qualified Data.Aeson   as Aeson
-import           Data.Text    (Text)
+import           Data.Aeson          (FromJSON, ToJSON, Value (Object), (.:),
+                                      (.=))
+import qualified Data.Aeson          as Aeson
+import qualified Data.HashMap.Strict as HM
+import           Data.Text           (Text)
 import           GHC.Generics
 
 
@@ -75,4 +77,20 @@ instance ToJSON Span where
     , "data" .= spanData sp
     , "f"    .= f sp
     ]
+
+
+readSdkName :: Span -> Maybe Text
+readSdkName span_ =
+  let
+    value = extractProperty ["sdk", "name"] (spanData span_)
+  in
+    case value of
+      Just (Aeson.String sdkName) -> Just sdkName
+      _                           -> Nothing
+
+
+extractProperty :: [Text] -> Value -> Maybe Value
+extractProperty [] value              = Just value
+extractProperty (key:keys) (Object o) = HM.lookup key o >>= extractProperty keys
+extractProperty _      _              = Nothing
 

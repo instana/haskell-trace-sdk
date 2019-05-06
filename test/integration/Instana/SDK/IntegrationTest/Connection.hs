@@ -59,7 +59,7 @@ shouldReestablishLostConnection _ =
     recordSpan "haskell.dummy.connectionloss.entry-3"
     -- wait for span 3 to arrive, check that 1 and 3 have been received
 
-    spansResult <- TestHelper.waitForSpansMatching
+    spansResult <- TestHelper.waitForSdkSpansMatching
       [ "haskell.dummy.connectionloss.entry-3"
       ]
 
@@ -71,11 +71,11 @@ shouldReestablishLostConnection _ =
       Right spans -> do
         let
           maybeSpan1 =
-            TestHelper.getSpanByName
+            TestHelper.getSpanBySdkName
               "haskell.dummy.connectionloss.entry-1"
               spans
           maybeSpan3 =
-            TestHelper.getSpanByName
+            TestHelper.getSpanBySdkName
               "haskell.dummy.connectionloss.entry-3"
               spans
         if isNothing maybeSpan1
@@ -153,13 +153,13 @@ verifyRecconnectAfterAgentRestart spansResultBefore = do
           failure
     (Right spansBefore, Right spansAfter) -> do
       let
-        maybeSpanBefore = TestHelper.getSpanByName
+        maybeSpanBefore = TestHelper.getSpanBySdkName
           "haskell.agent-restart.before-restart"
           spansBefore
-        maybeSpanAfter1 = TestHelper.getSpanByName
+        maybeSpanAfter1 = TestHelper.getSpanBySdkName
           "haskell.agent-restart.after-restart-1"
           spansAfter
-        maybeSpanAfter2 = TestHelper.getSpanByName
+        maybeSpanAfter2 = TestHelper.getSpanBySdkName
           "haskell.agent-restart.after-restart-2"
           spansAfter
       assertAllIO
@@ -187,7 +187,7 @@ shouldUseTranslatedPid pid = do
       Right spans -> do
         let
           maybeEntrySpan =
-            TestHelper.getSpanByName "haskell.test.pid-translation" spans
+            TestHelper.getSpanBySdkName "haskell.test.pid-translation" spans
         if isNothing maybeEntrySpan
           then
             failIO "expected span has not been recorded"

@@ -114,7 +114,7 @@ runApp instana = do
 
 #### Trace HTTP Entries Automatically
 
-You can let the SDK automatically create entry spans for all incoming HTTP requests in a WAI application by using it as a WAI middleware plug-in. Note that exit spans still need to be created manually via the withExit or startExit/stopExit functions (see below).
+You can let the SDK automatically create entry spans for all incoming HTTP requests in a WAI application by using it as a WAI middleware plug-in. Note that exit spans still need to be created manually via the `withHttpExit` or `startHttpExit`/`completeExit` functions (see below).
 
 ```
 import qualified Instana.Wai.Middleware.Entry as InstanaWaiMiddleware
@@ -129,19 +129,31 @@ All functions starting with `with` accept (among other parameters) an IO action.
 
 * `withRootEntry`: Creates an entry span that is the root of a trace (it has no parent span).
 * `withEntry`: Creates an entry span that has a parent span.
-* `withHttpEntry`: A convenience function that examines an HTTP request for Instana tracing headers and creates an entry span.
+* `withHttpEntry`: A convenience function that examines an HTTP request for Instana tracing headers and creates an entry span. It will automatically add the correct metadata to the span. You do not need to handle incoming HTTP requests at all when using the Instana WAI middleware plug-in (see above).
 * `withExit`: Creates an exit span. This can only be called inside a `withRootEntry` or an `withEntry` call, as an exit span needs an entry span as its parent.
-* `withHttpExit`: Creates an exit span for a given HTTP client request.
+* `withHttpExit`: Creates an exit span for a given HTTP client request. It will automatically add the correct metadata to the span so it should be preferred to `withExit` when tracing outgoing HTTP requests.
 
 #### Low Level API/Explicit Start And Complete
 
 * `startRootEntry`: Starts an entry span that is the beginning of a trace (has no parent span). You will need to call `completeEntry` at some point.
 * `startEntry`: Starts an entry span. You will need to call `completeEntry` at some point.
-* `startHttpEntry`: Starts an entry span for an incoming HTTP request.
-* `startExit`: Starts an exit span. You need to call `completeExit`/`completeExitWithData` at some point with the partial exit span value that is returned by this function.
-* `startHttpExit`: Starts an exit span for an outgoing HTTP request.
+* `startHttpEntry`: Starts an entry span for an incoming HTTP request. It will automatically add the correct metadata to the span. You do not need to handle incoming HTTP requests at all when using the WAI middleware plug-in (see above). You will need to call `completeEntry` at some point.
+* `startExit`: Starts an exit span. You will need to call `completeExit` at some point.
+* `startHttpExit`: Starts an exit span for an outgoing HTTP request. It will automatically add the correct metadata to the span so it should be preferred to `startExit` when tracing outgoing HTTP requests. You will need to call `completeExit` at some point.
 * `completeEntry`: Finalizes an entry span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
 * `completeExit`: Finalizes an exit span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
+
+#### Best Practices
+
+Make sure you have read Instana's [docs on custom tracing](https://docs.instana.io/quick_start/custom_tracing/#tips--best-practices) and in particular the [best practices section](https://docs.instana.io/quick_start/custom_tracing/#tips--best-practices). This documentation contains a lot of useful info for integrating Instana tracing into your code; among other things, it explains which [metadata](https://docs.instana.io/quick_start/custom_tracing/#list-of-processed-tags) can be added to spans (via `InstanaSDK.addTag` and `InstanaSDK.addTagAt`).
+
+Instana differentiates between so-called registered spans and SDK spans. Registered spans are usually created by automatic tracing and there is specialized handling for each registered in Instana's processing pipeline. SDK spans, in contrast, are the type of spans created by using a trace SDK (like the Haskell trace SDK or other, similar SDKs for other runtime platforms). SDK span are processed in a more generic fashion by Instana's processing pipeline.
+
+Note that nearly all spans created with this SDK should be SDK spans. The are only two exceptions, for which this SDK creates registered spans:
+- HTTP/WAI entry (server) spans, and
+- HTTP exit (client) spans.
+
+The SDK offers special functions to create these registered spans (`withHttpEntry`, `withHttpExit` as well as the corresponding lower level functions `startHttpEntry` and `startHttpExit`, see above).
 
 ### Configuration Via Environment Variables
 
