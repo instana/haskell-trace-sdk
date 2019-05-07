@@ -15,6 +15,8 @@ module Instana.SDK.Span.Span
   , timestamp
   , errorCount
   , addToErrorCount
+  , serviceName
+  , setServiceName
   , spanData
   , addRegisteredData
   , addRegisteredDataAt
@@ -104,7 +106,7 @@ timestamp span_ =
     Exit exit   -> ExitSpan.timestamp exit
 
 
--- |Start time.
+-- |Error count.
 errorCount :: Span -> Int
 errorCount span_ =
   case span_ of
@@ -120,6 +122,24 @@ addToErrorCount increment span_ =
       Entry $ EntrySpan.addToErrorCount increment entry
     Exit exit ->
       Exit $ ExitSpan.addToErrorCount increment exit
+
+
+-- |An optional attribute for overriding the name of the service in Instana.
+serviceName :: Span -> Maybe Text
+serviceName span_ =
+  case span_ of
+    Entry entry -> EntrySpan.serviceName entry
+    Exit exit   -> ExitSpan.serviceName exit
+
+
+-- |Override the name of the service for the associated call in Instana.
+setServiceName :: Text -> Span -> Span
+setServiceName serviceName_ span_ =
+  case span_ of
+    Entry entry ->
+      Entry $ EntrySpan.setServiceName serviceName_ entry
+    Exit exit ->
+      Exit $ ExitSpan.setServiceName serviceName_ exit
 
 
 -- |Optional additional span data.

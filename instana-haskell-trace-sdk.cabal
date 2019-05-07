@@ -266,6 +266,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , Instana.SDK.IntegrationTest.LowLevelApi
     , Instana.SDK.IntegrationTest.Metrics
     , Instana.SDK.IntegrationTest.Runner
+    , Instana.SDK.IntegrationTest.ServiceName
     , Instana.SDK.IntegrationTest.Suite
     , Instana.SDK.IntegrationTest.TestHelper
     , Instana.SDK.IntegrationTest.TestSuites

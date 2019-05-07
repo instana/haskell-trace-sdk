@@ -9,6 +9,7 @@ module Instana.SDK.Span.ExitSpan
   , traceId
   , addData
   , addToErrorCount
+  , setServiceName
   ) where
 
 
@@ -27,20 +28,22 @@ data ExitSpan  =
   ExitSpan
     {
       -- |The parent span
-      parentSpan :: EntrySpan
+      parentSpan  :: EntrySpan
       -- |The span ID
-    , spanId     :: Id
+    , spanId      :: Id
       -- |The span name/type, e.g. a short string like "haskell.wai.server",
       -- "haskell.http.client". For SDK spans this is always "sdk", the actual
       -- name is then in span.data.sdk.name.
-    , spanName   :: Text
+    , spanName    :: Text
       -- |The time the span started
-    , timestamp  :: Int
+    , timestamp   :: Int
+      -- |An attribute for overriding the name of the service in Instana
+    , serviceName :: Maybe Text
       -- |The number of errors that occured during processing
-    , errorCount :: Int
+    , errorCount  :: Int
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
-    , spanData   :: Value
+    , spanData    :: Value
     } deriving (Eq, Generic, Show)
 
 
@@ -63,6 +66,12 @@ addToErrorCount increment exitSpan =
     ec = errorCount exitSpan
   in
   exitSpan { errorCount = ec + increment }
+
+
+-- |Override the name of the service for the associated call in Instana.
+setServiceName :: Text -> ExitSpan -> ExitSpan
+setServiceName serviceName_ exitSpan =
+  exitSpan { serviceName = Just serviceName_ }
 
 
 -- |Add a value to the span's data section.

@@ -2,7 +2,7 @@
 module Instana.SDK.IntegrationTest.LowLevelApi
   ( shouldRecordSpans
   , shouldRecordNonRootEntry
-  , shouldMergeData
+  , shouldMergeTags
   ) where
 
 
@@ -143,14 +143,14 @@ createNonRootEntry = do
   return $ LBSC8.unpack $ HTTP.responseBody response
 
 
-shouldMergeData :: String -> IO Test
-shouldMergeData pid =
-  applyLabel "shouldMergeData" $ do
+shouldMergeTags :: String -> IO Test
+shouldMergeTags pid =
+  applyLabel "shouldMergeTags" $ do
     let
       from = Just $ From pid "agent-stub-id"
     (result, spansResults) <-
       TestHelper.withSpanCreation
-        createSpansWithData
+        createSpansWithTags
         [ "haskell.dummy.root.entry"
         , "haskell.dummy.exit"
         ]
@@ -241,8 +241,8 @@ shouldMergeData pid =
               ]
 
 
-createSpansWithData :: IO String
-createSpansWithData = do
-  response <- HttpHelper.doAppRequest "low/level/api/with-data" "POST" []
+createSpansWithTags :: IO String
+createSpansWithTags = do
+  response <- HttpHelper.doAppRequest "low/level/api/with-tags" "POST" []
   return $ LBSC8.unpack $ HTTP.responseBody response
 

@@ -227,8 +227,9 @@ entrySpan =
         { RootEntry.spanAndTraceId = Id.fromString "traceId"
         , RootEntry.spanName       = "test.entry"
         , RootEntry.timestamp      = 1514761200000
-        , RootEntry.spanData       = initialData
+        , RootEntry.serviceName    = Nothing
         , RootEntry.errorCount     = 0
+        , RootEntry.spanData       = initialData
         }
 
 

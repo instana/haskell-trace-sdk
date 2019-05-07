@@ -27,5 +27,7 @@ script:
   # 1) run tests
   # 2) verifies that a source-distribution can be generated
   # 3) verifies that haddock documentation can be generated
-  - TEST_LOG_LEVEL=DEBUG stack --no-terminal --skip-ghc-check test && stack sdist && stack haddock
+  - date && TEST_LOG_LEVEL=DEBUG stack --no-terminal --skip-ghc-check test
+  - date && stack sdist
+  - date && stack haddock
 

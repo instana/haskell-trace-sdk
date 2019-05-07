@@ -30,6 +30,8 @@ module Instana.SDK.SDK
     , initInstana
     , maxBufferedSpans
     , readHttpTracingHeaders
+    , serviceName
+    , setServiceName
     , startEntry
     , startExit
     , startHttpEntry
@@ -367,6 +369,7 @@ startRootEntry context spanType = do
             , RootEntry.spanName       = SpanType.spanName spanType
             , RootEntry.timestamp      = timestamp
             , RootEntry.errorCount     = 0
+            , RootEntry.serviceName    = Nothing
             , RootEntry.spanData       = SpanType.initialData EntryKind spanType
             }
     pushSpan
@@ -399,13 +402,14 @@ startEntry context traceId parentId spanType = do
       newSpan =
         NonRootEntrySpan $
           NonRootEntry
-            { NonRootEntry.traceId    = Id.fromString traceId
-            , NonRootEntry.spanId     = spanId
-            , NonRootEntry.parentId   = Id.fromString parentId
-            , NonRootEntry.spanName   = SpanType.spanName spanType
-            , NonRootEntry.timestamp  = timestamp
-            , NonRootEntry.errorCount = 0
-            , NonRootEntry.spanData   = SpanType.initialData EntryKind spanType
+            { NonRootEntry.traceId     = Id.fromString traceId
+            , NonRootEntry.spanId      = spanId
+            , NonRootEntry.parentId    = Id.fromString parentId
+            , NonRootEntry.spanName    = SpanType.spanName spanType
+            , NonRootEntry.timestamp   = timestamp
+            , NonRootEntry.errorCount  = 0
+            , NonRootEntry.serviceName = Nothing
+            , NonRootEntry.spanData    = SpanType.initialData EntryKind spanType
             }
     pushSpan
       context
@@ -485,6 +489,7 @@ startExit context spanType = do
                 , ExitSpan.spanName    = SpanType.spanName spanType
                 , ExitSpan.timestamp   = timestamp
                 , ExitSpan.errorCount  = 0
+                , ExitSpan.serviceName = Nothing
                 , ExitSpan.spanData    = SpanType.initialData ExitKind spanType
                 }
           pushSpan
@@ -659,6 +664,13 @@ addToErrorCount :: MonadIO m => InstanaContext -> Int -> m ()
 addToErrorCount context increment =
   liftIO $ modifyCurrentSpan context
     (\span_ -> Span.addToErrorCount increment span_)
+
+
+-- |Override the name of the service for the associated call in Instana.
+setServiceName :: MonadIO m => InstanaContext -> Text -> m ()
+setServiceName context serviceName_ =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.setServiceName serviceName_ span_)
 
 
 -- |Adds additional custom tags to the currently active span. Call this

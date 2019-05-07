@@ -11,6 +11,8 @@ module Instana.SDK.Span.EntrySpan
   , spanName
   , timestamp
   , errorCount
+  , serviceName
+  , setServiceName
   , spanData
   , addData
   , addToErrorCount
@@ -91,6 +93,24 @@ addToErrorCount increment entrySpan =
       RootEntrySpan $ RootEntry.addToErrorCount increment entry
     NonRootEntrySpan entry ->
       NonRootEntrySpan $ NonRootEntry.addToErrorCount increment entry
+
+
+-- |An optional attribute for overriding the name of the service in Instana.
+serviceName :: EntrySpan -> Maybe Text
+serviceName entrySpan =
+  case entrySpan of
+    RootEntrySpan entry    -> RootEntry.serviceName entry
+    NonRootEntrySpan entry -> NonRootEntry.serviceName entry
+
+
+-- |Override the name of the service for the associated call in Instana.
+setServiceName :: Text -> EntrySpan -> EntrySpan
+setServiceName serviceName_ entrySpan =
+  case entrySpan of
+    RootEntrySpan entry ->
+      RootEntrySpan $ RootEntry.setServiceName serviceName_ entry
+    NonRootEntrySpan entry ->
+      NonRootEntrySpan $ NonRootEntry.setServiceName serviceName_ entry
 
 
 -- |Optional additional span data.

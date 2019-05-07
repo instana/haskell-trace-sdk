@@ -2,7 +2,8 @@
 module Instana.SDK.IntegrationTest.BracketApi
   ( shouldRecordSpans
   , shouldRecordNonRootEntry
-  , shouldMergeData
+  , shouldMergeTags
+  , shouldSetServiceName
   ) where
 
 
@@ -138,14 +139,14 @@ createNonRootEntry = do
   return $ LBSC8.unpack $ HTTP.responseBody response
 
 
-shouldMergeData :: String -> IO Test
-shouldMergeData pid =
-  applyLabel "shouldMergeData" $ do
+shouldMergeTags :: String -> IO Test
+shouldMergeTags pid =
+  applyLabel "shouldMergeTags" $ do
     let
       from = Just $ From pid "agent-stub-id"
     (result, spansResults) <-
       TestHelper.withSpanCreation
-        createSpansWithData
+        createSpansWithTags
         [ "haskell.dummy.root.entry"
         , "haskell.dummy.exit"
         ]
@@ -233,8 +234,86 @@ shouldMergeData pid =
               ]
 
 
-createSpansWithData :: IO String
-createSpansWithData = do
-  response <- HttpHelper.doAppRequest "bracket/api/with-data" "POST" []
+createSpansWithTags :: IO String
+createSpansWithTags = do
+  response <- HttpHelper.doAppRequest "bracket/api/with-tags" "POST" []
+  return $ LBSC8.unpack $ HTTP.responseBody response
+
+
+shouldSetServiceName :: String -> IO Test
+shouldSetServiceName pid =
+  applyLabel "shouldSetServiceName" $ do
+    let
+      from = Just $ From pid "agent-stub-id"
+    (result, spansResults) <-
+      TestHelper.withSpanCreation
+        createSpansWithServiceName
+        [ "haskell.dummy.root.entry"
+        , "haskell.dummy.exit"
+        ]
+    case spansResults of
+      Left failure ->
+        failIO $ "Could not load recorded spans from agent stub: " ++ failure
+      Right spans -> do
+        let
+          maybeRootEntrySpan =
+            TestHelper.getSpanBySdkName "haskell.dummy.root.entry" spans
+          maybeExitSpan = TestHelper.getSpanBySdkName "haskell.dummy.exit" spans
+        if isNothing maybeRootEntrySpan || isNothing maybeExitSpan
+          then
+            failIO "expected spans have not been recorded"
+          else do
+            let
+              Just rootEntrySpan = maybeRootEntrySpan
+              Just exitSpan = maybeExitSpan
+            assertAllIO
+              [ assertEqual "result" "exit done::entry done" result
+              , assertEqual "trace ID is consistent"
+                  (TraceRequest.t rootEntrySpan)
+                  (TraceRequest.t exitSpan)
+              , assertEqual "root.traceId == root.spanId"
+                  (TraceRequest.s rootEntrySpan)
+                  (TraceRequest.t rootEntrySpan)
+              , assertBool "root has no parent" $
+                  isNothing $ TraceRequest.p rootEntrySpan
+              , assertEqual "exit parent"
+                  (Just $ TraceRequest.s rootEntrySpan)
+                  (TraceRequest.p exitSpan)
+              , assertBool "entry timestamp" $ TraceRequest.ts rootEntrySpan > 0
+              , assertBool "entry duration" $ TraceRequest.d rootEntrySpan > 0
+              , assertEqual "entry kind" 1 (TraceRequest.k rootEntrySpan)
+              , assertEqual "entry error" 0 (TraceRequest.ec rootEntrySpan)
+              , assertEqual "entry from" from $ TraceRequest.f rootEntrySpan
+              , assertEqual "entry data"
+                ( Aeson.object
+                  [ "service" .= ("Service Entry" :: String)
+                  , "sdk"     .= (Aeson.object
+                    [ "name"  .= ("haskell.dummy.root.entry" :: String)
+                    , "type"  .= ("entry" :: String)
+                    ])
+                  ]
+                )
+                (TraceRequest.spanData rootEntrySpan)
+              , assertBool "exit timestamp" $ TraceRequest.ts exitSpan > 0
+              , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
+              , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
+              , assertEqual "exit error" 0 (TraceRequest.ec exitSpan)
+              , assertEqual "exit from" from $ TraceRequest.f exitSpan
+              , assertEqual "exit data"
+                ( Aeson.object
+                  [ "service" .= ("Service Exit" :: String)
+                  , "sdk"    .= (Aeson.object
+                    [ "name" .= ("haskell.dummy.exit" :: String)
+                    , "type" .= ("exit" :: String)
+                    ])
+                  ]
+                )
+                (TraceRequest.spanData exitSpan)
+              ]
+
+
+createSpansWithServiceName :: IO String
+createSpansWithServiceName = do
+  response <- HttpHelper.doAppRequest "bracket/api/with-service-name" "POST" []
   return $ LBSC8.unpack $ HTTP.responseBody response
 

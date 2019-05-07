@@ -41,6 +41,11 @@ agentNameKey :: String
 agentNameKey = "INSTANA_AGENT_NAME"
 
 
+-- |Environment variable for the service name override.
+serviceNameKey :: String
+serviceNameKey = "INSTANA_SERVICE_NAME"
+
+
 -- |Environment variable for the force-transmision-afeter setting
 forceTransmissionAfterKey :: String
 forceTransmissionAfterKey = "INSTANA_FORCE_TRANSMISSION_STARTING_AFTER"
@@ -92,6 +97,7 @@ data FinalConfig = FinalConfig
   { agentHost                   :: String
   , agentPort                   :: Int
   , agentName                   :: String
+  , serviceName                 :: Maybe String
   , forceTransmissionAfter      :: Int
   , forceTransmissionStartingAt :: Int
   , maxBufferedSpans            :: Int
@@ -103,6 +109,7 @@ mkFinalConfig ::
   String
   -> Int
   -> String
+  -> Maybe String
   -> Int
   -> Int
   -> Int
@@ -111,6 +118,7 @@ mkFinalConfig
   agentHost_
   agentPort_
   agentName_
+  serviceName_
   forceTransmissionAfter_
   forceTransmissionStartingAt_
   maxBufferedSpans_ =
@@ -118,6 +126,7 @@ mkFinalConfig
     { agentHost = agentHost_
     , agentPort = agentPort_
     , agentName = agentName_
+    , serviceName = serviceName_
     , forceTransmissionAfter = forceTransmissionAfter_
     , forceTransmissionStartingAt = forceTransmissionStartingAt_
     , maxBufferedSpans = maxBufferedSpans_
@@ -130,6 +139,7 @@ readConfigFromEnvironment = do
   agentHostEnv <- lookupEnv agentHostKey
   agentPortEnv <- lookupEnv agentPortKey
   agentNameEnv <- lookupEnv agentNameKey
+  serviceNameEnv <- lookupEnv serviceNameKey
   forceTransmissionAfterEnv <- lookupEnv forceTransmissionAfterKey
   forceTransmissionStartingAtEnv <- lookupEnv forceTransmissionStartingAtKey
   maxBufferedSpansEnv <- lookupEnv maxBufferedSpansKey
@@ -147,6 +157,7 @@ readConfigFromEnvironment = do
       { Config.agentHost = agentHostEnv
       , Config.agentPort = agentPortParsed
       , Config.agentName = agentNameEnv
+      , Config.serviceName = serviceNameEnv
       , Config.forceTransmissionAfter = forceTransmissionAfterParsed
       , Config.forceTransmissionStartingAt = forceTransmissionStartingAtParsed
       , Config.maxBufferedSpans = maxBufferedSpansParsed
@@ -171,6 +182,7 @@ applyDefaults config =
        fromMaybe defaultAgentPort (Config.agentPort config)
    , agentName =
        fromMaybe defaultAgentName (Config.agentName config)
+   , serviceName = Config.serviceName config
    , forceTransmissionAfter =
        fromMaybe
          defaultForceTransmissionAfter
@@ -200,6 +212,9 @@ mergeConfigs userConfig configFromEnv =
       , Config.agentName =
           (Config.agentName userConfig) <|>
           (Config.agentName configFromEnv)
+      , Config.serviceName =
+          (Config.serviceName userConfig) <|>
+          (Config.serviceName configFromEnv)
       , Config.forceTransmissionAfter =
           (Config.forceTransmissionAfter userConfig) <|>
           (Config.forceTransmissionAfter configFromEnv)

@@ -296,20 +296,22 @@ entrySpan =
       { RootEntry.spanAndTraceId = Id.fromString "traceId"
       , RootEntry.spanName       = "test.entry"
       , RootEntry.timestamp      = 1514761200000
-      , RootEntry.spanData       = emptyValue
       , RootEntry.errorCount     = 0
+      , RootEntry.serviceName    = Nothing
+      , RootEntry.spanData       = emptyValue
       }
 
 
 exitSpan :: ExitSpan
 exitSpan =
   ExitSpan
-    { ExitSpan.parentSpan = entrySpan
-    , ExitSpan.spanId     = Id.fromString "spanId"
-    , ExitSpan.spanName   = "test.exit"
-    , ExitSpan.timestamp  = 1514761201000
-    , ExitSpan.spanData   = emptyValue
-    , ExitSpan.errorCount = 0
+    { ExitSpan.parentSpan   = entrySpan
+    , ExitSpan.spanId      = Id.fromString "spanId"
+    , ExitSpan.spanName    = "test.exit"
+    , ExitSpan.timestamp   = 1514761201000
+    , ExitSpan.errorCount  = 0
+    , ExitSpan.serviceName = Nothing
+    , ExitSpan.spanData    = emptyValue
     }
 
 

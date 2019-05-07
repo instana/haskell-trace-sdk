@@ -24,28 +24,34 @@ import           GHC.Generics
 import           Instana.SDK.Span.Span (SpanKind (EntryKind, ExitKind, IntermediateKind))
 
 
+-- |Differentiates between SDK spans and registered spans (which receive
+-- special treatment by Instana's processing pipeline.
 data SpanType =
     SdkSpan Text
   | RegisteredSpan Registered
   deriving (Eq, Generic, Show)
 
 
+-- |All registered spans that the Haskell trace SDK will produce.
 data Registered =
     HaskellWaiServer
   | HaskellHttpClient
   deriving (Eq, Generic, Show)
 
 
+-- |Returns the wire value of span.n for a SpanType value.
 spanName    :: SpanType -> Text
 spanName    (SdkSpan _)                 = "sdk"
 spanName    (RegisteredSpan registered) = registeredSpanName registered
 
 
+-- |Returns the wire value of span.n for a registered span.
 registeredSpanName :: Registered -> Text
 registeredSpanName HaskellWaiServer  = "haskell.wai.server"
 registeredSpanName HaskellHttpClient = "haskell.http.client"
 
 
+-- |Returns the initial data (span.data) for a SpanType value.
 initialData :: SpanKind -> SpanType -> Value
 initialData kind (SdkSpan s)     = initialSdkData kind s
 initialData _ (RegisteredSpan _) = emptyValue

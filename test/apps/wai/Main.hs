@@ -53,14 +53,18 @@ application instana httpManager pid request respond = do
       bracketApiRootEntry instana respond
     ("POST", ["bracket", "api", "non-root"]) ->
       bracketApiNonRootEntry instana respond
-    ("POST", ["bracket", "api", "with-data"]) ->
-      bracketApiWithData instana respond
+    ("POST", ["bracket", "api", "with-tags"]) ->
+      bracketApiWithTags instana respond
+    ("POST", ["bracket", "api", "with-service-name"]) ->
+      bracketApiWithServiceName instana respond
+    ("POST", ["bracket", "api", "with-service-name-exit-only"]) ->
+      bracketApiWithServiceNameExitOnly instana respond
     ("POST", ["low", "level", "api", "root"]) ->
       lowLevelApiRootEntry instana respond
     ("POST", ["low", "level", "api", "non-root"]) ->
       lowLevelApiNonRootEntry instana respond
-    ("POST", ["low", "level", "api", "with-data"]) ->
-      lowLevelApiWithData instana respond
+    ("POST", ["low", "level", "api", "with-tags"]) ->
+      lowLevelApiWithTags instana respond
     ("GET", ["http", "bracket", "api"]) ->
       httpBracketApi instana httpManager request respond
     ("GET", ["http", "low", "level", "api"]) ->
@@ -127,34 +131,34 @@ withExit instana =
     simulateExitCall
 
 
-bracketApiWithData ::
+bracketApiWithTags ::
   InstanaContext
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-bracketApiWithData instana respond = do
+bracketApiWithTags instana respond = do
   entryCallResult <-
     InstanaSDK.withRootEntry
       instana
       "haskell.dummy.root.entry"
-      (withExitWithData instana)
+      (withExitWithTags instana)
   respondWithPlainText respond $ entryCallResult
 
 
-withExitWithData :: InstanaContext -> IO String
-withExitWithData instana = do
+withExitWithTags :: InstanaContext -> IO String
+withExitWithTags instana = do
   InstanaSDK.addTag instana (someSpanData "entry")
   exitCallResult <-
     InstanaSDK.withExit
       instana
       "haskell.dummy.exit"
-      (simulateExitCallWithData instana)
+      (simulateExitCallWithTags instana)
   InstanaSDK.incrementErrorCount instana
   InstanaSDK.addTag instana (moreSpanData "entry")
   return $ exitCallResult ++ "::entry done"
 
 
-simulateExitCallWithData :: InstanaContext -> IO String
-simulateExitCallWithData instana = do
+simulateExitCallWithTags :: InstanaContext -> IO String
+simulateExitCallWithTags instana = do
   InstanaSDK.addTag instana (someSpanData "exit")
   -- some time needs to pass, otherwise the exit span's duration will be 0
   threadDelay $ 10 * 1000
@@ -163,6 +167,61 @@ simulateExitCallWithData instana = do
   InstanaSDK.addTagAt instana "nested.key1" ("nested.text.value1" :: String)
   InstanaSDK.addTagAt instana "nested.key2" ("nested.text.value2" :: String)
   InstanaSDK.addTagAt instana "nested.key3" (1604 :: Int)
+  return "exit done"
+
+
+bracketApiWithServiceName ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+bracketApiWithServiceName instana respond = do
+  entryCallResult <-
+    InstanaSDK.withRootEntry
+      instana
+      "haskell.dummy.root.entry"
+      (withExitWithServiceName instana)
+  respondWithPlainText respond $ entryCallResult
+
+
+withExitWithServiceName :: InstanaContext -> IO String
+withExitWithServiceName instana = do
+  InstanaSDK.setServiceName instana "Service Entry"
+  exitCallResult <-
+    InstanaSDK.withExit
+      instana
+      "haskell.dummy.exit"
+      (simulateExitCallWithServiceName instana)
+  return $ exitCallResult ++ "::entry done"
+
+
+bracketApiWithServiceNameExitOnly ::
+  InstanaContext
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+bracketApiWithServiceNameExitOnly instana respond = do
+  entryCallResult <-
+    InstanaSDK.withRootEntry
+      instana
+      "haskell.dummy.root.entry"
+      (withExitWithServiceNameExitOnly instana)
+  respondWithPlainText respond $ entryCallResult
+
+
+withExitWithServiceNameExitOnly :: InstanaContext -> IO String
+withExitWithServiceNameExitOnly instana = do
+  exitCallResult <-
+    InstanaSDK.withExit
+      instana
+      "haskell.dummy.exit"
+      (simulateExitCallWithServiceName instana)
+  return $ exitCallResult ++ "::entry done"
+
+
+simulateExitCallWithServiceName :: InstanaContext -> IO String
+simulateExitCallWithServiceName instana = do
+  InstanaSDK.setServiceName instana "Service Exit"
+  -- some time needs to pass, otherwise the exit span's duration will be 0
+  threadDelay $ 10 * 1000
   return "exit done"
 
 
@@ -204,16 +263,16 @@ doExitCall instana = do
   return result
 
 
-lowLevelApiWithData ::
+lowLevelApiWithTags ::
   InstanaContext
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-lowLevelApiWithData instana respond = do
+lowLevelApiWithTags instana respond = do
   InstanaSDK.startRootEntry
     instana
     "haskell.dummy.root.entry"
   InstanaSDK.addTag instana (someSpanData "entry")
-  result <- doExitCallWithData instana
+  result <- doExitCallWithTags instana
   InstanaSDK.incrementErrorCount instana
   InstanaSDK.addTag instana (moreSpanData "entry")
   InstanaSDK.addTagAt
@@ -222,8 +281,8 @@ lowLevelApiWithData instana respond = do
   respondWithPlainText respond result
 
 
-doExitCallWithData :: InstanaContext -> IO String
-doExitCallWithData instana = do
+doExitCallWithTags :: InstanaContext -> IO String
+doExitCallWithTags instana = do
   InstanaSDK.startExit
     instana
     "haskell.dummy.exit"

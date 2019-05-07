@@ -7,6 +7,7 @@ module Instana.SDK.Span.NonRootEntry
   ( NonRootEntry(..)
   , addData
   , addToErrorCount
+  , setServiceName
   ) where
 
 
@@ -23,22 +24,24 @@ data NonRootEntry =
   NonRootEntry
     {
       -- |The trace ID
-      traceId    :: Id
+      traceId     :: Id
       -- |The span ID
-    , spanId     :: Id
+    , spanId      :: Id
       -- |The ID of the parent span
-    , parentId   :: Id
+    , parentId    :: Id
       -- |The span name/type, e.g. a short string like "haskell.wai.server",
       -- "haskell.http.client". For SDK spans this is always "sdk", the actual
       -- name is then in span.data.sdk.name.
-    , spanName   :: Text
+    , spanName    :: Text
       -- |The time the span started
-    , timestamp  :: Int
+    , timestamp   :: Int
       -- |The number of errors that occured during processing
-    , errorCount :: Int
+    , errorCount  :: Int
+      -- |An attribute for overriding the name of the service in Instana
+    , serviceName :: Maybe Text
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
-    , spanData   :: Value
+    , spanData    :: Value
     } deriving (Eq, Generic, Show)
 
 
@@ -49,6 +52,12 @@ addToErrorCount increment nonRootEntry =
     ec = errorCount nonRootEntry
   in
   nonRootEntry { errorCount = ec + increment }
+
+
+-- |Override the name of the service for the associated call in Instana.
+setServiceName :: Text -> NonRootEntry -> NonRootEntry
+setServiceName serviceName_ nonRootEntry =
+  nonRootEntry { serviceName = Just serviceName_ }
 
 
 -- |Add a value to the span's data section.
