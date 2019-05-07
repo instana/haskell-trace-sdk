@@ -9,6 +9,7 @@ module Instana.SDK.Span.RootEntry
   , traceId
   , addData
   , addToErrorCount
+  , setServiceName
   ) where
 
 
@@ -34,6 +35,8 @@ data RootEntry =
     , timestamp      :: Int
       -- |The number of errors that occured during processing
     , errorCount     :: Int
+      -- |An attribute for overriding the name of the service in Instana
+    , serviceName    :: Maybe Text
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
     , spanData       :: Value
@@ -57,6 +60,12 @@ addToErrorCount increment rootEntry =
     ec = errorCount rootEntry
   in
   rootEntry { errorCount = ec + increment }
+
+
+-- |Override the name of the service for the associated call in Instana.
+setServiceName :: Text -> RootEntry -> RootEntry
+setServiceName serviceName_ rootEntry =
+  rootEntry { serviceName = Just serviceName_ }
 
 
 -- |Add a value to the span's data section.

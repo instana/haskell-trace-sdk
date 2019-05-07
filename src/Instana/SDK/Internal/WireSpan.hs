@@ -13,8 +13,10 @@ module Instana.SDK.Internal.WireSpan
   ) where
 
 
+import           Control.Applicative     ((<|>))
 import           Data.Aeson              (FromJSON, ToJSON, Value, (.:), (.=))
 import qualified Data.Aeson              as Aeson
+import qualified Data.Aeson.Extra.Merge  as AesonExtra
 import           Data.Aeson.Types        (Parser)
 import           Data.Text               (Text)
 import           GHC.Generics
@@ -83,26 +85,29 @@ instance ToJSON From where
 -- are constant per Haskell process (pid/entityId and agent UUID/host ID). This
 -- is a preliminary representation of what will be send to the agent later
 -- (after adding the aforementioned per-process/static attributes). Values of
--- this type are stored in the spanQueue in Instana.SDK.Internal.Context.
+-- this type are stored in the spanQueue in Instana.SDK.Internal.Context after
+-- they have been completed.
 data QueuedSpan = QueuedSpan
-  { traceId    :: Id
-  , spanId     :: Id
-  , parentId   :: Maybe Id
-  , spanName   :: Text
-  , timestamp  :: Int
-  , duration   :: Int
-  , kind       :: SpanKind
-  , errorCount :: Int
-  , spanData   :: Value
+  { traceId     :: Id
+  , spanId      :: Id
+  , parentId    :: Maybe Id
+  , spanName    :: Text
+  , timestamp   :: Int
+  , duration    :: Int
+  , kind        :: SpanKind
+  , errorCount  :: Int
+  , serviceName :: Maybe Text
+  , spanData    :: Value
   } deriving (Eq, Generic, Show)
 
 
 -- |Combines the actual span data with static per-process data (PID,
 -- agent UUID). This is the final value that will be sent to the agent.
 data WireSpan = WireSpan
-  { queuedSpan :: QueuedSpan
-  , pid        :: String
-  , agentUuid  :: Text
+  { queuedSpan        :: QueuedSpan
+  , pid               :: String
+  , agentUuid         :: Text
+  , serviceNameConfig :: Maybe Text
   } deriving (Eq, Generic, Show)
 
 
@@ -113,6 +118,15 @@ instance ToJSON WireSpan where
       span_ = queuedSpan wireSpan
       pid_ = pid wireSpan
       agentUuid_ = agentUuid wireSpan
+      serviceNameConfig_ = serviceNameConfig wireSpan
+      spanData_ =
+        case (serviceName span_ <|> serviceNameConfig_) of
+          Just service ->
+            AesonExtra.lodashMerge
+              (spanData span_)
+              (Aeson.object [ "service" .= service ])
+          _ ->
+            spanData span_
     in
     Aeson.object
       [ "t"     .= traceId span_
@@ -124,7 +138,7 @@ instance ToJSON WireSpan where
       , "d"     .= duration span_
       , "k"     .= kind span_
       , "ec"    .= errorCount span_
-      , "data"  .= spanData span_
+      , "data"  .= spanData_
       , "f"     .= From pid_ agentUuid_
       ]
 

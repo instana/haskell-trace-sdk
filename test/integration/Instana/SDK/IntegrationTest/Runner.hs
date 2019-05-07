@@ -106,6 +106,7 @@ runSuite suite = do
       buildCommand
         [ ("APP_LOG_LEVEL", Just logLevel)
         , ("INSTANA_AGENT_NAME", Suite.customAgentName options)
+        , ("INSTANA_SERVICE_NAME", Suite.customServiceName options)
         , ("INSTANA_LOG_LEVEL", Just logLevel)
         ]
         "stack exec " ++ Suite.appUnderTest options

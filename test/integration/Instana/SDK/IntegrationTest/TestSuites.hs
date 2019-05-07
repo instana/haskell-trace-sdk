@@ -6,6 +6,7 @@ import qualified Instana.SDK.IntegrationTest.Connection    as Connection
 import qualified Instana.SDK.IntegrationTest.HttpTracing   as HttpTracing
 import qualified Instana.SDK.IntegrationTest.LowLevelApi   as LowLevelApi
 import qualified Instana.SDK.IntegrationTest.Metrics       as Metrics
+import qualified Instana.SDK.IntegrationTest.ServiceName   as ServiceName
 import           Instana.SDK.IntegrationTest.Suite         (ConditionalSuite (..),
                                                             Suite (..))
 import qualified Instana.SDK.IntegrationTest.Suite         as Suite
@@ -21,6 +22,7 @@ allSuites =
   , testAgentRestart
   , testPidTranslation
   , testCustomAgentName
+  , testServiceName
   , testHttpTracing
   , testWaiMiddleware
   , testMetrics
@@ -35,7 +37,8 @@ testBracketApi =
       , Suite.tests = (\pid ->
          [ BracketApi.shouldRecordSpans pid
          , BracketApi.shouldRecordNonRootEntry pid
-         , BracketApi.shouldMergeData pid
+         , BracketApi.shouldMergeTags pid
+         , BracketApi.shouldSetServiceName pid
          ])
       , Suite.options = Suite.defaultOptions
       }
@@ -49,7 +52,7 @@ testLowLevelApi =
       , Suite.tests = (\pid ->
          [ LowLevelApi.shouldRecordSpans pid
          , LowLevelApi.shouldRecordNonRootEntry pid
-         , LowLevelApi.shouldMergeData pid
+         , LowLevelApi.shouldMergeTags pid
          ])
       , Suite.options = Suite.defaultOptions
       }
@@ -100,6 +103,18 @@ testPidTranslation =
           Connection.shouldUseTranslatedPid pid
         ])
       , Suite.options = Suite.withPidTranslation
+      }
+
+
+testServiceName :: ConditionalSuite
+testServiceName =
+  Run $
+    Suite
+      { Suite.label = "INSTANA_SERVICE_NAME env var"
+      , Suite.tests = (\pid ->
+         [ ServiceName.shouldUseServiceNameEnvVar pid
+         ])
+      , Suite.options = Suite.withCustomServiceName "Custom Service Name"
       }
 
 

@@ -22,6 +22,7 @@ import           Data.Foldable                                    (toList)
 import           Data.List                                        (map)
 import           Data.Sequence                                    ((|>))
 import qualified Data.Sequence                                    as Seq
+import qualified Data.Text                                        as T
 import           Data.Time.Clock.POSIX                            (getPOSIXTime)
 import qualified Network.HTTP.Client                              as HTTP
 import qualified Network.HTTP.Types.Status                        as HttpTypes
@@ -128,15 +129,16 @@ queueEntrySpan entrySpan context = do
   queueSpan
     context
     QueuedSpan
-      { WireSpan.traceId    = EntrySpan.traceId entrySpan
-      , WireSpan.spanId     = EntrySpan.spanId entrySpan
-      , WireSpan.parentId   = EntrySpan.parentId entrySpan
-      , WireSpan.spanName   = EntrySpan.spanName entrySpan
-      , WireSpan.timestamp  = timestamp
-      , WireSpan.duration   = now - timestamp
-      , WireSpan.kind       = Entry
-      , WireSpan.errorCount = EntrySpan.errorCount entrySpan
-      , WireSpan.spanData   = EntrySpan.spanData entrySpan
+      { WireSpan.traceId     = EntrySpan.traceId entrySpan
+      , WireSpan.spanId      = EntrySpan.spanId entrySpan
+      , WireSpan.parentId    = EntrySpan.parentId entrySpan
+      , WireSpan.spanName    = EntrySpan.spanName entrySpan
+      , WireSpan.timestamp   = timestamp
+      , WireSpan.duration    = now - timestamp
+      , WireSpan.kind        = Entry
+      , WireSpan.errorCount  = EntrySpan.errorCount entrySpan
+      , WireSpan.serviceName = EntrySpan.serviceName entrySpan
+      , WireSpan.spanData    = EntrySpan.spanData entrySpan
       }
 
 
@@ -148,15 +150,16 @@ queueExitSpan exitSpan context = do
   queueSpan
     context
     QueuedSpan
-      { WireSpan.traceId    = EntrySpan.traceId parentSpan
-      , WireSpan.spanId     = ExitSpan.spanId exitSpan
-      , WireSpan.parentId   = Just $ EntrySpan.spanId parentSpan
-      , WireSpan.spanName   = ExitSpan.spanName exitSpan
-      , WireSpan.timestamp  = ExitSpan.timestamp exitSpan
-      , WireSpan.duration   = now - ExitSpan.timestamp exitSpan
-      , WireSpan.kind       = Exit
-      , WireSpan.errorCount = ExitSpan.errorCount exitSpan
-      , WireSpan.spanData   = ExitSpan.spanData exitSpan
+      { WireSpan.traceId     = EntrySpan.traceId parentSpan
+      , WireSpan.spanId      = ExitSpan.spanId exitSpan
+      , WireSpan.parentId    = Just $ EntrySpan.spanId parentSpan
+      , WireSpan.spanName    = ExitSpan.spanName exitSpan
+      , WireSpan.timestamp   = ExitSpan.timestamp exitSpan
+      , WireSpan.duration    = now - ExitSpan.timestamp exitSpan
+      , WireSpan.kind        = Exit
+      , WireSpan.errorCount  = ExitSpan.errorCount exitSpan
+      , WireSpan.serviceName = ExitSpan.serviceName exitSpan
+      , WireSpan.spanData    = ExitSpan.spanData exitSpan
       }
 
 
@@ -239,17 +242,20 @@ sendSpansToAgent context spans agentConnection _ = do
     agentPort = InternalContext.agentPort agentConnection
     translatedPidStr = InternalContext.pid agentConnection
     agentUuid = InternalContext.agentUuid agentConnection
+    serviceNameConfig =
+      T.pack <$> (InternalConfig.serviceName . InternalContext.config $ context)
     traceEndpointUrl =
       (show $
         URL.mkHttp agentHost agentPort haskellTracePluginPath
       ) ++ "." ++ translatedPidStr
-    -- combine actual span data with static per-process data (e.g. PID)
-    spansWithPid = map
+    -- combine actual span data with static per-process data
+    wireSpans = map
       (\queuedSpan ->
         WireSpan {
-          WireSpan.queuedSpan = queuedSpan
-        , WireSpan.pid        = translatedPidStr
-        , WireSpan.agentUuid  = agentUuid
+          WireSpan.queuedSpan        = queuedSpan
+        , WireSpan.pid               = translatedPidStr
+        , WireSpan.agentUuid         = agentUuid
+        , WireSpan.serviceNameConfig = serviceNameConfig
         }
       ) spans
   defaultRequestSettings <- HTTP.parseUrlThrow traceEndpointUrl
@@ -257,7 +263,7 @@ sendSpansToAgent context spans agentConnection _ = do
     request =
       defaultRequestSettings
         { HTTP.method = "POST"
-        , HTTP.requestBody = HTTP.RequestBodyLBS $ Aeson.encode spansWithPid
+        , HTTP.requestBody = HTTP.RequestBodyLBS $ Aeson.encode wireSpans
         , HTTP.requestHeaders =
           [ ("Accept", "application/json")
           , ("Content-Type", "application/json; charset=UTF-8'")

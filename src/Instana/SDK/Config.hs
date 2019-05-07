@@ -13,6 +13,7 @@ module Instana.SDK.Config
   , forceTransmissionAfter
   , forceTransmissionStartingAt
   , maxBufferedSpans
+  , serviceName
   ) where
 
 
@@ -33,6 +34,8 @@ data Config = Config
     -- changed the Server name on the agent side, you can use parameter to
     -- provide the name to match that header against.
   , agentName                   :: Maybe String
+    -- | Overrides the default service name that is used in Instana.
+  , serviceName                 :: Maybe String
     -- | Spans are usually buffered before being transmitted to the agent. This
     -- setting forces the transmission of all buffered spans after the given
     -- amount of milliseconds. Default: 1000.
@@ -58,6 +61,7 @@ defaultConfig =
     { agentHost = Nothing
     , agentPort = Nothing
     , agentName = Nothing
+    , serviceName = Nothing
     , forceTransmissionAfter = Nothing
     , forceTransmissionStartingAt = Nothing
     , maxBufferedSpans = Nothing

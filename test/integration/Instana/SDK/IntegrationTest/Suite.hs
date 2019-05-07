@@ -6,6 +6,7 @@ module Instana.SDK.IntegrationTest.Suite
   , isExclusive
   , withConnectionLoss
   , withCustomAgentName
+  , withCustomServiceName
   , withPidTranslation
   , withStartupDelay
   ) where
@@ -31,6 +32,7 @@ data SuiteOptions =
     , startupDelay           :: Bool
     , simulateConnectionLoss :: Bool
     , appUnderTest           :: String
+    , customServiceName      :: Maybe String
     }
 
 
@@ -42,6 +44,7 @@ defaultOptions =
     , startupDelay           = False
     , simulateConnectionLoss = False
     , appUnderTest           = "instana-haskell-test-wai-server"
+    , customServiceName      = Nothing
     }
 
 
@@ -63,6 +66,11 @@ withStartupDelay =
 withConnectionLoss :: SuiteOptions
 withConnectionLoss =
   defaultOptions { simulateConnectionLoss = True }
+
+
+withCustomServiceName :: String -> SuiteOptions
+withCustomServiceName serviceName =
+  defaultOptions { customServiceName = Just serviceName }
 
 
 data ConditionalSuite =
