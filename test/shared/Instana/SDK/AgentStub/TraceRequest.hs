@@ -16,7 +16,8 @@ type TraceRequest = [Span]
 
 
 data From = From
-  { entityId :: String
+  { entityId  :: String
+  , agentUuid :: String
   } deriving (Eq, Generic, Show)
 
 
@@ -25,12 +26,15 @@ instance FromJSON From where
     \fr ->
       From
         <$> fr .: "e" -- entityId
+        <*> fr .: "h" -- agent UUID/host ID
 
 
 instance ToJSON From where
   toJSON :: From -> Value
   toJSON fr = Aeson.object
-    [ "e" .= entityId fr ]
+    [ "e" .= entityId fr
+    , "h" .= agentUuid fr
+    ]
 
 
 data Span =

@@ -88,7 +88,7 @@ library
       Instana.SDK.Internal.Command
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.Context
-      Instana.SDK.Internal.FullSpan
+      Instana.SDK.Internal.WireSpan
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Metrics.Collector

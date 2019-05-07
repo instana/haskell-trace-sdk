@@ -30,9 +30,9 @@ import           Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse (Ann
 import qualified Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse as AnnounceResponse
 import           Instana.SDK.Internal.Command                               (Command)
 import           Instana.SDK.Internal.Config                                (FinalConfig)
-import           Instana.SDK.Internal.FullSpan                              (FullSpan)
 import           Instana.SDK.Internal.Metrics.Sample                        (TimedSample)
 import           Instana.SDK.Internal.SpanStack                             (SpanStack)
+import           Instana.SDK.Internal.WireSpan                              (QueuedSpan)
 
 
 -- |The current state of the connection to the agent.
@@ -113,7 +113,7 @@ data InternalContext = InternalContext
   , sdkStartTime          :: Int
   , httpManager           :: HttpClient.Manager
   , commandQueue          :: STM.TQueue Command
-  , spanQueue             :: STM.TVar (Seq FullSpan)
+  , spanQueue             :: STM.TVar (Seq QueuedSpan)
   , connectionState       :: STM.TVar ConnectionState
   , fileDescriptor        :: STM.TVar (Maybe CTypes.CInt)
   , currentSpans          :: STM.TVar (Map ThreadId SpanStack)

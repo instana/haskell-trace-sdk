@@ -176,7 +176,7 @@ shouldUseTranslatedPid :: String -> IO Test
 shouldUseTranslatedPid pid = do
   applyLabel "shouldUseTranslatedPid" $ do
     let
-      from = Just $ From pid
+      from = Just $ From pid "agent-stub-id"
     (_, spansResult) <-
       TestHelper.withSpanCreation
         (recordSpan "haskell.test.pid-translation")
