@@ -57,7 +57,7 @@ runTest pid urlPath headers extraAsserts = do
     HttpHelper.doAppRequest urlPath "GET" headers
   let
     result = LBSC8.unpack $ HTTP.responseBody response
-    from = Just $ From pid
+    from = Just $ From pid "agent-stub-id"
   spansResults <-
     TestHelper.waitForRegisteredSpansMatching
       [ "haskell.wai.server", "haskell.http.client" ]

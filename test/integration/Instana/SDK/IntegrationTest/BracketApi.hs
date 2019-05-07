@@ -25,7 +25,7 @@ shouldRecordSpans ::  String -> IO Test
 shouldRecordSpans pid =
   applyLabel "shouldRecordSpans" $ do
     let
-      from = Just $ From pid
+      from = Just $ From pid "agent-stub-id"
     (result, spansResults) <-
       TestHelper.withSpanCreation
         createRootEntry
@@ -83,7 +83,7 @@ shouldRecordNonRootEntry :: String -> IO Test
 shouldRecordNonRootEntry pid =
   applyLabel "shouldRecordNonRootEntry" $ do
     let
-      from = Just $ From pid
+      from = Just $ From pid "agent-stub-id"
     (result, spansResults) <-
       TestHelper.withSpanCreation
         createNonRootEntry
@@ -142,7 +142,7 @@ shouldMergeData :: String -> IO Test
 shouldMergeData pid =
   applyLabel "shouldMergeData" $ do
     let
-      from = Just $ From pid
+      from = Just $ From pid "agent-stub-id"
     (result, spansResults) <-
       TestHelper.withSpanCreation
         createSpansWithData

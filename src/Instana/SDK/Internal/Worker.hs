@@ -38,16 +38,16 @@ import           Instana.SDK.Internal.Context                     (AgentConnecti
                                                                    ConnectionState (..),
                                                                    InternalContext)
 import qualified Instana.SDK.Internal.Context                     as InternalContext
-import           Instana.SDK.Internal.FullSpan                    (FullSpan (FullSpan),
-                                                                   FullSpanWithPid (FullSpanWithPid),
-                                                                   SpanKind (Entry, Exit))
-import qualified Instana.SDK.Internal.FullSpan                    as FullSpan
 import           Instana.SDK.Internal.Logging                     (instanaLogger)
 import qualified Instana.SDK.Internal.Metrics.Collector           as MetricsCollector
 import qualified Instana.SDK.Internal.Metrics.Compression         as MetricsCompression
 import qualified Instana.SDK.Internal.Metrics.Deltas              as Deltas
 import qualified Instana.SDK.Internal.Metrics.Sample              as Sample
 import qualified Instana.SDK.Internal.URL                         as URL
+import           Instana.SDK.Internal.WireSpan                    (QueuedSpan (QueuedSpan),
+                                                                   SpanKind (Entry, Exit),
+                                                                   WireSpan (WireSpan))
+import qualified Instana.SDK.Internal.WireSpan                    as WireSpan
 import           Instana.SDK.Span.EntrySpan                       (EntrySpan (..))
 import qualified Instana.SDK.Span.EntrySpan                       as EntrySpan
 import           Instana.SDK.Span.ExitSpan                        (ExitSpan (..))
@@ -127,16 +127,16 @@ queueEntrySpan entrySpan context = do
     timestamp = EntrySpan.timestamp entrySpan
   queueSpan
     context
-    FullSpan
-      { FullSpan.traceId    = EntrySpan.traceId entrySpan
-      , FullSpan.spanId     = EntrySpan.spanId entrySpan
-      , FullSpan.parentId   = EntrySpan.parentId entrySpan
-      , FullSpan.spanName   = EntrySpan.spanName entrySpan
-      , FullSpan.timestamp  = timestamp
-      , FullSpan.duration   = now - timestamp
-      , FullSpan.kind       = Entry
-      , FullSpan.errorCount = EntrySpan.errorCount entrySpan
-      , FullSpan.spanData   = EntrySpan.spanData entrySpan
+    QueuedSpan
+      { WireSpan.traceId    = EntrySpan.traceId entrySpan
+      , WireSpan.spanId     = EntrySpan.spanId entrySpan
+      , WireSpan.parentId   = EntrySpan.parentId entrySpan
+      , WireSpan.spanName   = EntrySpan.spanName entrySpan
+      , WireSpan.timestamp  = timestamp
+      , WireSpan.duration   = now - timestamp
+      , WireSpan.kind       = Entry
+      , WireSpan.errorCount = EntrySpan.errorCount entrySpan
+      , WireSpan.spanData   = EntrySpan.spanData entrySpan
       }
 
 
@@ -147,20 +147,20 @@ queueExitSpan exitSpan context = do
   now <- round . (* 1000) <$> getPOSIXTime
   queueSpan
     context
-    FullSpan
-      { FullSpan.traceId    = EntrySpan.traceId parentSpan
-      , FullSpan.spanId     = ExitSpan.spanId exitSpan
-      , FullSpan.parentId   = Just $ EntrySpan.spanId parentSpan
-      , FullSpan.spanName   = ExitSpan.spanName exitSpan
-      , FullSpan.timestamp  = ExitSpan.timestamp exitSpan
-      , FullSpan.duration   = now - ExitSpan.timestamp exitSpan
-      , FullSpan.kind       = Exit
-      , FullSpan.errorCount = ExitSpan.errorCount exitSpan
-      , FullSpan.spanData   = ExitSpan.spanData exitSpan
+    QueuedSpan
+      { WireSpan.traceId    = EntrySpan.traceId parentSpan
+      , WireSpan.spanId     = ExitSpan.spanId exitSpan
+      , WireSpan.parentId   = Just $ EntrySpan.spanId parentSpan
+      , WireSpan.spanName   = ExitSpan.spanName exitSpan
+      , WireSpan.timestamp  = ExitSpan.timestamp exitSpan
+      , WireSpan.duration   = now - ExitSpan.timestamp exitSpan
+      , WireSpan.kind       = Exit
+      , WireSpan.errorCount = ExitSpan.errorCount exitSpan
+      , WireSpan.spanData   = ExitSpan.spanData exitSpan
       }
 
 
-queueSpan :: InternalContext -> FullSpan -> IO ()
+queueSpan :: InternalContext -> QueuedSpan -> IO ()
 queueSpan context span_ = do
   currentSpanQueue <-
     STM.atomically $
@@ -220,7 +220,7 @@ drainSpanBuffer context = do
   spansSeq <- STM.atomically $
     STM.swapTVar (InternalContext.spanQueue context) Seq.empty
   let
-    spans :: [FullSpan]
+    spans :: [QueuedSpan]
     spans = toList spansSeq
   when (not $ null spans) $ do
     InternalContext.whenConnected context $
@@ -229,7 +229,7 @@ drainSpanBuffer context = do
 
 sendSpansToAgent ::
   InternalContext
-  -> [FullSpan]
+  -> [QueuedSpan]
   -> AgentConnection
   -> Metrics.Store
   -> IO ()
@@ -238,16 +238,18 @@ sendSpansToAgent context spans agentConnection _ = do
     agentHost = InternalContext.agentHost agentConnection
     agentPort = InternalContext.agentPort agentConnection
     translatedPidStr = InternalContext.pid agentConnection
+    agentUuid = InternalContext.agentUuid agentConnection
     traceEndpointUrl =
       (show $
         URL.mkHttp agentHost agentPort haskellTracePluginPath
       ) ++ "." ++ translatedPidStr
     -- combine actual span data with static per-process data (e.g. PID)
     spansWithPid = map
-      (\fullSpan ->
-        FullSpanWithPid {
-          FullSpan.fullSpan = fullSpan
-        , FullSpan.pid      = translatedPidStr
+      (\queuedSpan ->
+        WireSpan {
+          WireSpan.queuedSpan = queuedSpan
+        , WireSpan.pid        = translatedPidStr
+        , WireSpan.agentUuid  = agentUuid
         }
       ) spans
   defaultRequestSettings <- HTTP.parseUrlThrow traceEndpointUrl
