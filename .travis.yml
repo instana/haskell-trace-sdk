@@ -2,9 +2,11 @@
 
 sudo: false
 
-# Caching so the next build will be fast too.
+# Cache some directories to speed up the next build.
 cache:
   directories:
+  - $HOME/.ghc
+  - $HOME/.cabal
   - $HOME/.stack
 
 before_install:
