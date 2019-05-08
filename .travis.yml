@@ -31,5 +31,5 @@ script:
   # 3) verifies that haddock documentation can be generated
   - date && TEST_LOG_LEVEL=DEBUG stack --no-terminal --skip-ghc-check test
   - date && stack sdist
-  - date && stack haddock
+  - date && stack haddock --no-haddock-deps
 

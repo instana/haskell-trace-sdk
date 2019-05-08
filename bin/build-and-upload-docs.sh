@@ -6,7 +6,7 @@ set -e
 # This if stack-enabled fork of https://github.com/ekmett/lens/blob/master/scripts/hackage-docs.sh
 
 if [ "$#" -ne 1 ]; then
-  echo "Usage: scripts/hackage-docs.sh HACKAGE_USER"
+  echo "Usage: bin/build-and-upload-docs.sh HACKAGE_USER"
   exit 1
 fi
 
