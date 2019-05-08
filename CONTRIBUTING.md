@@ -56,3 +56,16 @@ The agent stub can be configured with a number of environment variables:
 * `STARTUP_DELAY` (default: `0`): An artificial startup delay in milliseconds, used for integration testing.
 * `SIMULATE_CONNECTION_LOSS` (default: `false`): Used for integration testing.
 * `SIMULATE_PID_TRANSLATION` (default: `false`): Used for integration testing.
+
+Publishing a New Release
+------------------------
+
+* Make sure ChangeLog.md has an entry for the upcoming release.
+* Bump the version in:
+    * `README.md` (installation instructions/extra-deps)
+    * `instana-haskell-trace-sdk.cabal`
+    * `package.yaml`
+    * `test/integration/Instana/SDK/IntegrationTest/Metrics.hs` (assertion for `sensorVersion`)
+* Commit this change with a commit comment like `chore: version a.b.c.d`
+* Build the package with stack and upload it to Hackage.
+
