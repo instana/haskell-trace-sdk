@@ -21,7 +21,6 @@ allSuites =
   , testConnectionLoss
   , testAgentRestart
   , testPidTranslation
-  , testCustomAgentName
   , testServiceName
   , testHttpTracing
   , testWaiMiddleware
@@ -115,18 +114,6 @@ testServiceName =
          [ ServiceName.shouldUseServiceNameEnvVar pid
          ])
       , Suite.options = Suite.withCustomServiceName "Custom Service Name"
-      }
-
-
-testCustomAgentName :: ConditionalSuite
-testCustomAgentName =
-  Run $
-    Suite
-      { Suite.label = "Custom Agent Name"
-      , Suite.tests = (\pid -> [
-          Connection.shouldUseCustomAgentName pid
-        ])
-      , Suite.options = Suite.withCustomAgentName "Devil in Disguise"
       }
 
 

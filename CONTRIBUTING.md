@@ -52,7 +52,6 @@ The agent stub can be configured with a number of environment variables:
 
 * `HOST` (default: `127.0.0.1`): The bind address of the agent stub. `127.0.0.1` is usually fine, but you can also use for example `*4` to bind to any IPv4 or IPv6 hostname, IPv4 preferred. See <https://hackage.haskell.org/package/warp-3.2.9/docs/Network-Wai-Handler-Warp.html#t:HostPreference>.
 * `PORT` (default: `1302`): The port to bind to.
-* `AGENT_NAME` (default: `Instana Agent`): Will be included in the response to `GET /` as the `Server` header.
 * `STARTUP_DELAY` (default: `0`): An artificial startup delay in milliseconds, used for integration testing.
 * `SIMULATE_CONNECTION_LOSS` (default: `false`): Used for integration testing.
 * `SIMULATE_PID_TRANSLATION` (default: `false`): Used for integration testing.

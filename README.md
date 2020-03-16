@@ -163,7 +163,6 @@ Instead of configuring the SDK programatically, as seen above, it can also be co
 
 * `INSTANA_AGENT_HOST`: The IP or the host of the Instana agent to connect to. Default: 127.0.0.1.
 * `INSTANA_AGENT_PORT`: The port of the Instana agent to connect to. Default: 42699.
-* `INSTANA_AGENT_NAME`: When establishing a connection to the Instana agent, the SDK validates the Instana agent's `Server` HTTP response header. Should you have changed the Server name on the agent side, you can use this environment variable to provide the name to match that header against.
 * `INSTANA_SERVICE_NAME`: Override the default service name in Instana.
 * `INSTANA_FORCE_TRANSMISSION_STARTING_AFTER`: Spans are usually buffered before being transmitted to the agent. This setting forces the transmission of all buffered spans after the given amount of milliseconds. Default: 1000.
 * `INSTANA_FORCE_TRANSMISSION_STARTING_AT`: This setting forces the transmission of all buffered spans when the given number of spans has been buffered.

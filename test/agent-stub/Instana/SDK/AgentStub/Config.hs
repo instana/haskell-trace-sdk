@@ -17,7 +17,6 @@ import           Text.Read                (readMaybe)
 data AgentStubConfig = AgentStubConfig
   { bindHost               :: Warp.HostPreference
   , bindPort               :: Int
-  , agentName              :: String
   , startupDelay           :: Int
   , simulateConnectionLoss :: Bool
   , simulatPidTranslation  :: Bool
@@ -33,7 +32,6 @@ readConfig = do
   -- incoming connections every time the app is recompiled and restarted.
   hostString     <- lookupEnvWithDefault    "HOST" "127.0.0.1"
   port           <- lookupEnvIntWithDefault "PORT" 1302
-  name           <- lookupEnvWithDefault    "AGENT_NAME" "Instana Agent"
   delay          <- lookupEnvIntWithDefault "STARTUP_DELAY" 0
   connectionLoss <- lookupFlag              "SIMULATE_CONNECTION_LOSS"
   pidTranslation <- lookupFlag              "SIMULATE_PID_TRANSLATION"
@@ -44,7 +42,6 @@ readConfig = do
     AgentStubConfig
       { bindHost               = hostPreference
       , bindPort               = port
-      , agentName              = name
       , startupDelay           = delay
       , simulateConnectionLoss = connectionLoss
       , simulatPidTranslation  = pidTranslation

@@ -18,7 +18,6 @@ module Instana.SDK.SDK
     , addTagAt
     , addToErrorCount
     , agentHost
-    , agentName
     , agentPort
     , completeEntry
     , completeExit

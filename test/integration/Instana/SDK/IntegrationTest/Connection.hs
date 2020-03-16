@@ -4,7 +4,6 @@ module Instana.SDK.IntegrationTest.Connection
   , shouldReestablishLostConnection
   , shouldReconnectAfterAgentRestart
   , shouldUseTranslatedPid
-  , shouldUseCustomAgentName
   ) where
 
 
@@ -197,15 +196,3 @@ shouldUseTranslatedPid pid = do
             assertAllIO $
               [ assertEqual "entry from" from $ TraceRequest.f entrySpan
               ]
-
-
-shouldUseCustomAgentName :: String -> IO Test
-shouldUseCustomAgentName _ =
-  return $
-    TestLabel "shouldUseCustomAgentName" $
-      TestCase $
-        -- no actuall assertions needed, the fact that this function is executed
-        -- is already proof that the connection to the agent stub has been
-        -- established in spite of the custom agent name parameter.
-        return ()
-

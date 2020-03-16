@@ -5,7 +5,6 @@ module Instana.SDK.IntegrationTest.Suite
   , defaultOptions
   , isExclusive
   , withConnectionLoss
-  , withCustomAgentName
   , withCustomServiceName
   , withPidTranslation
   , withStartupDelay
@@ -28,7 +27,6 @@ data Suite =
 data SuiteOptions =
   SuiteOptions
     { usePidTranslation      :: Bool
-    , customAgentName        :: Maybe String
     , startupDelay           :: Bool
     , simulateConnectionLoss :: Bool
     , appUnderTest           :: String
@@ -40,7 +38,6 @@ defaultOptions :: SuiteOptions
 defaultOptions =
   SuiteOptions
     { usePidTranslation      = False
-    , customAgentName        = Nothing
     , startupDelay           = False
     , simulateConnectionLoss = False
     , appUnderTest           = "instana-haskell-test-wai-server"
@@ -51,11 +48,6 @@ defaultOptions =
 withPidTranslation :: SuiteOptions
 withPidTranslation =
   defaultOptions { usePidTranslation = True }
-
-
-withCustomAgentName :: String -> SuiteOptions
-withCustomAgentName agentName =
-  defaultOptions { customAgentName = Just agentName }
 
 
 withStartupDelay :: SuiteOptions

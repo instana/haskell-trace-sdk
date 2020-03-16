@@ -36,11 +36,6 @@ agentPortKey :: String
 agentPortKey = "INSTANA_AGENT_PORT"
 
 
--- |Environment variable for the agent name (server header)
-agentNameKey :: String
-agentNameKey = "INSTANA_AGENT_NAME"
-
-
 -- |Environment variable for the service name override.
 serviceNameKey :: String
 serviceNameKey = "INSTANA_SERVICE_NAME"
@@ -71,11 +66,6 @@ defaultAgentPort :: Int
 defaultAgentPort = 42699
 
 
--- |Default agent name
-defaultAgentName :: String
-defaultAgentName = "Instana Agent"
-
-
 -- |Default force-transmission-after setting
 defaultForceTransmissionAfter :: Int
 defaultForceTransmissionAfter = 1000
@@ -96,7 +86,6 @@ defaultMaxBufferedSpans = 1000
 data FinalConfig = FinalConfig
   { agentHost                   :: String
   , agentPort                   :: Int
-  , agentName                   :: String
   , serviceName                 :: Maybe String
   , forceTransmissionAfter      :: Int
   , forceTransmissionStartingAt :: Int
@@ -108,7 +97,6 @@ data FinalConfig = FinalConfig
 mkFinalConfig ::
   String
   -> Int
-  -> String
   -> Maybe String
   -> Int
   -> Int
@@ -117,7 +105,6 @@ mkFinalConfig ::
 mkFinalConfig
   agentHost_
   agentPort_
-  agentName_
   serviceName_
   forceTransmissionAfter_
   forceTransmissionStartingAt_
@@ -125,7 +112,6 @@ mkFinalConfig
   FinalConfig
     { agentHost = agentHost_
     , agentPort = agentPort_
-    , agentName = agentName_
     , serviceName = serviceName_
     , forceTransmissionAfter = forceTransmissionAfter_
     , forceTransmissionStartingAt = forceTransmissionStartingAt_
@@ -138,7 +124,6 @@ readConfigFromEnvironment :: IO Config
 readConfigFromEnvironment = do
   agentHostEnv <- lookupEnv agentHostKey
   agentPortEnv <- lookupEnv agentPortKey
-  agentNameEnv <- lookupEnv agentNameKey
   serviceNameEnv <- lookupEnv serviceNameKey
   forceTransmissionAfterEnv <- lookupEnv forceTransmissionAfterKey
   forceTransmissionStartingAtEnv <- lookupEnv forceTransmissionStartingAtKey
@@ -156,7 +141,6 @@ readConfigFromEnvironment = do
     Config.defaultConfig
       { Config.agentHost = agentHostEnv
       , Config.agentPort = agentPortParsed
-      , Config.agentName = agentNameEnv
       , Config.serviceName = serviceNameEnv
       , Config.forceTransmissionAfter = forceTransmissionAfterParsed
       , Config.forceTransmissionStartingAt = forceTransmissionStartingAtParsed
@@ -180,8 +164,6 @@ applyDefaults config =
        fromMaybe defaultAgentHost (Config.agentHost config)
    , agentPort =
        fromMaybe defaultAgentPort (Config.agentPort config)
-   , agentName =
-       fromMaybe defaultAgentName (Config.agentName config)
    , serviceName = Config.serviceName config
    , forceTransmissionAfter =
        fromMaybe
@@ -209,9 +191,6 @@ mergeConfigs userConfig configFromEnv =
       , Config.agentPort =
           (Config.agentPort userConfig) <|>
           (Config.agentPort configFromEnv)
-      , Config.agentName =
-          (Config.agentName userConfig) <|>
-          (Config.agentName configFromEnv)
       , Config.serviceName =
           (Config.serviceName userConfig) <|>
           (Config.serviceName configFromEnv)

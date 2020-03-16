@@ -94,7 +94,6 @@ runSuite suite = do
       buildCommand
         [ ("SIMULATE_PID_TRANSLATION",
              booleanEnv $ Suite.usePidTranslation options)
-        , ("AGENT_NAME", Suite.customAgentName options)
         , ("STARTUP_DELAY",
             (if Suite.startupDelay options then Just "2500" else Nothing))
         , ("SIMULATE_CONNECTION_LOSS",
@@ -105,7 +104,6 @@ runSuite suite = do
     appCommand =
       buildCommand
         [ ("APP_LOG_LEVEL", Just logLevel)
-        , ("INSTANA_AGENT_NAME", Suite.customAgentName options)
         , ("INSTANA_SERVICE_NAME", Suite.customServiceName options)
         , ("INSTANA_LOG_LEVEL", Just logLevel)
         ]

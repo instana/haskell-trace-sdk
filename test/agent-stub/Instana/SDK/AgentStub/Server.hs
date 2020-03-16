@@ -42,7 +42,7 @@ mainServer ::
   -> Recorders
   -> Servant.Server API
 mainServer config startupTime recorders =
-      getRoot config
+      getRoot
  :<|> putDiscovery config startupTime recorders
  :<|> headAgentReady config startupTime recorders
  :<|> postEntityData config startupTime recorders
@@ -50,11 +50,9 @@ mainServer config startupTime recorders =
  :<|> StubServer.stubServer recorders
 
 
-getRoot ::
-  AgentStubConfig
-  -> Servant.Handler (Headers '[Header "Server" String] NoContent)
-getRoot config =
-  return $ Servant.addHeader (Config.agentName config) NoContent
+getRoot :: Servant.Handler (Headers '[Header "Server" String] NoContent)
+getRoot =
+  return $ Servant.addHeader "Instana Agent" NoContent
 
 
 putDiscovery ::

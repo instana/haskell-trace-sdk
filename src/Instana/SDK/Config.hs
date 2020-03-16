@@ -8,7 +8,6 @@ module Instana.SDK.Config
   ( Config
   , agentHost
   , agentPort
-  , agentName
   , defaultConfig
   , forceTransmissionAfter
   , forceTransmissionStartingAt
@@ -29,11 +28,6 @@ data Config = Config
     agentHost                   :: Maybe String
     -- | Port of the Instana agent
   , agentPort                   :: Maybe Int
-    -- | When establishing a connection to the Instana agent, the SDK validates
-    -- the Instana agent's `Server` HTTP response header. Should you have
-    -- changed the Server name on the agent side, you can use parameter to
-    -- provide the name to match that header against.
-  , agentName                   :: Maybe String
     -- | Overrides the default service name that is used in Instana.
   , serviceName                 :: Maybe String
     -- | Spans are usually buffered before being transmitted to the agent. This
@@ -60,7 +54,6 @@ defaultConfig =
   Config
     { agentHost = Nothing
     , agentPort = Nothing
-    , agentName = Nothing
     , serviceName = Nothing
     , forceTransmissionAfter = Nothing
     , forceTransmissionStartingAt = Nothing

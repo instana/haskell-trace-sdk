@@ -114,8 +114,7 @@ tryHost ::
   -> IO (Either String SuccessfullHost)
 tryHost context host port = do
   let
-    config = InternalContext.config context
-    expectedServerHeader = InternalConfig.agentName config
+    expectedServerHeader = "Instana Agent"
     manager = InternalContext.httpManager context
     agentRootUrl = URL.mkHttp host port ""
   debugM instanaLogger $ "Trying to reach agent at " ++ show agentRootUrl
@@ -135,7 +134,8 @@ tryHost context host port = do
       else do
         return $ Left $
           "Host at " ++ show agentRootUrl ++ " did not respond with " ++
-          "expected agent header but with: " ++ show serverHeaderValue
+          "expected Server header (" ++ expectedServerHeader ++
+          ") but with: " ++ show serverHeaderValue
     )
     (\e -> do
       let
