@@ -16,7 +16,6 @@ module Instana.SDK.Internal.Logging
 
 import           Control.Monad             (when)
 import           Data.Maybe                (catMaybes, isJust)
-import           Data.Traversable          (sequence)
 import           System.Directory          (getTemporaryDirectory)
 import           System.Environment        (lookupEnv)
 import           System.IO                 (Handle, stdout)

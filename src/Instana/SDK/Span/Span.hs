@@ -29,7 +29,6 @@ import           Data.Aeson                 (Value, (.=))
 import qualified Data.Aeson                 as Aeson
 import qualified Data.List                  as List
 import           Data.Text                  as T
-import           Data.Text                  (Text)
 import           GHC.Generics
 
 import           Instana.SDK.Internal.Id    (Id)

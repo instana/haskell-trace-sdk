@@ -22,7 +22,6 @@ import           Data.Aeson            (FromJSON, ToJSON, Value)
 import qualified Data.Aeson            as Aeson
 import           Data.Aeson.Types      (Parser)
 import qualified Data.ByteString.Char8 as BSC8
-import           Data.List             (foldl)
 import           Data.Text             (Text)
 import qualified Data.Text             as T
 import           GHC.Generics

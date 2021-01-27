@@ -185,8 +185,7 @@ initInstanaInternal conf = do
       , HTTP.managerRawConnection =
           HTTP.rawConnectionModifySocket
             (\socket -> do
-                let
-                  fileDescriptorFromSocket = Socket.fdSocket socket
+                fileDescriptorFromSocket <- Socket.unsafeFdSocket socket
                 STM.atomically $
                   STM.writeTVar fileDescriptor (Just fileDescriptorFromSocket)
             )

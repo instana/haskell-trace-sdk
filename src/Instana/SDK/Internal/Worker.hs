@@ -19,7 +19,6 @@ import           Control.Monad                                    (forever,
                                                                    when)
 import qualified Data.Aeson                                       as Aeson
 import           Data.Foldable                                    (toList)
-import           Data.List                                        (map)
 import           Data.Sequence                                    ((|>))
 import qualified Data.Sequence                                    as Seq
 import qualified Data.Text                                        as T

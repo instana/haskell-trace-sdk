@@ -16,7 +16,6 @@ module Instana.SDK.Internal.Retry
 import           Control.Monad.Catch  (Handler)
 import qualified Control.Retry        as Retry
 import           Data.ByteString.Lazy (ByteString)
-import           Data.Semigroup       ((<>))
 import qualified Network.HTTP.Client  as HTTP
 
 

@@ -23,7 +23,6 @@ module Instana.SDK.IntegrationTest.TestHelper
 
 import           Control.Exception                       (catch)
 import qualified Data.ByteString.Lazy                    as LBS
-import           Data.Either                             (Either)
 import qualified Data.List                               as List
 import qualified Data.Maybe                              as Maybe
 import           Data.Text                               (Text)
