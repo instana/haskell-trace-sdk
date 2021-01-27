@@ -1,4 +1,4 @@
-# Instana Haskell Trace SDK &nbsp; [![Build Status](https://travis-ci.org/instana/haskell-trace-sdk.svg?branch=master)](https://travis-ci.org/instana/haskell-trace-sdk)
+# Instana Haskell Trace SDK &nbsp; [![Build Status](https://travis-ci.org/instana/haskell-trace-sdk.svg?branch=main)](https://travis-ci.org/instana/haskell-trace-sdk)
 
 Monitor your Haskell application with [Instana](https://www.instana.com/)! 🎉
 
@@ -220,5 +220,5 @@ depending on whether the application already uses and configures hslogger. The a
 Contributing
 ------------
 
-See [CONTRIBUTING.md](https://github.com/instana/haskell-trace-sdk/blob/master/CONTRIBUTING.md).
+See [CONTRIBUTING.md](https://github.com/instana/haskell-trace-sdk/blob/main/CONTRIBUTING.md).
 
