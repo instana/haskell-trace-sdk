@@ -22,6 +22,12 @@ extra-deps:
 - instana-haskell-trace-sdk-0.4.0.0
 ```
 
+Depending on the stack resolver you use, you might also need to add `aeson-extra` to your extra-deps:
+
+```
+- aeson-extra-0.4.1.3@sha256:8ad8e4d28e46280ea98af2e94dcaaf524c396c9d91b1eba867961efc6e7f923f,2997
+```
+
 Usage
 -----
 

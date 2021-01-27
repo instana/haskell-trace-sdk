@@ -67,7 +67,7 @@ Publishing a New Release
     * `test/integration/Instana/SDK/IntegrationTest/Metrics.hs` (assertion for `sensorVersion`)
 * Commit and push this change with a commit comment like `chore: version a.b.c.d`
 * Build the package with stack and upload it to Hackage:
-    * `stack haddock && stack sdist && stack upload --no-signature .`
+    * `stack haddock && stack sdist && stack upload .`
 
 Actually, the Hackage server should build the haddock docs after the package has been uploaded and add it to the package version. You can check if this has worked - if the individual modules on <http://hackage.haskell.org/package/instana-haskell-trace-sdk> are links to the documentation, it worked. Legend has it that this takes a few minutes - you could theoretically wait to see if the docs show up. Most of the times this does not actually work for reasons unknown. In these cases you can build the docs manually in the format Hackage expects and upload them for an already published package version by running
 ```
