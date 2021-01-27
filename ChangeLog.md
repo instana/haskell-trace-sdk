@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## 0.4.0.0
+- Accomodate for breaking changes in `network-3.0.0.0`.
+
 ## 0.3.0.0
 - Honor the environment variable `INSTANA_SERVICE_NAME` to override the default service name in Instana.
 - Add a configuration option for overriding the default service name in Instana.
