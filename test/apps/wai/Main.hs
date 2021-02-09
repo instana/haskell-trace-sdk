@@ -326,23 +326,25 @@ httpBracketApi ::
   -> Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-httpBracketApi instana httpManager requestIn respond =
-  InstanaSDK.withHttpEntry instana requestIn $ do
-    requestOut <-
-      HTTP.parseUrlThrow $
-        "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
-    _ <- InstanaSDK.withHttpExit
-      instana
-      requestOut
-      (\req -> do
-        _ <- HTTP.httpLbs req httpManager
-        threadDelay $ 1000 -- make sure there is a duration > 0
-      )
-    respond $
-      Wai.responseBuilder
-        HTTPTypes.status200
-        [("Content-Type", "application/json; charset=UTF-8")]
-        "{\"response\": \"ok\"}"
+httpBracketApi instana httpManager requestIn respond = do
+  response <- do
+    InstanaSDK.withCorrelatedHttpEntry instana requestIn $ do
+      requestOut <-
+        HTTP.parseUrlThrow $
+          "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
+      _ <- InstanaSDK.withHttpExit
+        instana
+        requestOut
+        (\req -> do
+          _ <- HTTP.httpLbs req httpManager
+          threadDelay $ 1000 -- make sure there is a duration > 0
+        )
+      return $
+        Wai.responseBuilder
+          HTTPTypes.status200
+          [("Content-Type", "application/json; charset=UTF-8")]
+          "{\"response\": \"ok\"}"
+  respond response
 
 
 httpLowLevelApi ::
@@ -360,11 +362,14 @@ httpLowLevelApi instana httpManager requestIn respond = do
   _ <- HTTP.httpLbs requestOut' httpManager
   threadDelay $ 1000 -- make sure there is a duration > 0
   InstanaSDK.completeExit instana
-  result <- respond $
-    Wai.responseBuilder
-      HTTPTypes.status200
-      [("Content-Type", "application/json; charset=UTF-8")]
-      "{\"response\": \"ok\"}"
+  let
+    response =
+      Wai.responseBuilder
+        HTTPTypes.status200
+        [("Content-Type", "application/json; charset=UTF-8")]
+        "{\"response\": \"ok\"}"
+  response' <- InstanaSDK.addWebsiteMonitoringBackEndCorrelation instana response
+  result <- respond response'
   InstanaSDK.completeEntry instana
   return result
 

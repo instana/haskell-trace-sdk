@@ -139,7 +139,7 @@ All functions starting with `with` accept (among other parameters) an IO action.
 * `withEntry`: Creates an entry span that has a parent span.
 * `withHttpEntry`: A convenience function that examines an HTTP request for Instana tracing headers and creates an entry span. It will automatically add the correct metadata to the span. You do not need to handle incoming HTTP requests at all when using the Instana WAI middleware plug-in (see above).
 * `withExit`: Creates an exit span. This can only be called inside a `withRootEntry` or an `withEntry` call, as an exit span needs an entry span as its parent.
-* `withHttpExit`: Creates an exit span for a given HTTP client request. It will automatically add the correct metadata to the span so it should be preferred to `withExit` when tracing outgoing HTTP requests.
+* `withHttpExit`: Creates an exit span for a given HTTP client request. It will automatically add the correct metadata to the span so it should be preferred to `withExit` when tracing outgoing HTTP requests. It will also add HTTP headers to the request to propagate the trace context downstream.
 
 #### Low Level API/Explicit Start And Complete
 
@@ -147,7 +147,7 @@ All functions starting with `with` accept (among other parameters) an IO action.
 * `startEntry`: Starts an entry span. You will need to call `completeEntry` at some point.
 * `startHttpEntry`: Starts an entry span for an incoming HTTP request. It will automatically add the correct metadata to the span. You do not need to handle incoming HTTP requests at all when using the WAI middleware plug-in (see above). You will need to call `completeEntry` at some point.
 * `startExit`: Starts an exit span. You will need to call `completeExit` at some point.
-* `startHttpExit`: Starts an exit span for an outgoing HTTP request. It will automatically add the correct metadata to the span so it should be preferred to `startExit` when tracing outgoing HTTP requests. You will need to call `completeExit` at some point.
+* `startHttpExit`: Starts an exit span for an outgoing HTTP request. It will automatically add the correct metadata to the span so it should be preferred to `startExit` when tracing outgoing HTTP requests. It will also add HTTP headers to the request to propagate the trace context downstream. You will need to call `completeExit` at some point.
 * `completeEntry`: Finalizes an entry span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
 * `completeExit`: Finalizes an exit span. This will put the span into the SDK's span buffer for transmission to the Instana agent.
 

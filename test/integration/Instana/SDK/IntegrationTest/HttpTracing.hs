@@ -12,9 +12,10 @@ module Instana.SDK.IntegrationTest.HttpTracing
 import           Control.Concurrent                     (threadDelay)
 import           Data.Aeson                             ((.=))
 import qualified Data.Aeson                             as Aeson
+import qualified Data.ByteString.Char8                  as BSC8
 import qualified Data.ByteString.Lazy.Char8             as LBSC8
 import qualified Data.List                              as List
-import           Data.Maybe                             (isNothing)
+import           Data.Maybe                             (isNothing, listToMaybe)
 import           Instana.SDK.AgentStub.TraceRequest     (From (..), Span)
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
@@ -23,6 +24,7 @@ import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel, applyLabel,
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import qualified Network.HTTP.Client                    as HTTP
 import           Network.HTTP.Types                     (Header)
+import qualified Network.HTTP.Types.Header
 import           Test.HUnit
 
 
@@ -89,6 +91,15 @@ runTest pid urlPath headers extraAsserts = do
   let
     result = LBSC8.unpack $ HTTP.responseBody response
     from = Just $ From pid "agent-stub-id"
+    responseHeaders = HTTP.responseHeaders response
+    serverTimingTuple :: Maybe (Network.HTTP.Types.Header.HeaderName, BSC8.ByteString)
+    serverTimingTuple =
+      listToMaybe $
+        filter
+          (\ (headerName, _) -> headerName == "Server-Timing")
+          responseHeaders
+    serverTimingValue = BSC8.unpack <$> (snd <$> serverTimingTuple)
+
   spansResults <-
     TestHelper.waitForRegisteredSpansMatching
       [ "haskell.wai.server", "haskell.http.client" ]
@@ -109,7 +120,7 @@ runTest pid urlPath headers extraAsserts = do
             Just entrySpan = maybeEntrySpan
             Just exitSpan = maybeExitSpan
           assertAllIO $
-            (commonAsserts entrySpan exitSpan result from) ++
+            (commonAsserts entrySpan exitSpan result from serverTimingValue) ++
             (extraAsserts entrySpan)
 
 
@@ -158,12 +169,21 @@ nonRootEntryAsserts entrySpan =
   ]
 
 
-commonAsserts :: Span -> Span -> String -> Maybe From -> [Assertion]
-commonAsserts entrySpan exitSpan result from =
+commonAsserts ::
+  Span
+  -> Span
+  -> String
+  -> Maybe From
+  -> Maybe String
+  -> [Assertion]
+commonAsserts entrySpan exitSpan result from serverTimingValue =
   [ assertEqual "result" "{\"response\": \"ok\"}" result
   , assertEqual "trace ID is consistent"
       (TraceRequest.t exitSpan)
       (TraceRequest.t entrySpan)
+  , assertEqual "Server-Timing header with trace ID is present"
+      (Just $ "intid;desc=" ++ (TraceRequest.t entrySpan))
+      (serverTimingValue)
   , assertEqual "exit parent ID"
       (Just $ TraceRequest.s entrySpan)
       (TraceRequest.p exitSpan)

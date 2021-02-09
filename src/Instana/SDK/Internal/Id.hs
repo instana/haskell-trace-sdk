@@ -10,6 +10,7 @@ module Instana.SDK.Internal.Id
    , generate
    , fromString
    , toByteString
+   , toString
    , toText
    -- exposed for testing purposes
    , createFromIntsForTest

@@ -15,13 +15,16 @@ module Instana.SDK.Internal.SpanStack
   , popWhenMatches
   , push
   , pushSuppress
+  , readTraceId
   , suppress
   ) where
 
 import           GHC.Generics
 
+import           Instana.SDK.Internal.Id    (Id)
 import           Instana.SDK.Internal.Util  ((|>))
 import           Instana.SDK.Span.EntrySpan (EntrySpan)
+import qualified Instana.SDK.Span.EntrySpan as EntrySpan
 import           Instana.SDK.Span.ExitSpan  (ExitSpan)
 import           Instana.SDK.Span.Span      (Span (..), SpanKind (..))
 
@@ -187,6 +190,19 @@ peek (EntryOnly entrySpan) =
   Just $ Entry entrySpan
 peek (EntryAndExit _ exitSpan) =
   Just $ Exit exitSpan
+
+
+{-|Reads the trace ID from the entry span of the stack, if any.
+-}
+readTraceId :: SpanStack -> Maybe Id
+readTraceId None =
+  Nothing
+readTraceId Suppressed =
+  Nothing
+readTraceId (EntryOnly entrySpan) =
+  Just $ EntrySpan.traceId entrySpan
+readTraceId (EntryAndExit entrySpan _) =
+  Just $ EntrySpan.traceId entrySpan
 
 
 {-|Modifies the top element in place by applying the given function to it. This

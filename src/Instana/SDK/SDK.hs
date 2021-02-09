@@ -11,16 +11,18 @@ of the 'withRootEntry', 'withEntry', 'withExit' functions for tracing.
 module Instana.SDK.SDK
     ( Config
     , InstanaContext
+    , addHttpTracingHeaders
     , addRegisteredData
     , addRegisteredDataAt
-    , addHttpTracingHeaders
     , addTag
     , addTagAt
     , addToErrorCount
+    , addWebsiteMonitoringBackEndCorrelation
     , agentHost
     , agentPort
     , completeEntry
     , completeExit
+    , currentTraceId
     , defaultConfig
     , forceTransmissionAfter
     , forceTransmissionStartingAt
@@ -37,6 +39,7 @@ module Instana.SDK.SDK
     , startHttpExit
     , startRootEntry
     , withConfiguredInstana
+    , withCorrelatedHttpEntry
     , withEntry
     , withExit
     , withHttpEntry
@@ -50,6 +53,7 @@ import           Control.Concurrent                  (ThreadId)
 import qualified Control.Concurrent                  as Concurrent
 import           Control.Concurrent.STM              (STM)
 import qualified Control.Concurrent.STM              as STM
+import           Control.Monad                       (join)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Data.Aeson                          (Value, (.=))
 import qualified Data.Aeson                          as Aeson
@@ -75,11 +79,13 @@ import           Instana.SDK.Internal.Config         (FinalConfig)
 import qualified Instana.SDK.Internal.Config         as InternalConfig
 import           Instana.SDK.Internal.Context        (ConnectionState (..), InternalContext (InternalContext))
 import qualified Instana.SDK.Internal.Context        as InternalContext
+import           Instana.SDK.Internal.Id             (Id)
 import qualified Instana.SDK.Internal.Id             as Id
 import           Instana.SDK.Internal.Logging        (instanaLogger)
 import qualified Instana.SDK.Internal.Logging        as Logging
 import qualified Instana.SDK.Internal.Metrics.Sample as Sample
 import qualified Instana.SDK.Internal.Secrets        as Secrets
+import qualified Instana.SDK.Internal.ServerTiming   as ServerTiming
 import           Instana.SDK.Internal.SpanStack      (SpanStack)
 import qualified Instana.SDK.Internal.SpanStack      as SpanStack
 import           Instana.SDK.Internal.Util           ((|>))
@@ -213,7 +219,9 @@ initInstanaInternal conf = do
   return context
 
 
--- |Wraps an IO action in 'startRootEntry' and 'completeEntry'.
+-- |Wraps an IO action in 'startRootEntry' and 'completeEntry'. For incoming
+-- HTTP requests, prefer 'withCorrelatedHttpEntry' or 'withHttpEntry'
+-- instead.
 withRootEntry ::
   MonadIO m =>
   InstanaContext
@@ -227,7 +235,9 @@ withRootEntry context spanType io = do
   return result
 
 
--- |Wraps an IO action in 'startEntry' and 'completeEntry'.
+-- |Wraps an IO action in 'startEntry' and 'completeEntry'. For incoming HTTP
+-- requests, prefer 'withCorrelatedHttpEntry' or 'withHttpEntry'
+-- instead.
 withEntry ::
   MonadIO m =>
   InstanaContext
@@ -247,6 +257,12 @@ withEntry context traceId parentId spanType io = do
 -- headers (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
 -- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
 -- 'completeEntry', depending on the presence or absence of these headers.
+--
+-- It is recommended to use 'withCorrelatedHttpEntry' instead of this
+-- function to also automatically add the HTTP response header for website
+-- monitoring back end correlation. Alternatively you can also call
+-- 'addWebsiteMonitoringBackEndCorrelation' with the WAI Response value before
+-- handing it off to WAI's 'respond' function.
 withHttpEntry ::
   MonadIO m =>
   InstanaContext
@@ -269,6 +285,7 @@ withHttpEntry context request io = do
           withEntry context t s spanType io'
         _                ->
           withRootEntry context spanType io'
+
     TracingHeaders.Suppress -> do
       liftIO $ pushSpan
         context
@@ -282,6 +299,30 @@ withHttpEntry context request io = do
               SpanStack.pushSuppress spanStack
         )
       io
+
+
+-- |A convenience function that examines the given request for Instana tracing
+-- headers (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
+-- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
+-- 'completeEntry', depending on the presence or absence of these headers. It
+-- will also add (or append to) the HTTP response header (Server-Timing) that is
+-- used for website monitoring back end correlation. (The latter part is the
+-- difference to 'withHttpEntry', plus the slightly different type signature.)
+--
+-- This function should be preferred over 'withHttpEntry'.
+withCorrelatedHttpEntry ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Request
+  -> m Wai.Response
+  -> m Wai.Response
+withCorrelatedHttpEntry
+  context
+  request
+  io = do
+    response <- withHttpEntry context request $ do
+      io >>= addWebsiteMonitoringBackEndCorrelation context
+    return response
 
 
 -- |Takes an IO action and appends another side effecto to it that will add HTTP
@@ -459,6 +500,31 @@ startHttpEntry context request = do
             Just spanStack ->
               SpanStack.pushSuppress spanStack
         )
+
+
+-- |Adds an additional HTTP response header (Server-Timing) to the given
+-- response that enables website monitoring back end correlation. In case the
+-- respons already has a Server-Timing header, a value is appended to the
+-- existing Server-Timing list.
+--
+-- Client code should rarely have the need to call this directly. Instead,
+-- capture incoming HTTP requests with 'withCorrelatedHttpEntry', which adds the
+-- response header automatically.
+addWebsiteMonitoringBackEndCorrelation ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Response
+  -> m Wai.Response
+addWebsiteMonitoringBackEndCorrelation context response = do
+  liftIO $ do
+    mt <- currentTraceId context
+    case mt of
+      Nothing -> return response
+      Just t  ->
+        return $
+          Wai.mapResponseHeaders
+          (ServerTiming.addTraceIdToServerTiming t)
+          response
 
 
 -- |Creates a preliminary/incomplete exit span, which should later be completed
@@ -883,41 +949,46 @@ popSpanStm context threadId expectedKind = do
 -- |Yields the currently active span without modifying the span stack.
 peekSpan :: InstanaContext -> IO (Maybe Span)
 peekSpan context = do
-  threadId <- Concurrent.myThreadId
-  STM.atomically $ peekSpanStm context threadId
+  spanMaybe <- readFromSpanStack context SpanStack.peek
+  return $ join spanMaybe
 
 
--- |Yields the currently active span without modifying the span stack.
-peekSpanStm :: InstanaContext -> ThreadId -> STM (Maybe Span)
-peekSpanStm context threadId = do
-  currentSpansPerThread <- STM.readTVar $ InternalContext.currentSpans context
-  let
-    stack = Map.lookup threadId currentSpansPerThread
-  case stack of
-    Nothing ->
-      return Nothing
-    Just s ->
-      return $ SpanStack.peek s
+-- |Retrieves the trace ID the current thread.
+currentTraceId :: InstanaContext -> IO (Maybe Id)
+currentTraceId context = do
+  traceIdMaybe <- readFromSpanStack context SpanStack.readTraceId
+  return $ join traceIdMaybe
 
 
 -- |Checks if tracing is suppressed for the current thread.
 isSuppressed :: InstanaContext -> IO Bool
 isSuppressed context = do
+  suppressedMaybe <- readFromSpanStack context SpanStack.isSuppressed
+  return $ Maybe.fromMaybe False suppressedMaybe
+
+
+-- |Reads a value from the currently active span stack.
+readFromSpanStack :: InstanaContext -> (SpanStack -> a) -> IO (Maybe a)
+readFromSpanStack context accessor = do
   threadId <- Concurrent.myThreadId
-  STM.atomically $ isSuppressedStm context threadId
+  STM.atomically $ readFromSpanStackStm context threadId accessor
 
 
--- |Checks if tracing is suppressed for the current thread.
-isSuppressedStm :: InstanaContext -> ThreadId -> STM Bool
-isSuppressedStm context threadId = do
+-- |Reads a value from the currently active span stack in the given thread.
+readFromSpanStackStm ::
+  InstanaContext
+  -> ThreadId
+  -> (SpanStack -> a)
+  -> STM (Maybe a)
+readFromSpanStackStm context threadId accessor = do
   currentSpansPerThread <- STM.readTVar $ InternalContext.currentSpans context
   let
-    stack = Map.lookup threadId currentSpansPerThread
-  case stack of
+    maybeStack = Map.lookup threadId currentSpansPerThread
+  case maybeStack of
     Nothing ->
-      return False
-    Just s ->
-      return $ SpanStack.isSuppressed s
+      return Nothing
+    Just stack ->
+      return $ Just $ accessor stack
 
 
 -- |Applies the given function to the currently active span, replacing it in
