@@ -8,6 +8,7 @@ import qualified Instana.SDK.Internal.LoggingTest                   as LoggingTe
 import qualified Instana.SDK.Internal.Metrics.CompressionTest       as MetricsCompressionTest
 import qualified Instana.SDK.Internal.Metrics.DeltasTest            as MetricsDeltasTest
 import qualified Instana.SDK.Internal.SecretsTest                   as SecretsTest
+import qualified Instana.SDK.Internal.ServerTimingTest              as ServerTimingTest
 import qualified Instana.SDK.Internal.SpanStackTest                 as SpanStackTest
 import qualified Instana.SDK.Internal.SpanTest                      as SpanTest
 
@@ -27,9 +28,10 @@ allTests =
     , LoggingTest.allTests
     , MetricsCompressionTest.allTests
     , MetricsDeltasTest.allTests
-    , SecretsTest.allTests
-    , SpanTest.allTests
-    , SpanStackTest.allTests
     , SchedFileTest.allTests
+    , SecretsTest.allTests
+    , ServerTimingTest.allTests
+    , SpanStackTest.allTests
+    , SpanTest.allTests
     ]
 

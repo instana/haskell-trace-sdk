@@ -48,6 +48,7 @@ library
     , process
     , random
     , regex-base
+    , regex-compat
     , regex-tdfa
     , retry
     , scientific
@@ -98,6 +99,7 @@ library
       Instana.SDK.Internal.Retry
       Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
+      Instana.SDK.Internal.ServerTiming
       Instana.SDK.Internal.URL
       Instana.SDK.Internal.Util
       Instana.SDK.Internal.Worker
@@ -142,15 +144,17 @@ test-suite instana-haskell-trace-sdk-unit-tests
       -Wall -threaded -rtsopts -with-rtsopts=-N -Wno-missing-home-modules
   build-depends:
       base >=4.7 && <5
-    , bytestring
+    , HUnit
     , aeson
     , aeson-extra
+    , bytestring
     , directory
     , ekg-core
-    , HUnit
+    , http-types
     , hslogger
     , random
     , regex-base
+    , regex-compat
     , regex-tdfa
     , scientific
     , text
@@ -166,6 +170,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.SecretsTest
       Instana.SDK.Internal.SpanStackTest
       Instana.SDK.Internal.SpanTest
+      Instana.SDK.Internal.ServerTimingTest
       -- modules under test
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.AgentConnection.SchedFile
@@ -175,6 +180,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.Metrics.Deltas
       Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
+      Instana.SDK.Internal.ServerTiming
       Instana.SDK.Span.Span
       -- dependencies of modules under test
       Instana.SDK.Config
