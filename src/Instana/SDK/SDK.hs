@@ -32,6 +32,8 @@ module Instana.SDK.SDK
     , maxBufferedSpans
     , readHttpTracingHeaders
     , serviceName
+    , setCorrelationId
+    , setCorrelationType
     , setServiceName
     , startEntry
     , startExit
@@ -283,8 +285,9 @@ withHttpEntry context request io = do
       case (traceId, spanId) of
         (Just t, Just s) ->
           withEntry context t s spanType io'
-        _                ->
-          withRootEntry context spanType io'
+        _                -> do
+          withRootEntry context spanType $
+            addCorrelationTypeAndIdToSpan context tracingHeaders io'
 
     TracingHeaders.Suppress -> do
       liftIO $ pushSpan
@@ -359,6 +362,31 @@ addHttpData context request = do
     )
 
 
+addCorrelationTypeAndIdToSpan ::
+  MonadIO m =>
+  InstanaContext
+  -> TracingHeaders
+  -> m a
+  -> m a
+addCorrelationTypeAndIdToSpan context tracingHeaders ioResult = do
+  let
+    correlationType = TracingHeaders.correlationType tracingHeaders
+    correlationId = TracingHeaders.correlationId tracingHeaders
+  case (correlationType, correlationId) of
+    (Nothing, Nothing) ->
+      ioResult
+    (Just crtp, Nothing) -> do
+      setCorrelationType context (T.pack crtp)
+      ioResult
+    (Nothing, Just crid) -> do
+      setCorrelationId context (T.pack crid)
+      ioResult
+    (Just crtp, Just crid) -> do
+      setCorrelationType context (T.pack crtp)
+      setCorrelationId context (T.pack crid)
+      ioResult
+
+
 -- |Wraps an IO action in 'startExit' and 'completeExit'.
 withExit ::
   MonadIO m =>
@@ -404,12 +432,14 @@ startRootEntry context spanType = do
       newSpan =
         RootEntrySpan $
           RootEntry
-            { RootEntry.spanAndTraceId = traceId
-            , RootEntry.spanName       = SpanType.spanName spanType
-            , RootEntry.timestamp      = timestamp
-            , RootEntry.errorCount     = 0
-            , RootEntry.serviceName    = Nothing
-            , RootEntry.spanData       = SpanType.initialData EntryKind spanType
+            { RootEntry.spanAndTraceId  = traceId
+            , RootEntry.spanName        = SpanType.spanName spanType
+            , RootEntry.timestamp       = timestamp
+            , RootEntry.errorCount      = 0
+            , RootEntry.serviceName     = Nothing
+            , RootEntry.correlationType = Nothing
+            , RootEntry.correlationId   = Nothing
+            , RootEntry.spanData        = SpanType.initialData EntryKind spanType
             }
     pushSpan
       context
@@ -489,6 +519,8 @@ startHttpEntry context request = do
         _                -> do
           startRootEntry context spanType
           addHttpData context request
+          addCorrelationTypeAndIdToSpan context tracingHeaders $ return ()
+
     TracingHeaders.Suppress -> do
       liftIO $ pushSpan
         context
@@ -737,6 +769,22 @@ setServiceName context serviceName_ =
     (\span_ -> Span.setServiceName serviceName_ span_)
 
 
+-- |Set the website monitoring correlation type. This should only be set on
+-- root entry spans. It will be silently ignored for other types of spans.
+setCorrelationType :: MonadIO m => InstanaContext -> Text -> m ()
+setCorrelationType context correlationType_ =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.setCorrelationType correlationType_ span_)
+
+
+-- |Set the website monitoring correlation ID. This should only be set on
+-- root entry spans. It will be silently ignored for other types of spans.
+setCorrelationId :: MonadIO m => InstanaContext -> Text -> m ()
+setCorrelationId context correlationId_ =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.setCorrelationId correlationId_ span_)
+
+
 -- |Adds additional custom tags to the currently active span. Call this
 -- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
 -- inside the IO action given to with withEntry/withExit/withRootEntry.
@@ -831,15 +879,19 @@ readHttpTracingHeaders request =
       headers
       |> List.lookup TracingHeaders.spanIdHeaderName
       |> (<$>) BSC8.unpack
-    level =
+    xInstanaLValue =
       headers
       |> List.lookup TracingHeaders.levelHeaderName
       |> (<$>) BSC8.unpack
+    (level, correlationType, correlationId) =
+      TracingHeaders.parseXInstanaL xInstanaLValue
   in
   TracingHeaders
     { TracingHeaders.traceId = traceId
     , TracingHeaders.spanId = spanId
-    , TracingHeaders.level = TracingHeaders.maybeStringToTracingLevel level
+    , TracingHeaders.level = level
+    , TracingHeaders.correlationType = correlationType
+    , TracingHeaders.correlationId = correlationId
     }
 
 

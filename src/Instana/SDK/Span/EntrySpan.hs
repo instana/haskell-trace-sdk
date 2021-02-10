@@ -5,17 +5,21 @@ Description : An entry span
 -}
 module Instana.SDK.Span.EntrySpan
   ( EntrySpan(..)
-  , traceId
-  , spanId
-  , parentId
-  , spanName
-  , timestamp
-  , errorCount
-  , serviceName
-  , setServiceName
-  , spanData
   , addData
   , addToErrorCount
+  , correlationId
+  , correlationType
+  , errorCount
+  , parentId
+  , serviceName
+  , setCorrelationId
+  , setCorrelationType
+  , setServiceName
+  , spanData
+  , spanId
+  , spanName
+  , timestamp
+  , traceId
   ) where
 
 
@@ -111,6 +115,44 @@ setServiceName serviceName_ entrySpan =
       RootEntrySpan $ RootEntry.setServiceName serviceName_ entry
     NonRootEntrySpan entry ->
       NonRootEntrySpan $ NonRootEntry.setServiceName serviceName_ entry
+
+
+-- |The website monitoring correlation type.
+correlationType :: EntrySpan -> Maybe Text
+correlationType entrySpan =
+  case entrySpan of
+    RootEntrySpan entry -> RootEntry.correlationType entry
+    NonRootEntrySpan _  -> Nothing
+
+
+-- |Set the website monitoring correlation type. This should only be set on
+-- root entry spans. It will be silently ignored for other types of spans.
+setCorrelationType :: Text -> EntrySpan -> EntrySpan
+setCorrelationType correlationType_ entrySpan =
+  case entrySpan of
+    RootEntrySpan entry ->
+      RootEntrySpan $ RootEntry.setCorrelationType correlationType_ entry
+    NonRootEntrySpan _ ->
+      entrySpan
+
+
+-- |The website monitoring correlation ID.
+correlationId :: EntrySpan -> Maybe Text
+correlationId entrySpan =
+  case entrySpan of
+    RootEntrySpan entry -> RootEntry.correlationId entry
+    NonRootEntrySpan _  -> Nothing
+
+
+-- |Set the website monitoring correlation ID. This should only be set on
+-- root entry spans. It will be silently ignored for other types of spans.
+setCorrelationId :: Text -> EntrySpan -> EntrySpan
+setCorrelationId correlationId_ entrySpan =
+  case entrySpan of
+    RootEntrySpan entry ->
+      RootEntrySpan $ RootEntry.setCorrelationId correlationId_ entry
+    NonRootEntrySpan _ ->
+      entrySpan
 
 
 -- |Optional additional span data.

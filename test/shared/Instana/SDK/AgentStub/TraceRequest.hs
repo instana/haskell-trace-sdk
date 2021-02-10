@@ -47,6 +47,8 @@ data Span =
     , d        :: Int          -- duration
     , k        :: Int          -- kind
     , ec       :: Int          -- errorCount
+    , crtp     :: Maybe String -- correlation type
+    , crid     :: Maybe String -- correlation id
     , spanData :: Aeson.Value  -- spanData
     , f        :: Maybe From   -- from
     } deriving (Eq, Show, Generic)
@@ -64,6 +66,8 @@ instance FromJSON Span where
         <*> decodedObject .: "d"
         <*> decodedObject .: "k"
         <*> decodedObject .: "ec"
+        <*> decodedObject .: "crtp"
+        <*> decodedObject .: "crid"
         <*> decodedObject .: "data"
         <*> decodedObject .: "f"
 
@@ -78,6 +82,8 @@ instance ToJSON Span where
     , "d"    .= d sp
     , "k"    .= k sp
     , "ec"   .= ec sp
+    , "crtp" .= crtp sp
+    , "crid" .= crid sp
     , "data" .= spanData sp
     , "f"    .= f sp
     ]

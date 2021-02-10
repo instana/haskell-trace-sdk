@@ -88,16 +88,18 @@ instance ToJSON From where
 -- this type are stored in the spanQueue in Instana.SDK.Internal.Context after
 -- they have been completed.
 data QueuedSpan = QueuedSpan
-  { traceId     :: Id
-  , spanId      :: Id
-  , parentId    :: Maybe Id
-  , spanName    :: Text
-  , timestamp   :: Int
-  , duration    :: Int
-  , kind        :: SpanKind
-  , errorCount  :: Int
-  , serviceName :: Maybe Text
-  , spanData    :: Value
+  { traceId         :: Id
+  , spanId          :: Id
+  , parentId        :: Maybe Id
+  , spanName        :: Text
+  , timestamp       :: Int
+  , duration        :: Int
+  , kind            :: SpanKind
+  , errorCount      :: Int
+  , serviceName     :: Maybe Text
+  , correlationType :: Maybe Text
+  , correlationId   :: Maybe Text
+  , spanData        :: Value
   } deriving (Eq, Generic, Show)
 
 
@@ -138,6 +140,8 @@ instance ToJSON WireSpan where
       , "d"     .= duration span_
       , "k"     .= kind span_
       , "ec"    .= errorCount span_
+      , "crtp"  .= correlationType span_
+      , "crid"  .= correlationId span_
       , "data"  .= spanData_
       , "f"     .= From pid_ agentUuid_
       ]

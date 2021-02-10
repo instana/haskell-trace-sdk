@@ -128,16 +128,18 @@ queueEntrySpan entrySpan context = do
   queueSpan
     context
     QueuedSpan
-      { WireSpan.traceId     = EntrySpan.traceId entrySpan
-      , WireSpan.spanId      = EntrySpan.spanId entrySpan
-      , WireSpan.parentId    = EntrySpan.parentId entrySpan
-      , WireSpan.spanName    = EntrySpan.spanName entrySpan
-      , WireSpan.timestamp   = timestamp
-      , WireSpan.duration    = now - timestamp
-      , WireSpan.kind        = Entry
-      , WireSpan.errorCount  = EntrySpan.errorCount entrySpan
-      , WireSpan.serviceName = EntrySpan.serviceName entrySpan
-      , WireSpan.spanData    = EntrySpan.spanData entrySpan
+      { WireSpan.traceId         = EntrySpan.traceId entrySpan
+      , WireSpan.spanId          = EntrySpan.spanId entrySpan
+      , WireSpan.parentId        = EntrySpan.parentId entrySpan
+      , WireSpan.spanName        = EntrySpan.spanName entrySpan
+      , WireSpan.timestamp       = timestamp
+      , WireSpan.duration        = now - timestamp
+      , WireSpan.kind            = Entry
+      , WireSpan.errorCount      = EntrySpan.errorCount entrySpan
+      , WireSpan.serviceName     = EntrySpan.serviceName entrySpan
+      , WireSpan.correlationType = EntrySpan.correlationType entrySpan
+      , WireSpan.correlationId   = EntrySpan.correlationId entrySpan
+      , WireSpan.spanData        = EntrySpan.spanData entrySpan
       }
 
 
@@ -149,16 +151,18 @@ queueExitSpan exitSpan context = do
   queueSpan
     context
     QueuedSpan
-      { WireSpan.traceId     = EntrySpan.traceId parentSpan
-      , WireSpan.spanId      = ExitSpan.spanId exitSpan
-      , WireSpan.parentId    = Just $ EntrySpan.spanId parentSpan
-      , WireSpan.spanName    = ExitSpan.spanName exitSpan
-      , WireSpan.timestamp   = ExitSpan.timestamp exitSpan
-      , WireSpan.duration    = now - ExitSpan.timestamp exitSpan
-      , WireSpan.kind        = Exit
-      , WireSpan.errorCount  = ExitSpan.errorCount exitSpan
-      , WireSpan.serviceName = ExitSpan.serviceName exitSpan
-      , WireSpan.spanData    = ExitSpan.spanData exitSpan
+      { WireSpan.traceId         = EntrySpan.traceId parentSpan
+      , WireSpan.spanId          = ExitSpan.spanId exitSpan
+      , WireSpan.parentId        = Just $ EntrySpan.spanId parentSpan
+      , WireSpan.spanName        = ExitSpan.spanName exitSpan
+      , WireSpan.timestamp       = ExitSpan.timestamp exitSpan
+      , WireSpan.duration        = now - ExitSpan.timestamp exitSpan
+      , WireSpan.kind            = Exit
+      , WireSpan.errorCount      = ExitSpan.errorCount exitSpan
+      , WireSpan.serviceName     = ExitSpan.serviceName exitSpan
+      , WireSpan.correlationType = Nothing
+      , WireSpan.correlationId   = Nothing
+      , WireSpan.spanData        = ExitSpan.spanData exitSpan
       }
 
 

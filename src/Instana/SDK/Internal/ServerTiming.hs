@@ -10,6 +10,7 @@ module Instana.SDK.Internal.ServerTiming
 
 import qualified Data.ByteString.Char8   as BSC8
 import qualified Network.HTTP.Types      as HTTPTypes
+import           Text.Regex              (Regex)
 import qualified Text.Regex              as Regex
 
 import           Instana.SDK.Internal.Id (Id)
@@ -84,7 +85,7 @@ replaceExistingInTIdMetric traceId existingMetrics headers =
     current = BSC8.unpack existingMetrics
     replaced =
       Regex.subRegex
-        (Regex.mkRegex "intid;desc=[^,]*")
+        replaceExistingRegex
         current
         ("intid;desc=" ++ Id.toString traceId)
     newServerTimingValue = BSC8.pack replaced
@@ -92,4 +93,9 @@ replaceExistingInTIdMetric traceId existingMetrics headers =
       filter (\(k, _) -> k /= "Server-Timing")  headers
   in
   headersWithoutServerTiming ++ [("Server-Timing", newServerTimingValue)]
+
+
+replaceExistingRegex :: Regex
+replaceExistingRegex =
+  Regex.mkRegex "intid;desc=[^,]*"
 

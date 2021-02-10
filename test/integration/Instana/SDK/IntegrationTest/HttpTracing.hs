@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Instana.SDK.IntegrationTest.HttpTracing
   ( shouldCreateRootEntryWithBracketApi
+  , shouldAddWebsiteMonitoringCorrelationWithBracketApi
   , shouldCreateNonRootEntryWithBracketApi
   , shouldSuppressWithBracketApi
   , shouldCreateRootEntryWithLowLevelApi
+  , shouldAddWebsiteMonitoringCorrelationWithLowLevelApi
   , shouldCreateNonRootEntryWithLowLevelApi
   , shouldSuppressWithLowLevelApi
   ) where
@@ -31,7 +33,19 @@ import           Test.HUnit
 shouldCreateRootEntryWithBracketApi :: String -> IO Test
 shouldCreateRootEntryWithBracketApi pid =
   applyLabel "shouldCreateRootEntryWithBracketApi" $
-    runBracketTest pid [] (applyConcat [rootEntryAsserts, bracketAsserts])
+    runBracketTest
+      pid
+      []
+      (applyConcat [rootEntryAsserts, bracketAsserts])
+
+
+shouldAddWebsiteMonitoringCorrelationWithBracketApi :: String -> IO Test
+shouldAddWebsiteMonitoringCorrelationWithBracketApi pid =
+  applyLabel "shouldAddWebsiteMonitoringCorrelationWithBracketApi" $
+    runBracketTest
+      pid
+      [("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")]
+      (applyConcat [rootEntryAsserts, bracketAsserts, correlationAsserts])
 
 
 shouldCreateNonRootEntryWithBracketApi :: String -> IO Test
@@ -54,7 +68,19 @@ shouldSuppressWithBracketApi =
 shouldCreateRootEntryWithLowLevelApi :: String -> IO Test
 shouldCreateRootEntryWithLowLevelApi pid =
   applyLabel "shouldCreateRootEntryWithLowLevelApi" $
-    runLowLevelTest pid [] (applyConcat [rootEntryAsserts, lowLevelAsserts])
+    runLowLevelTest
+      pid
+      []
+      (applyConcat [rootEntryAsserts, lowLevelAsserts])
+
+
+shouldAddWebsiteMonitoringCorrelationWithLowLevelApi :: String -> IO Test
+shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid =
+  applyLabel "shouldAddWebsiteMonitoringCorrelationWithLowLevelApi" $
+    runLowLevelTest
+      pid
+      [("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")]
+      (applyConcat [rootEntryAsserts, lowLevelAsserts, correlationAsserts])
 
 
 shouldCreateNonRootEntryWithLowLevelApi :: String -> IO Test
@@ -209,6 +235,17 @@ commonAsserts entrySpan exitSpan result from serverTimingValue =
       ]
     )
     (TraceRequest.spanData exitSpan)
+  ]
+
+
+correlationAsserts :: Span -> [Assertion]
+correlationAsserts entrySpan =
+  [ assertEqual "entry correlation type"
+      (Just "web")
+      (TraceRequest.crtp entrySpan)
+  , assertEqual "entry correlation ID"
+      (Just "1234567890abcdef")
+      (TraceRequest.crid entrySpan)
   ]
 
 

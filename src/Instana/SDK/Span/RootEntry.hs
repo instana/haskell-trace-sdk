@@ -10,6 +10,8 @@ module Instana.SDK.Span.RootEntry
   , addData
   , addToErrorCount
   , setServiceName
+  , setCorrelationType
+  , setCorrelationId
   ) where
 
 
@@ -26,20 +28,24 @@ data RootEntry =
   RootEntry
     {
       -- |The trace ID and span ID (those are identical for root spans)
-      spanAndTraceId :: Id
+      spanAndTraceId  :: Id
       -- |The span name/type, e.g. a short string like "haskell.wai.server",
       -- "haskell.http.client". For SDK spans this is always "sdk", the actual
       -- name is then in span.data.sdk.name.
-    , spanName       :: Text
+    , spanName        :: Text
       -- |The time the span (and trace) started
-    , timestamp      :: Int
+    , timestamp       :: Int
       -- |The number of errors that occured during processing
-    , errorCount     :: Int
+    , errorCount      :: Int
       -- |An attribute for overriding the name of the service in Instana
-    , serviceName    :: Maybe Text
+    , serviceName     :: Maybe Text
+      -- |The website monitoring correlation type
+    , correlationType :: Maybe Text
+      -- |The website monitoring correlation ID
+    , correlationId   :: Maybe Text
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
-    , spanData       :: Value
+    , spanData        :: Value
     } deriving (Eq, Generic, Show)
 
 
@@ -66,6 +72,18 @@ addToErrorCount increment rootEntry =
 setServiceName :: Text -> RootEntry -> RootEntry
 setServiceName serviceName_ rootEntry =
   rootEntry { serviceName = Just serviceName_ }
+
+
+-- |Set the website monitoring correlation type.
+setCorrelationType :: Text -> RootEntry -> RootEntry
+setCorrelationType correlationType_ rootEntry =
+  rootEntry { correlationType = Just correlationType_ }
+
+
+-- |Set the website monitoring correlation ID.
+setCorrelationId :: Text -> RootEntry -> RootEntry
+setCorrelationId correlationId_ rootEntry =
+  rootEntry { correlationId = Just correlationId_ }
 
 
 -- |Add a value to the span's data section.
