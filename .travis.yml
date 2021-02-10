@@ -1,6 +1,7 @@
 # See https://docs.haskellstack.org/en/stable/travis_ci/
 
-sudo: false
+# Do not choose a language; we provide our own build tools.
+language: generic
 
 # Cache some directories to speed up the next build.
 cache:
@@ -14,22 +15,17 @@ before_install:
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
 - travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-# Configure stack to use the system GHC installation
-- stack config set system-ghc --global true
-- export PATH=/opt/ghc/8.2.2/bin:$PATH
+- stack --version
 
-addons:
-  apt:
-    sources:
-    - hvr-ghc
-    packages:
-    - ghc-8.2.2
+install:
+# Build dependencies
+- stack --no-terminal --install-ghc test --only-dependencies
 
 script:
   # 1) run tests
   # 2) verifies that a source-distribution can be generated
   # 3) verifies that haddock documentation can be generated
-  - date && TEST_LOG_LEVEL=DEBUG stack --no-terminal --skip-ghc-check test
+  - date && TEST_LOG_LEVEL=DEBUG stack --no-terminal test
   - date && stack sdist
   - date && stack haddock --no-haddock-deps
 
