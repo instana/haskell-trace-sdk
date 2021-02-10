@@ -224,12 +224,14 @@ entrySpan =
   Entry $
     RootEntrySpan $
       RootEntry
-        { RootEntry.spanAndTraceId = Id.fromString "traceId"
-        , RootEntry.spanName       = "test.entry"
-        , RootEntry.timestamp      = 1514761200000
-        , RootEntry.serviceName    = Nothing
-        , RootEntry.errorCount     = 0
-        , RootEntry.spanData       = initialData
+        { RootEntry.spanAndTraceId  = Id.fromString "traceId"
+        , RootEntry.spanName        = "test.entry"
+        , RootEntry.timestamp       = 1514761200000
+        , RootEntry.errorCount      = 0
+        , RootEntry.serviceName     = Nothing
+        , RootEntry.correlationType = Nothing
+        , RootEntry.correlationId   = Nothing
+        , RootEntry.spanData        = initialData
         }
 
 

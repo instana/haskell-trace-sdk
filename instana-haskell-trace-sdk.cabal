@@ -49,6 +49,7 @@ library
     , random
     , regex-base
     , regex-compat
+    , regex-pcre
     , regex-tdfa
     , retry
     , scientific
@@ -155,6 +156,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , random
     , regex-base
     , regex-compat
+    , regex-pcre
     , regex-tdfa
     , scientific
     , text
@@ -168,9 +170,10 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.Metrics.CompressionTest
       Instana.SDK.Internal.Metrics.DeltasTest
       Instana.SDK.Internal.SecretsTest
+      Instana.SDK.Internal.ServerTimingTest
       Instana.SDK.Internal.SpanStackTest
       Instana.SDK.Internal.SpanTest
-      Instana.SDK.Internal.ServerTimingTest
+      Instana.SDK.TracingHeadersTest
       -- modules under test
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.AgentConnection.SchedFile
@@ -182,6 +185,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.ServerTiming
       Instana.SDK.Span.Span
+      Instana.SDK.TracingHeaders
       -- dependencies of modules under test
       Instana.SDK.Config
       Instana.SDK.Internal.Metrics.Sample

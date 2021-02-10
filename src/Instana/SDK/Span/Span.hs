@@ -7,21 +7,25 @@ Description : A type for spans (entries, exits or intermediates).
 module Instana.SDK.Span.Span
   ( Span (Entry, Exit)
   , SpanKind (EntryKind, ExitKind, IntermediateKind)
-  , traceId
-  , spanId
-  , spanKind
-  , parentId
-  , spanName
-  , timestamp
-  , errorCount
-  , addToErrorCount
-  , serviceName
-  , setServiceName
-  , spanData
   , addRegisteredData
   , addRegisteredDataAt
   , addTag
   , addTagAt
+  , addToErrorCount
+  , correlationId
+  , correlationType
+  , errorCount
+  , parentId
+  , serviceName
+  , setCorrelationId
+  , setCorrelationType
+  , setServiceName
+  , spanData
+  , spanId
+  , spanKind
+  , spanName
+  , timestamp
+  , traceId
   ) where
 
 
@@ -139,6 +143,44 @@ setServiceName serviceName_ span_ =
       Entry $ EntrySpan.setServiceName serviceName_ entry
     Exit exit ->
       Exit $ ExitSpan.setServiceName serviceName_ exit
+
+
+-- |The website monitoring correlation type.
+correlationType :: Span -> Maybe Text
+correlationType span_ =
+  case span_ of
+    Entry entry -> EntrySpan.correlationType entry
+    Exit _      -> Nothing
+
+
+-- |Set the website monitoring correlation type. This should only be set on
+-- root entry spans. It will be silently ignored for other types of spans.
+setCorrelationType :: Text -> Span -> Span
+setCorrelationType correlationType_ span_ =
+  case span_ of
+    Entry entry ->
+      Entry $ EntrySpan.setCorrelationType correlationType_ entry
+    Exit _ ->
+      span_
+
+
+-- |The website monitoring correlation ID.
+correlationId :: Span -> Maybe Text
+correlationId span_ =
+  case span_ of
+    Entry entry -> EntrySpan.correlationId entry
+    Exit _      -> Nothing
+
+
+-- |Set the website monitoring correlation ID. This should only be set on
+-- root entry spans. It will be silently ignored for other types of spans.
+setCorrelationId :: Text -> Span -> Span
+setCorrelationId correlationId_ span_ =
+  case span_ of
+    Entry entry ->
+      Entry $ EntrySpan.setCorrelationId correlationId_ entry
+    Exit _ ->
+      span_
 
 
 -- |Optional additional span data.

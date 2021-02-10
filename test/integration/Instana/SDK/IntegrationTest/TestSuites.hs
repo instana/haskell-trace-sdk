@@ -125,8 +125,10 @@ testHttpTracing =
       , Suite.tests = (\pid -> [
           HttpTracing.shouldCreateRootEntryWithBracketApi pid
         , HttpTracing.shouldCreateNonRootEntryWithBracketApi pid
+        , HttpTracing.shouldAddWebsiteMonitoringCorrelationWithBracketApi pid
         , HttpTracing.shouldSuppressWithBracketApi
         , HttpTracing.shouldCreateRootEntryWithLowLevelApi pid
+        , HttpTracing.shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid
         , HttpTracing.shouldCreateNonRootEntryWithLowLevelApi pid
         , HttpTracing.shouldSuppressWithLowLevelApi
         ])
@@ -142,6 +144,7 @@ testWaiMiddleware =
       , Suite.tests = (\pid -> [
           WaiMiddleware.shouldCreateRootEntry pid
         , WaiMiddleware.shouldCreateNonRootEntry pid
+        , WaiMiddleware.shouldAddWebsiteMonitoringCorrelation pid
         , WaiMiddleware.shouldSuppress
         ])
       , Suite.options =

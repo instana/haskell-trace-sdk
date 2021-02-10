@@ -2,6 +2,7 @@
 module Instana.SDK.IntegrationTest.WaiMiddleware
   ( shouldCreateRootEntry
   , shouldCreateNonRootEntry
+  , shouldAddWebsiteMonitoringCorrelation
   , shouldSuppress
   ) where
 
@@ -40,6 +41,15 @@ shouldCreateNonRootEntry pid =
       , ("X-INSTANA-S", "test-span-id")
       ]
       (applyConcat [nonRootEntryAsserts, asserts])
+
+
+shouldAddWebsiteMonitoringCorrelation :: String -> IO Test
+shouldAddWebsiteMonitoringCorrelation pid =
+  applyLabel "shouldAddWebsiteMonitoringCorrelation" $
+    runMiddlewareTest
+      pid
+      [("X-INSTANA-L", "   1 ,   correlationType = web ;  correlationId =  1234567890abcdef  ")]
+      (applyConcat [rootEntryAsserts, asserts, correlationAsserts])
 
 
 shouldSuppress :: IO Test
@@ -195,6 +205,17 @@ asserts entrySpan =
       ]
     )
     (TraceRequest.spanData entrySpan)
+  ]
+
+
+correlationAsserts :: Span -> [Assertion]
+correlationAsserts entrySpan =
+  [ assertEqual "entry correlation type"
+      (Just "web")
+      (TraceRequest.crtp entrySpan)
+  , assertEqual "entry correlation ID"
+      (Just "1234567890abcdef")
+      (TraceRequest.crid entrySpan)
   ]
 
 

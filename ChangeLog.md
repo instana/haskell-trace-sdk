@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Add support for website monitoring back end correlation via Server-Timing.
+- Add support for website monitoring back end correlation via X-INSTANA-L/correlationType/correlationId.
 
 ## 0.4.0.0
 - Accomodate for breaking changes in `network-3.0.0.0`.
