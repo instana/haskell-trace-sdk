@@ -255,8 +255,9 @@ withEntry context traceId parentId spanType io = do
   return result
 
 
--- |A convenience function that examines the given request for Instana tracing
--- headers (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
+-- |A convenience function that examines the given incoming HTTP request for
+-- Instana tracing headers
+-- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
 -- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
 -- 'completeEntry', depending on the presence or absence of these headers.
 --
@@ -265,6 +266,9 @@ withEntry context traceId parentId spanType io = do
 -- monitoring back end correlation. Alternatively you can also call
 -- 'addWebsiteMonitoringBackEndCorrelation' with the WAI Response value before
 -- handing it off to WAI's 'respond' function.
+--
+-- You do not need to handle incoming HTTP requests at all when using the
+-- Instana WAI middleware plug-in.
 withHttpEntry ::
   MonadIO m =>
   InstanaContext
@@ -304,8 +308,9 @@ withHttpEntry context request io = do
       io
 
 
--- |A convenience function that examines the given request for Instana tracing
--- headers (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
+-- |A convenience function that examines the given incoming HTTP request for
+-- Instana tracing headers
+-- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
 -- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
 -- 'completeEntry', depending on the presence or absence of these headers. It
 -- will also add (or append to) the HTTP response header (Server-Timing) that is
@@ -313,6 +318,9 @@ withHttpEntry context request io = do
 -- difference to 'withHttpEntry', plus the slightly different type signature.)
 --
 -- This function should be preferred over 'withHttpEntry'.
+--
+-- You do not need to handle incoming HTTP requests at all when using the
+-- Instana WAI middleware plug-in.
 withCorrelatedHttpEntry ::
   MonadIO m =>
   InstanaContext
@@ -534,9 +542,9 @@ startHttpEntry context request = do
         )
 
 
--- |Adds an additional HTTP response header (Server-Timing) to the given
+-- |Adds an additional HTTP response header (Server-Timing) to the given HTTP
 -- response that enables website monitoring back end correlation. In case the
--- respons already has a Server-Timing header, a value is appended to the
+-- response already has a Server-Timing header, a value is appended to the
 -- existing Server-Timing list.
 --
 -- Client code should rarely have the need to call this directly. Instead,

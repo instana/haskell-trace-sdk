@@ -125,6 +125,8 @@ runApp instana = do
 
 You can let the SDK automatically create entry spans for all incoming HTTP requests in a WAI application by using it as a WAI middleware plug-in. Note that exit spans still need to be created manually via the `withHttpExit` or `startHttpExit`/`completeExit` functions (see below).
 
+The middleware plug-in will also add an additional HTTP response header (`Server-Timing`) to HTTP responses. This header enables website monitoring back end correlation.
+
 ```
 import qualified Instana.Wai.Middleware.Entry as InstanaWaiMiddleware
 
@@ -138,9 +140,11 @@ All functions starting with `with` accept (among other parameters) an IO action.
 
 * `withRootEntry`: Creates an entry span that is the root of a trace (it has no parent span).
 * `withEntry`: Creates an entry span that has a parent span.
-* `withHttpEntry`: A convenience function that examines an HTTP request for Instana tracing headers and creates an entry span. It will automatically add the correct metadata to the span. You do not need to handle incoming HTTP requests at all when using the Instana WAI middleware plug-in (see above).
+* `withCorrelatedHttpEntry`: A convenience function that examines an incoming HTTP request for Instana tracing headers and creates an entry span. It will automatically add the correct metadata to the span. It will also add (or append to) the HTTP response header (`Server-Timing`) that is used for website monitoring back end correlation. (The latter part is the difference to `withHttpEntry`, plus the slightly different type signature.) This function should be preferred over `withHttpEntry`. You do not need to handle incoming HTTP requests at all when using the Instana WAI middleware plug-in (see above).
+* `withHttpEntry`: A convenience function that examines an incoming HTTP request for Instana tracing headers and creates an entry span. It will automatically add the correct metadata to the span. It is recommended to use `withCorrelatedHttpEntry` instead of this function to also automatically add the HTTP response header for website monitoring back end correlation. Alternatively you can also call `addWebsiteMonitoringBackEndCorrelation` with the WAI Response value before handing it off to WAI's `respond` function. You do not need to handle incoming HTTP requests at all when using the Instana WAI middleware plug-in (see above).
 * `withExit`: Creates an exit span. This can only be called inside a `withRootEntry` or an `withEntry` call, as an exit span needs an entry span as its parent.
 * `withHttpExit`: Creates an exit span for a given HTTP client request. It will automatically add the correct metadata to the span so it should be preferred to `withExit` when tracing outgoing HTTP requests. It will also add HTTP headers to the request to propagate the trace context downstream.
+* `addWebsiteMonitoringBackEndCorrelation`: Adds an additional HTTP response header (`Server-Timing`) to the given HTTP response. This header enables website monitoring back end correlation. In case the response already has a Server-Timing header, a value is appended to the existing Server-Timing list. Client code should rarely have the need to call this directly. Instead, capture incoming HTTP requests with 'withCorrelatedHttpEntry', which adds the response header automatically.
 
 #### Low Level API/Explicit Start And Complete
 
