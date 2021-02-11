@@ -1,6 +1,6 @@
 # Changelog for instana-haskell-trace-sdk
 
-## Unreleased
+## 0.5.0.0
 - Add support for website monitoring back end correlation via Server-Timing.
 - Add support for website monitoring back end correlation via X-INSTANA-L/correlationType/correlationId.
 

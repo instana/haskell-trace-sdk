@@ -51,7 +51,7 @@ shouldReportMetrics pid =
               (EntityDataRequest.arguments entityData)
           , assertLabelIs
               "sensorVersion"
-              "0.4.0.0"
+              "0.5.0.0"
               (EntityDataRequest.sensorVersion entityData)
           , assertCounterSatisfies
               "startTime"

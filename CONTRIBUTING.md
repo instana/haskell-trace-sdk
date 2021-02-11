@@ -65,6 +65,7 @@ Publishing a New Release
     * `instana-haskell-trace-sdk.cabal`
     * `package.yaml`
     * `test/integration/Instana/SDK/IntegrationTest/Metrics.hs` (assertion for `sensorVersion`)
+    * `CHANGELOG.md` (update/add entry)
 * Commit and push this change with a commit comment like `chore: version a.b.c.d`
 * Build the package with stack and upload it to Hackage:
     * `stack haddock && stack sdist && stack upload .`
