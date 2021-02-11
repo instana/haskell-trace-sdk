@@ -1,4 +1,5 @@
-# Instana Haskell Trace SDK &nbsp; [![Build Status](https://travis-ci.org/instana/haskell-trace-sdk.svg?branch=main)](https://travis-ci.org/instana/haskell-trace-sdk)
+# Instana Haskell Trace SDK &nbsp; [![Build Status](https://circleci.com/gh/instana/haskell-trace-sdk.svg?style=svg)](https://circleci.com/gh/instana/haskell-trace-sdk)
+
 
 Monitor your Haskell application with [Instana](https://www.instana.com/)! 🎉
 
