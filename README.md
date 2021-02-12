@@ -32,6 +32,8 @@ Depending on the stack resolver you use, you might also need to add `aeson-extra
 Usage
 -----
 
+<i>Example app: Take a look at the [Monad Shop](https://github.com/instana/monad-shop) To see the Instana Haskell Trace SDK in action.</i>
+
 ### Initialization
 
 Before using the SDK, you need to initialize it once, usually during application startup.
