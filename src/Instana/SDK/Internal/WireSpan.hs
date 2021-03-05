@@ -136,7 +136,6 @@ instance ToJSON WireSpan where
       , "p"     .= parentId span_
       , "n"     .= spanName span_
       , "ts"    .= timestamp span_
-      , "ta"    .= ("haskell" :: String)
       , "d"     .= duration span_
       , "k"     .= kind span_
       , "ec"    .= errorCount span_

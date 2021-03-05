@@ -7,6 +7,7 @@
     - `currentTraceId` (provides the trace ID of the currently active trace),
     - `currentSpanId` (provides the span ID of the currently active span), and
     - `currentParentId` (provides the parent ID of the currently active span).
+- Remove deprecated attribute `span.ta`.
 
 ## 0.5.0.1
 - No changes, only documentation updates.
