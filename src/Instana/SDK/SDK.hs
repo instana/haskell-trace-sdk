@@ -22,13 +22,18 @@ module Instana.SDK.SDK
     , agentPort
     , completeEntry
     , completeExit
+    , currentSpan
+    , currentParentId
+    , currentSpanId
     , currentTraceId
+    , currentTraceIdInternal
     , defaultConfig
     , forceTransmissionAfter
     , forceTransmissionStartingAt
     , incrementErrorCount
     , initConfiguredInstana
     , initInstana
+    , isConnected
     , maxBufferedSpans
     , readHttpTracingHeaders
     , serviceName
@@ -100,6 +105,8 @@ import           Instana.SDK.Span.NonRootEntry       (NonRootEntry (NonRootEntry
 import qualified Instana.SDK.Span.NonRootEntry       as NonRootEntry
 import           Instana.SDK.Span.RootEntry          (RootEntry (RootEntry))
 import qualified Instana.SDK.Span.RootEntry          as RootEntry
+import           Instana.SDK.Span.SimpleSpan         (SimpleSpan)
+import qualified Instana.SDK.Span.SimpleSpan         as SimpleSpan
 import           Instana.SDK.Span.Span               (Span (..), SpanKind (..))
 import qualified Instana.SDK.Span.Span               as Span
 import           Instana.SDK.Span.SpanType           (SpanType (RegisteredSpan))
@@ -557,7 +564,7 @@ addWebsiteMonitoringBackEndCorrelation ::
   -> m Wai.Response
 addWebsiteMonitoringBackEndCorrelation context response = do
   liftIO $ do
-    mt <- currentTraceId context
+    mt <- currentTraceIdInternal context
     case mt of
       Nothing -> return response
       Just t  ->
@@ -1013,11 +1020,59 @@ peekSpan context = do
   return $ join spanMaybe
 
 
--- |Retrieves the trace ID the current thread.
-currentTraceId :: InstanaContext -> IO (Maybe Id)
+-- |Checks whether the SDK has a connection to an Instana agent.
+isConnected :: InstanaContext -> IO Bool
+isConnected =
+  InternalContext.isAgentConnectionEstablished
+
+
+-- |Provides the currently active span in a simple format fit for external use.
+currentSpan :: InstanaContext -> IO (Maybe SimpleSpan)
+currentSpan context = do
+  span_ <- peekSpan context
+  return $ SimpleSpan.convert <$> span_
+
+
+-- |Retrieves the trace ID of the currently active trace in the current thread.
+currentTraceId :: InstanaContext -> IO (Maybe String)
 currentTraceId context = do
+  traceIdMaybe <- currentTraceIdInternal context
+  return $ Id.toString <$> traceIdMaybe
+
+
+-- |Retrieves the trace ID of the currently active trace in the current thread.
+currentTraceIdInternal :: InstanaContext -> IO (Maybe Id)
+currentTraceIdInternal context = do
   traceIdMaybe <- readFromSpanStack context SpanStack.readTraceId
   return $ join traceIdMaybe
+
+
+-- |Retrieves the span ID of the currently active span in the current thread.
+currentSpanId :: InstanaContext -> IO (Maybe String)
+currentSpanId context = do
+  spanIdMaybe <- currentSpanIdInternal context
+  return $ Id.toString <$> spanIdMaybe
+
+
+-- |Retrieves the span ID of the currently active span in the current thread.
+currentSpanIdInternal :: InstanaContext -> IO (Maybe Id)
+currentSpanIdInternal context = do
+  span_ <- peekSpan context
+  return $ Span.spanId <$> span_
+
+
+-- |Retrieves the parent ID of the currently active span in the current thread.
+currentParentId :: InstanaContext -> IO (Maybe String)
+currentParentId context = do
+  parentIdMaybe <- currentParentIdInternal context
+  return $ Id.toString <$> parentIdMaybe
+
+
+-- |Retrieves the parent ID of the currently active span in the current thread.
+currentParentIdInternal :: InstanaContext -> IO (Maybe Id)
+currentParentIdInternal context = do
+  span_ <- peekSpan context
+  return $ join $ Span.parentId <$> span_
 
 
 -- |Checks if tracing is suppressed for the current thread.

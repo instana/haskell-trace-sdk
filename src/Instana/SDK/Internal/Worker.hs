@@ -306,7 +306,11 @@ sendSpansToAgent context spans agentConnection _ = do
             _ ->
               0
       if statusCode == 404
-        then
+        then do
+          warningM instanaLogger $
+            "Received HTTP 404 when sending spans to " ++
+            show traceEndpointUrl ++
+            ", resetting connection state to unconnected."
           resetToUnconnected context
         else do
           debugM instanaLogger $ show e
@@ -430,7 +434,11 @@ collectAndSendMetrics context agentConnection metricsStore = do
             _ ->
               0
       if statusCode == 404
-        then
+        then do
+          warningM instanaLogger $
+            "Received HTTP 404 when sending metrics to " ++
+            show metricsEndpointUrl ++
+            ", resetting connection state to unconnected."
           resetToUnconnected context
         else do
           debugM instanaLogger $ show e

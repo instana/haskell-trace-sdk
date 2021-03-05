@@ -1,5 +1,16 @@
 # Changelog for instana-haskell-trace-sdk
 
+## Unreleased
+- Breaking: Rename `Instana.SDK.SDK.currentTraceId` (with return type `Instana.SDK.Internal.Id.Id`) to `currentTraceIdInternal`. The function `Instana.SDK.SDK.currentTraceId` returns type `String` now.
+- Provide new convenience accessors `Instana.SDK.SDK`:
+    - `currentSpan` (provides the currently active span in a simplified format),
+    - `currentTraceId` (provides the trace ID of the currently active trace),
+    - `currentSpanId` (provides the span ID of the currently active span), and
+    - `currentParentId` (provides the parent ID of the currently active span).
+
+## 0.5.0.1
+- No changes, only documentation updates.
+
 ## 0.5.0.0
 - Add support for website monitoring back end correlation via Server-Timing.
 - Add support for website monitoring back end correlation via X-INSTANA-L/correlationType/correlationId.

@@ -23,6 +23,7 @@ import           Data.Aeson            (FromJSON, ToJSON, Value)
 import qualified Data.Aeson            as Aeson
 import           Data.Aeson.Types      (Parser)
 import qualified Data.ByteString.Char8 as BSC8
+import qualified Data.String           (IsString (..))
 import           Data.Text             (Text)
 import qualified Data.Text             as T
 import           GHC.Generics
@@ -51,6 +52,10 @@ instance ToJSON Id where
   toJSON :: Id -> Value
   toJSON =
     Aeson.String . toText
+
+
+instance Data.String.IsString Id where
+  fromString = fromString
 
 
 appendAsHex :: Int -> String -> Int -> String
@@ -90,11 +95,6 @@ bitsPerInt =
   floor $ logBase (2 :: Double) $ fromIntegral (maxBound :: Int)
 
 
--- |Converts a string into an ID.
-fromString :: String -> Id
-fromString = IdString
-
-
 -- |Converts an ID into a String
 toString :: Id -> String
 toString theId =
@@ -109,6 +109,10 @@ toString theId =
         (reverse intComponents)
     IdString string ->
       string
+
+--- |Converts a string into an ID.
+fromString :: String -> Id
+fromString = IdString
 
 
 -- |Converts an ID into a Text
