@@ -112,6 +112,10 @@ establishAgentConnection ::
 establishAgentConnection context processInfo = do
   currentState <- STM.atomically $
     STM.readTVar (InternalContext.connectionState context)
+
+  -- debugM instanaLogger $
+  --   "Checking agent connection, current state is " ++ show currentState
+
   -- Do nothing if a connection attempt is already in progress or connection has
   -- already been established.
   if currentState /= Unconnected
@@ -121,7 +125,8 @@ establishAgentConnection context processInfo = do
       STM.atomically $ STM.writeTVar
         (InternalContext.connectionState context)
         AgentHostLookup
-      debugM instanaLogger $ "agent connection is not up, attempting reconnect"
+      debugM instanaLogger $
+        "Agent connection is not up, attempting (re)connect"
       -- Initial status: Unconnected
       -- step 1: do agent host looup (retry forever until an agent has
       --         been found)

@@ -16,7 +16,7 @@ import           Network.Wai                       (Middleware, Response)
 import qualified Network.Wai                       as Wai
 
 import           Instana.SDK.SDK                   (InstanaContext,
-                                                    currentTraceId,
+                                                    currentTraceIdInternal,
                                                     withHttpEntry)
 
 
@@ -28,7 +28,7 @@ back end correlation.
 traceHttpEntries :: InstanaContext -> Middleware
 traceHttpEntries instana app request respond = do
   withHttpEntry instana request $ do
-    traceIdMaybe <- currentTraceId instana
+    traceIdMaybe <- currentTraceIdInternal instana
     case traceIdMaybe of
       Just traceId ->
         app request $ respond . addHeader traceId

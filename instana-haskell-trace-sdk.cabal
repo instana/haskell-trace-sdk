@@ -15,9 +15,10 @@ stability:      experimental
 cabal-version:  >= 1.10
 
 extra-source-files:
-  ChangeLog.md
+  CHANGELOG.md
   README.md
   CONTRIBUTING.md
+  LICENSE
 
 source-repository head
   type: git
@@ -73,6 +74,7 @@ library
       Instana.SDK.Span.ExitSpan
       Instana.SDK.Span.NonRootEntry
       Instana.SDK.Span.RootEntry
+      Instana.SDK.Span.SimpleSpan
       Instana.SDK.Span.Span
       Instana.SDK.Span.SpanType
       Instana.SDK.TracingHeaders
@@ -184,6 +186,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.Secrets
       Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.ServerTiming
+      Instana.SDK.Span.SimpleSpan
       Instana.SDK.Span.Span
       Instana.SDK.TracingHeaders
       -- dependencies of modules under test

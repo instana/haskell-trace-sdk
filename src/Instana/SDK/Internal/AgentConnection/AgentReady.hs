@@ -131,8 +131,7 @@ waitForAgent
       STM.atomically $
         STM.writeTVar (InternalContext.connectionState context) state
       infoM instanaLogger $
-        "🎉 agent connection established for process " ++ pidTranslationStr ++
-        " 🎉"
+        "Agent connection established for process " ++ pidTranslationStr
       return ()
   else do
     warningM instanaLogger $

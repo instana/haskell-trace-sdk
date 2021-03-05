@@ -3,16 +3,17 @@
 module Instana.SDK.Internal.SpanTest (allTests) where
 
 
-import           Data.Aeson                 (Value, (.=))
-import qualified Data.Aeson                 as Aeson
+import           Data.Aeson                  (Value, (.=))
+import qualified Data.Aeson                  as Aeson
 import           Test.HUnit
 
-import qualified Instana.SDK.Internal.Id    as Id
-import           Instana.SDK.Span.EntrySpan (EntrySpan (RootEntrySpan))
-import           Instana.SDK.Span.RootEntry (RootEntry (RootEntry))
-import qualified Instana.SDK.Span.RootEntry as RootEntry
-import           Instana.SDK.Span.Span      (Span (..))
-import qualified Instana.SDK.Span.Span      as Span
+import qualified Instana.SDK.Internal.Id     as Id
+import           Instana.SDK.Span.EntrySpan  (EntrySpan (RootEntrySpan))
+import           Instana.SDK.Span.RootEntry  (RootEntry (RootEntry))
+import qualified Instana.SDK.Span.RootEntry  as RootEntry
+import qualified Instana.SDK.Span.SimpleSpan as SimpleSpan
+import           Instana.SDK.Span.Span       (Span (..), SpanKind (..))
+import qualified Instana.SDK.Span.Span       as Span
 
 
 allTests :: Test
@@ -26,6 +27,7 @@ allTests =
     , TestLabel "shouldAddBooleanDeeplyNested" shouldAddBooleanDeeplyNested
     , TestLabel "shouldAddMultipleRegistered" shouldAddMultipleRegistered
     , TestLabel "shouldAddMultipleTags" shouldAddMultipleTags
+    , TestLabel "shouldConvertToSimpleSpanFormat" shouldConvertToSimpleSpanFormat
     ]
 
 
@@ -216,6 +218,43 @@ shouldAddMultipleTags =
           ])
         ]
       )
+      spanData
+
+
+shouldConvertToSimpleSpanFormat :: Test
+shouldConvertToSimpleSpanFormat =
+  let
+    span_ =
+      Span.addRegisteredDataAt "really.deeply.nested.path" True $ entrySpan
+    simple = SimpleSpan.convert span_
+    traceId = SimpleSpan.traceId simple
+    spanId = SimpleSpan.spanId simple
+    parentId = SimpleSpan.parentId simple
+    spanName = SimpleSpan.spanName simple
+    timestamp = SimpleSpan.timestamp simple
+    kind = SimpleSpan.kind simple
+    errorCount = SimpleSpan.errorCount simple
+    spanData = SimpleSpan.spanData simple
+  in
+  TestCase $ do
+    assertEqual "traceId" "traceId" traceId
+    assertEqual "spanId" "traceId" spanId
+    assertEqual "parentId" Nothing parentId
+    assertEqual "spanName" "test.entry" spanName
+    assertEqual "timestamp" 1514761200000 timestamp
+    assertEqual "kind" EntryKind kind
+    assertEqual "errorCount" 0 errorCount
+    assertEqual
+      "spanData"
+      (Aeson.object [
+        "really" .= (Aeson.object [
+          "deeply" .= (Aeson.object [
+            "nested" .= (Aeson.object [
+              "path" .= True
+            ])
+          ])
+        ])
+      ])
       spanData
 
 
