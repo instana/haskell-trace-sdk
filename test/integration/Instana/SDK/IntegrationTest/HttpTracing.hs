@@ -23,6 +23,7 @@ import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel, applyLabel,
                                                          assertAllIO, failIO)
+import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import qualified Network.HTTP.Client                    as HTTP
 import           Network.HTTP.Types                     (Header)
@@ -113,9 +114,9 @@ runLowLevelTest pid headers extraAsserts =
 runTest :: String -> String -> [Header] -> (Span -> [Assertion]) -> IO Test
 runTest pid urlPath headers extraAsserts = do
   response <-
-    HttpHelper.doAppRequest urlPath "GET" headers
+    HttpHelper.doAppRequest Suite.testServer urlPath "GET" headers
   let
-    result = LBSC8.unpack $ HTTP.responseBody response
+    responseBody = LBSC8.unpack $ HTTP.responseBody response
     from = Just $ From pid "agent-stub-id"
     responseHeaders = HTTP.responseHeaders response
     serverTimingTuple :: Maybe (Network.HTTP.Types.Header.HeaderName, BSC8.ByteString)
@@ -146,16 +147,20 @@ runTest pid urlPath headers extraAsserts = do
             Just entrySpan = maybeEntrySpan
             Just exitSpan = maybeExitSpan
           assertAllIO $
-            (commonAsserts entrySpan exitSpan result from serverTimingValue) ++
+            (commonAsserts entrySpan exitSpan responseBody from serverTimingValue) ++
             (extraAsserts entrySpan)
 
 
 runSuppressedTest :: String -> IO Test
 runSuppressedTest urlPath = do
   response <-
-    HttpHelper.doAppRequest urlPath "GET" [("X-INSTANA-L", "0")]
+    HttpHelper.doAppRequest
+      Suite.testServer
+      urlPath
+      "GET"
+      [("X-INSTANA-L", "0")]
   let
-    result = LBSC8.unpack $ HTTP.responseBody response
+    responseBody = LBSC8.unpack $ HTTP.responseBody response
   -- wait a second, then check that no spans have been recorded
   threadDelay $ 10 * 1000
   spansResults <-
@@ -227,7 +232,7 @@ commonAsserts entrySpan exitSpan result from serverTimingValue =
     ( Aeson.object
       [ "http" .= (Aeson.object
           [ "method" .= ("GET" :: String)
-          , "url"    .= ("http://127.0.0.1:1302/" :: String)
+          , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
           , "params" .= ("some=query&parameters=2" :: String)
           , "status" .= (200 :: Int)
           ]

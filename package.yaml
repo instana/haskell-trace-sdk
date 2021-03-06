@@ -8,7 +8,9 @@ copyright:           "Bastian Krol 2018"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
+- CHANGELOG.md
+- CONTRIBUTING.md
+- LICENSE
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package

@@ -342,3 +342,29 @@ executable instana-haskell-test-wai-with-middleware-server
     , warp
   default-language: Haskell2010
 
+executable downstream-target
+  -- scope: private
+  main-is: Main.hs
+  hs-source-dirs:
+      test/apps/downstream-target
+  if flag(dev)
+    ghc-options:
+      -Wall -Werror -threaded -rtsopts "-with-rtsopts=-T -N "
+  else
+    ghc-options:
+      -Wall -threaded -rtsopts "-with-rtsopts=-T -N "
+  build-depends:
+      base >=4.7 && <5
+    , aeson
+    , binary
+    , bytestring
+    , case-insensitive
+    , containers
+    , hslogger
+    , http-client
+    , http-types
+    , unix
+    , wai
+    , warp
+  default-language: Haskell2010
+

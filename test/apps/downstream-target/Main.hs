@@ -2,38 +2,38 @@
 module Main where
 
 
-import           Control.Concurrent           (threadDelay)
-import           Control.Monad.IO.Class       (liftIO)
-import qualified Data.Binary.Builder          as Builder
-import qualified Data.ByteString.Lazy.Char8   as LBSC8
-import           Instana.SDK.SDK              (InstanaContext)
-import qualified Instana.SDK.SDK              as InstanaSDK
-import qualified Instana.Wai.Middleware.Entry as InstanaWaiMiddleware
-import qualified Network.HTTP.Client          as HTTP
-import qualified Network.HTTP.Types           as HTTPTypes
-import qualified Network.Wai                  as Wai
-import qualified Network.Wai.Handler.Warp     as Warp
-import           System.Environment           (lookupEnv)
-import qualified System.Exit                  as Exit
-import           System.IO                    (Handle, stdout)
+import           Control.Monad.IO.Class     (liftIO)
+import qualified Data.Aeson                 as Aeson
+import qualified Data.Binary.Builder        as Builder
+import qualified Data.ByteString.Char8      as BSC8
+import qualified Data.ByteString.Lazy.Char8 as LBSC8
+import qualified Data.CaseInsensitive       as CaseInsensitive
+import qualified Data.Map                   as Map
+import qualified Network.HTTP.Client        as HTTP
+import qualified Network.HTTP.Types         as HTTPTypes
+import qualified Network.Wai                as Wai
+import qualified Network.Wai.Handler.Warp   as Warp
+import           System.Environment         (lookupEnv)
+import qualified System.Exit                as Exit
+import           System.IO                  (Handle, stdout)
 import           System.Log.Formatter
-import           System.Log.Handler           (setFormatter)
-import           System.Log.Handler.Simple    (GenericHandler, fileHandler,
-                                               streamHandler)
-import           System.Log.Logger            (Priority (..), rootLoggerName,
-                                               setHandlers, setLevel,
-                                               updateGlobalLogger)
-import           System.Log.Logger            (infoM)
-import qualified System.Posix.Process         as Posix
-import           System.Posix.Types           (CPid)
+import           System.Log.Handler         (setFormatter)
+import           System.Log.Handler.Simple  (GenericHandler, fileHandler,
+                                             streamHandler)
+import           System.Log.Logger          (Priority (..), rootLoggerName,
+                                             setHandlers, setLevel,
+                                             updateGlobalLogger)
+import           System.Log.Logger          (infoM)
+import qualified System.Posix.Process       as Posix
+import           System.Posix.Types         (CPid)
 
 
 appLogger :: String
-appLogger = "WaiWithMiddleware"
+appLogger = "DownstreamTarget"
 
 
-application :: InstanaContext -> HTTP.Manager -> CPid -> Wai.Application
-application instana httpManager pid request respond = do
+application :: CPid -> Wai.Application
+application pid request respond = do
   let
     route = Wai.pathInfo request
     method = Wai.requestMethod request
@@ -42,8 +42,8 @@ application instana httpManager pid request respond = do
       root respond
     (_, ["ping"]) ->
       ping respond pid
-    ("GET", ["api"]) ->
-      apiUnderTest instana httpManager request respond
+    (_, ["echo"]) ->
+      echoHeaders request respond
     ("POST", ["shutdown"]) ->
       shutDown respond
     _ ->
@@ -56,7 +56,7 @@ root ::
 root respond =
   respondWithPlainText
     respond
-    "Instana Haskell Trace SDK Integration Test Wai Dummy App"
+    "Downstream Target"
 
 
 ping ::
@@ -68,35 +68,36 @@ ping respond pid = do
     Wai.responseLBS HTTPTypes.status200 [] $ LBSC8.pack $ show pid
 
 
-apiUnderTest ::
-  InstanaContext
-  -> HTTP.Manager
-  -> Wai.Request
+echoHeaders ::
+  Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-apiUnderTest instana httpManager _ respond = do
-  requestOut <-
-    HTTP.parseUrlThrow $
-      "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
-  _ <- InstanaSDK.withHttpExit
-    instana
-    requestOut
-    (\req -> do
-      _ <- HTTP.httpLbs req httpManager
-      threadDelay $ 1000 -- make sure there is a duration > 0
-    )
+echoHeaders request respond = do
+  let
+    headers :: [(HTTPTypes.HeaderName, BSC8.ByteString)]
+    headers = Wai.requestHeaders request
+    mapped :: [(String, String)]
+    mapped =
+      map (
+        \(headerName, value) ->
+          (
+            BSC8.unpack $ CaseInsensitive.original headerName,
+            BSC8.unpack value
+          )
+      ) headers
+    encodedHeaders = Aeson.encode $ Map.fromList mapped
   respond $
-    Wai.responseBuilder
+    Wai.responseLBS
       HTTPTypes.status200
       [("Content-Type", "application/json; charset=UTF-8")]
-      "{\"response\": \"ok\"}"
+      encodedHeaders
 
 
 shutDown ::
   (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
 shutDown respond = do
-  liftIO $ infoM appLogger $ "Wai/Warp app (/w middleware) shutdown requested"
+  liftIO $ infoM appLogger $ "Downstream target app shutdown requested"
   _ <-liftIO $ Posix.exitImmediately Exit.ExitSuccess
   respond $
     Wai.responseBuilder HTTPTypes.status204 [] Builder.empty
@@ -125,27 +126,21 @@ respond404 respond =
 main :: IO ()
 main = do
   initLogging
-  httpManager <- initHttpManager
-  let
-    config = InstanaSDK.defaultConfig { InstanaSDK.agentPort = Just 1302 }
-  InstanaSDK.withConfiguredInstana config $ runApp httpManager
+  runApp
 
 
-runApp :: HTTP.Manager -> InstanaContext -> IO ()
-runApp httpManager instana = do
+runApp :: IO ()
+runApp = do
   pid <- Posix.getProcessID
   let
     host = "127.0.0.1"
-    port = (1207 :: Int)
+    port = (1208 :: Int)
     warpSettings =
       ((Warp.setPort port) . (Warp.setHost "127.0.0.1")) Warp.defaultSettings
   infoM appLogger $
-    "Starting Wai/Warp app (/w middleware) at " ++ host ++ ":" ++ show port ++
+    "Starting downstream target app at " ++ host ++ ":" ++ show port ++
     " (PID: " ++ show pid ++ ")."
-  let
-    app = application instana httpManager pid
-    appWithMiddleware = InstanaWaiMiddleware.traceHttpEntries instana $ app
-  Warp.runSettings warpSettings $ appWithMiddleware
+  Warp.runSettings warpSettings $ application pid
 
 
 initLogging :: IO ()
@@ -157,7 +152,7 @@ initLogging = do
         Just "DEBUG" -> DEBUG
         _            -> INFO
   updateGlobalLogger appLogger $ setLevel logLevel
-  appFileHandler <- fileHandler "wai-warp-app-with-middleware.log" logLevel
+  appFileHandler <- fileHandler "downstream-target.log" logLevel
   appStreamHandler <- streamHandler stdout logLevel
   let
     formattedAppFileHandler = withFormatter appFileHandler

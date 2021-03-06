@@ -329,21 +329,22 @@ httpBracketApi ::
 httpBracketApi instana httpManager requestIn respond = do
   response <- do
     InstanaSDK.withCorrelatedHttpEntry instana requestIn $ do
-      requestOut <-
+      downstreamRequest <-
         HTTP.parseUrlThrow $
-          "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
-      _ <- InstanaSDK.withHttpExit
+          "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+      downstreamResponse <- InstanaSDK.withHttpExit
         instana
-        requestOut
+        downstreamRequest
         (\req -> do
-          _ <- HTTP.httpLbs req httpManager
+          downstreamRespone' <- HTTP.httpLbs req httpManager
           threadDelay $ 1000 -- make sure there is a duration > 0
+          return downstreamRespone'
         )
       return $
-        Wai.responseBuilder
+        Wai.responseLBS
           HTTPTypes.status200
           [("Content-Type", "application/json; charset=UTF-8")]
-          "{\"response\": \"ok\"}"
+          (HTTP.responseBody downstreamResponse)
   respond response
 
 
@@ -355,16 +356,16 @@ httpLowLevelApi ::
   -> IO Wai.ResponseReceived
 httpLowLevelApi instana httpManager requestIn respond = do
   InstanaSDK.startHttpEntry instana requestIn
-  requestOut <-
+  downstreamRequest <-
     HTTP.parseUrlThrow $
-      "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
-  requestOut' <- InstanaSDK.startHttpExit instana requestOut
-  _ <- HTTP.httpLbs requestOut' httpManager
+      "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+  downstreamRequest' <- InstanaSDK.startHttpExit instana downstreamRequest
+  downstreamResponse <- HTTP.httpLbs downstreamRequest' httpManager
   threadDelay $ 1000 -- make sure there is a duration > 0
   InstanaSDK.completeExit instana
   let
     response =
-      Wai.responseBuilder
+      Wai.responseLBS
         HTTPTypes.status200
         [("Content-Type", "application/json; charset=UTF-8")]
         "{\"response\": \"ok\"}"
@@ -441,7 +442,7 @@ runApp httpManager instana = do
     host = "127.0.0.1"
     port = (1207 :: Int)
     warpSettings =
-      ((Warp.setPort 1207) . (Warp.setHost "127.0.0.1")) Warp.defaultSettings
+      ((Warp.setPort port) . (Warp.setHost "127.0.0.1")) Warp.defaultSettings
   infoM appLogger $
     "Starting Wai/Warp app at " ++ host ++ ":" ++ show port ++
     " (PID: " ++ show pid ++ ")."

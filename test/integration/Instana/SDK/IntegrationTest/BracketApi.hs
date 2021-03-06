@@ -19,6 +19,7 @@ import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
+import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 
 
@@ -76,7 +77,8 @@ shouldRecordSpans pid =
 
 createRootEntry :: IO String
 createRootEntry = do
-  response <- HttpHelper.doAppRequest "bracket/api/root" "POST" []
+  response <-
+    HttpHelper.doAppRequest Suite.testServer "bracket/api/root" "POST" []
   return $ LBSC8.unpack $ HTTP.responseBody response
 
 
@@ -135,7 +137,8 @@ shouldRecordNonRootEntry pid =
 
 createNonRootEntry :: IO String
 createNonRootEntry = do
-  response <- HttpHelper.doAppRequest "bracket/api/non-root" "POST" []
+  response <-
+    HttpHelper.doAppRequest Suite.testServer "bracket/api/non-root" "POST" []
   return $ LBSC8.unpack $ HTTP.responseBody response
 
 
@@ -236,7 +239,8 @@ shouldMergeTags pid =
 
 createSpansWithTags :: IO String
 createSpansWithTags = do
-  response <- HttpHelper.doAppRequest "bracket/api/with-tags" "POST" []
+  response <-
+    HttpHelper.doAppRequest Suite.testServer "bracket/api/with-tags" "POST" []
   return $ LBSC8.unpack $ HTTP.responseBody response
 
 
@@ -314,6 +318,11 @@ shouldSetServiceName pid =
 
 createSpansWithServiceName :: IO String
 createSpansWithServiceName = do
-  response <- HttpHelper.doAppRequest "bracket/api/with-service-name" "POST" []
+  response <-
+    HttpHelper.doAppRequest
+      Suite.testServer
+      "bracket/api/with-service-name"
+      "POST"
+      []
   return $ LBSC8.unpack $ HTTP.responseBody response
 

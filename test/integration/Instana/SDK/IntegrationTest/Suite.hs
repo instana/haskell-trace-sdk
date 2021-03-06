@@ -1,9 +1,13 @@
 module Instana.SDK.IntegrationTest.Suite
-  ( ConditionalSuite(..)
+  ( AppUnderTest(..)
+  , ConditionalSuite(..)
   , Suite(..)
   , SuiteOptions(..)
   , defaultOptions
+  , downstreamTarget
   , isExclusive
+  , testServer
+  , testServerWithMiddleware
   , withConnectionLoss
   , withCustomServiceName
   , withPidTranslation
@@ -29,8 +33,17 @@ data SuiteOptions =
     { usePidTranslation      :: Bool
     , startupDelay           :: Bool
     , simulateConnectionLoss :: Bool
-    , appUnderTest           :: String
     , customServiceName      :: Maybe String
+    , appsUnderTest          :: [AppUnderTest]
+    }
+
+
+-- |Describes options for running a test suite.
+data AppUnderTest =
+  AppUnderTest
+    { executable      :: String
+    , port            :: Int
+    , connectsToAgent :: Bool
     }
 
 
@@ -40,8 +53,35 @@ defaultOptions =
     { usePidTranslation      = False
     , startupDelay           = False
     , simulateConnectionLoss = False
-    , appUnderTest           = "instana-haskell-test-wai-server"
+    , appsUnderTest          = [testServer]
     , customServiceName      = Nothing
+    }
+
+
+testServer :: AppUnderTest
+testServer =
+  AppUnderTest
+    { executable      = "instana-haskell-test-wai-server"
+    , port            = 1207
+    , connectsToAgent = True
+    }
+
+
+testServerWithMiddleware :: AppUnderTest
+testServerWithMiddleware =
+  AppUnderTest
+    { executable      = "instana-haskell-test-wai-with-middleware-server"
+    , port            = 1207
+    , connectsToAgent = True
+    }
+
+
+downstreamTarget :: AppUnderTest
+downstreamTarget =
+  AppUnderTest
+    { executable      = "downstream-target"
+    , port            = 1208
+    , connectsToAgent = True
     }
 
 
