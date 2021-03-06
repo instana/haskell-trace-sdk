@@ -368,8 +368,9 @@ httpLowLevelApi instana httpManager requestIn respond = do
       Wai.responseLBS
         HTTPTypes.status200
         [("Content-Type", "application/json; charset=UTF-8")]
-        "{\"response\": \"ok\"}"
-  response' <- InstanaSDK.addWebsiteMonitoringBackEndCorrelation instana response
+        (HTTP.responseBody downstreamResponse)
+  response' <-
+    InstanaSDK.postProcessHttpResponse instana response
   result <- respond response'
   InstanaSDK.completeEntry instana
   return result

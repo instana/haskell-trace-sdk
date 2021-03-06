@@ -75,21 +75,22 @@ apiUnderTest ::
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
 apiUnderTest instana httpManager _ respond = do
-  requestOut <-
+  downstreamRequest <-
     HTTP.parseUrlThrow $
-      "http://127.0.0.1:1302/?some=query&parameters=2&pass=secret"
-  _ <- InstanaSDK.withHttpExit
+      "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+  downstreamResponse <- InstanaSDK.withHttpExit
     instana
-    requestOut
+    downstreamRequest
     (\req -> do
-      _ <- HTTP.httpLbs req httpManager
+      dowstreamRequest' <- HTTP.httpLbs req httpManager
       threadDelay $ 1000 -- make sure there is a duration > 0
+      return dowstreamRequest'
     )
   respond $
-    Wai.responseBuilder
+    Wai.responseLBS
       HTTPTypes.status200
       [("Content-Type", "application/json; charset=UTF-8")]
-      "{\"response\": \"ok\"}"
+      (HTTP.responseBody downstreamResponse)
 
 
 shutDown ::
@@ -144,7 +145,7 @@ runApp httpManager instana = do
     " (PID: " ++ show pid ++ ")."
   let
     app = application instana httpManager pid
-    appWithMiddleware = InstanaWaiMiddleware.traceHttpEntries instana $ app
+    appWithMiddleware = InstanaWaiMiddleware.traceHttpEntries instana app
   Warp.runSettings warpSettings $ appWithMiddleware
 
 

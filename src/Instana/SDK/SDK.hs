@@ -20,6 +20,7 @@ module Instana.SDK.SDK
     , addWebsiteMonitoringBackEndCorrelation
     , agentHost
     , agentPort
+    , captureHttpStatus
     , completeEntry
     , completeExit
     , currentSpan
@@ -35,6 +36,7 @@ module Instana.SDK.SDK
     , initInstana
     , isConnected
     , maxBufferedSpans
+    , postProcessHttpResponse
     , readHttpTracingHeaders
     , serviceName
     , setCorrelationId
@@ -60,7 +62,7 @@ import           Control.Concurrent                  (ThreadId)
 import qualified Control.Concurrent                  as Concurrent
 import           Control.Concurrent.STM              (STM)
 import qualified Control.Concurrent.STM              as STM
-import           Control.Monad                       (join)
+import           Control.Monad                       (join, when)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Data.Aeson                          (Value, (.=))
 import qualified Data.Aeson                          as Aeson
@@ -98,7 +100,6 @@ import qualified Instana.SDK.Internal.SpanStack      as SpanStack
 import           Instana.SDK.Internal.Util           ((|>))
 import qualified Instana.SDK.Internal.Worker         as Worker
 import           Instana.SDK.Span.EntrySpan          (EntrySpan (..))
-import qualified Instana.SDK.Span.EntrySpan          as EntrySpan
 import           Instana.SDK.Span.ExitSpan           (ExitSpan (ExitSpan))
 import qualified Instana.SDK.Span.ExitSpan           as ExitSpan
 import           Instana.SDK.Span.NonRootEntry       (NonRootEntry (NonRootEntry))
@@ -269,10 +270,9 @@ withEntry context traceId parentId spanType io = do
 -- 'completeEntry', depending on the presence or absence of these headers.
 --
 -- It is recommended to use 'withCorrelatedHttpEntry' instead of this
--- function to also automatically add the HTTP response header for website
--- monitoring back end correlation. Alternatively you can also call
--- 'addWebsiteMonitoringBackEndCorrelation' with the WAI Response value before
--- handing it off to WAI's 'respond' function.
+-- function to also automatically capture the status code and add the HTTP
+-- response header for website monitoring back end correlation. Alternatively,
+-- you can also call 'postProcessHttpResponse' inside the 'withHttpEntry' block.
 --
 -- You do not need to handle incoming HTTP requests at all when using the
 -- Instana WAI middleware plug-in.
@@ -320,9 +320,11 @@ withHttpEntry context request io = do
 -- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
 -- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
 -- 'completeEntry', depending on the presence or absence of these headers. It
--- will also add (or append to) the HTTP response header (Server-Timing) that is
--- used for website monitoring back end correlation. (The latter part is the
--- difference to 'withHttpEntry', plus the slightly different type signature.)
+-- will also capture the response HTTP status (and set the span's error count
+-- if it is 5xx). Finally, it will add (or append to) the HTTP response header
+-- (Server-Timing) that is used for website monitoring back end correlation.
+-- (The latter part is the difference to 'withHttpEntry', plus the slightly
+-- different type signature.)
 --
 -- This function should be preferred over 'withHttpEntry'.
 --
@@ -339,7 +341,7 @@ withCorrelatedHttpEntry
   request
   io = do
     response <- withHttpEntry context request $ do
-      io >>= addWebsiteMonitoringBackEndCorrelation context
+      io >>= postProcessHttpResponse context
     return response
 
 
@@ -549,6 +551,68 @@ startHttpEntry context request = do
         )
 
 
+-- |Processes the response of an HTTP entry. This should be called while the
+-- HTTP entry span is still active. It can be used inside a withHttpEntry block
+-- or between 'startHttpEntry' and 'completeEntry'.
+--
+-- This function accomplishes two things:
+-- * It captures the HTTP status code from the response and adds it as an
+--   annotation to the currently active span.
+-- * It adds an additional HTTP response header (Server-Timing) to the given HTTP
+--   response that enables website monitoring back end correlation. In case the
+--   response already has a Server-Timing header, a value is appended to the
+--   existing Server-Timing list.
+--
+-- Client code should rarely have the need to call this directly. Instead,
+-- capture incoming HTTP requests with 'withCorrelatedHttpEntry', which does
+-- both of these things automatically.
+postProcessHttpResponse ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Response
+  -> m Wai.Response
+postProcessHttpResponse context response = do
+  liftIO $ do
+    response' <- captureHttpStatusUnlifted context response
+    addWebsiteMonitoringBackEndCorrelationUnlifted context response'
+
+
+-- |Captures the status code of the HTTP response and adds it to the currently
+-- active span. If the status code is >= 500, the status message is also
+-- captured.
+--
+-- Client code should rarely have the need to call this directly. Instead,
+-- capture incoming HTTP requests with 'withCorrelatedHttpEntry', which
+-- captures the status code automatically.
+captureHttpStatus ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Response
+  -> m Wai.Response
+captureHttpStatus context response = do
+  liftIO $ captureHttpStatusUnlifted context response
+
+
+-- |Captures the status code of the HTTP response and adds it to the currently
+-- active span. If the status code is >= 500, the status message is also
+-- captured.
+captureHttpStatusUnlifted ::
+  InstanaContext
+  -> Wai.Response
+  -> IO Wai.Response
+captureHttpStatusUnlifted context response = do
+  let
+    (HTTPTypes.Status statusCode statusMessage) =
+      Wai.responseStatus response
+  addRegisteredDataAt context "http.status" statusCode
+  when
+    (statusCode >= 500 )
+    (addRegisteredDataAt context "http.message" $
+      BSC8.unpack statusMessage
+    )
+  return response
+
+
 -- |Adds an additional HTTP response header (Server-Timing) to the given HTTP
 -- response that enables website monitoring back end correlation. In case the
 -- response already has a Server-Timing header, a value is appended to the
@@ -556,22 +620,34 @@ startHttpEntry context request = do
 --
 -- Client code should rarely have the need to call this directly. Instead,
 -- capture incoming HTTP requests with 'withCorrelatedHttpEntry', which adds the
--- response header automatically.
+-- response header automatically. When not using 'withCorrelatedHttpEntry',
+-- 'postProcessHttpResponse' should be preferred over this function.
 addWebsiteMonitoringBackEndCorrelation ::
   MonadIO m =>
   InstanaContext
   -> Wai.Response
   -> m Wai.Response
 addWebsiteMonitoringBackEndCorrelation context response = do
-  liftIO $ do
-    mt <- currentTraceIdInternal context
-    case mt of
-      Nothing -> return response
-      Just t  ->
-        return $
-          Wai.mapResponseHeaders
-          (ServerTiming.addTraceIdToServerTiming t)
-          response
+  liftIO $ addWebsiteMonitoringBackEndCorrelationUnlifted context response
+
+
+-- |Adds an additional HTTP response header (Server-Timing) to the given HTTP
+-- response that enables website monitoring back end correlation. In case the
+-- response already has a Server-Timing header, a value is appended to the
+-- existing Server-Timing list.
+addWebsiteMonitoringBackEndCorrelationUnlifted ::
+  InstanaContext
+  -> Wai.Response
+  -> IO Wai.Response
+addWebsiteMonitoringBackEndCorrelationUnlifted context response = do
+  traceIdMaybe <- currentTraceIdInternal context
+  case traceIdMaybe of
+    Nothing -> return response
+    Just traceId  ->
+      return $
+        Wai.mapResponseHeaders
+        (ServerTiming.addTraceIdToServerTiming traceId)
+        response
 
 
 -- |Creates a preliminary/incomplete exit span, which should later be completed
@@ -640,11 +716,10 @@ startHttpExit ::
   -> HTTP.Request
   -> m HTTP.Request
 startHttpExit context request = do
-  request' <- addHttpTracingHeaders context request
   let
-    originalCheckResponse = HTTP.checkResponse request'
-    request'' =
-      request'
+    originalCheckResponse = HTTP.checkResponse request
+    request' =
+      request
         { HTTP.checkResponse = (\req res -> do
             let
               status =
@@ -668,6 +743,7 @@ startHttpExit context request = do
     url = protocol ++ host ++ port ++ path
 
   startExit context (RegisteredSpan SpanType.HaskellHttpClient)
+  request'' <- addHttpTracingHeaders context request'
   addRegisteredData
     context
     (Aeson.object [ "http" .=
@@ -921,24 +997,39 @@ addHttpTracingHeaders ::
 addHttpTracingHeaders context request =
   liftIO $ do
     suppressed <- isSuppressed context
-    entrySpan <- peekSpan context
+    traceId <- currentTraceIdInternal context
+    spanId <- currentSpanIdInternal context
     let
       originalHeaders = HTTP.requestHeaders request
       updatedRequest =
-        case (entrySpan, suppressed) of
-          (_, True) ->
+        case (traceId, spanId, suppressed) of
+          (_, _, True) ->
             request {
               HTTP.requestHeaders =
                 ((TracingHeaders.levelHeaderName, "0") : originalHeaders)
             }
-          (Just (Entry currentEntrySpan), _) ->
+          (Just tId, Just sId, False) ->
             request {
               HTTP.requestHeaders =
                 (originalHeaders ++
-                  [ (TracingHeaders.traceIdHeaderName, Id.toByteString $
-                      EntrySpan.traceId currentEntrySpan)
-                  , (TracingHeaders.spanIdHeaderName, Id.toByteString $
-                      EntrySpan.spanId currentEntrySpan)
+                  [ (TracingHeaders.traceIdHeaderName, Id.toByteString tId)
+                  , (TracingHeaders.spanIdHeaderName, Id.toByteString sId)
+                  ]
+                )
+            }
+          (Just tId, Nothing, False) ->
+            request {
+              HTTP.requestHeaders =
+                (originalHeaders ++
+                  [ (TracingHeaders.traceIdHeaderName, Id.toByteString tId)
+                  ]
+                )
+            }
+          (Nothing, Just sId, False) ->
+            request {
+              HTTP.requestHeaders =
+                (originalHeaders ++
+                  [ (TracingHeaders.spanIdHeaderName, Id.toByteString sId)
                   ]
                 )
             }

@@ -152,9 +152,11 @@ testWaiMiddleware =
         , WaiMiddleware.shouldAddWebsiteMonitoringCorrelation pid
         , WaiMiddleware.shouldSuppress
         ])
-      , Suite.options =
-          Suite.defaultOptions {
-            Suite.appsUnderTest = [Suite.testServerWithMiddleware]
+      , Suite.options = Suite.defaultOptions {
+            Suite.appsUnderTest =
+              [ Suite.testServerWithMiddleware
+              , Suite.downstreamTarget
+              ]
           }
       }
 

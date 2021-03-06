@@ -10,14 +10,10 @@ module Instana.Wai.Middleware.Entry.Internal
   ) where
 
 
-import           Instana.SDK.Internal.Id           (Id)
-import qualified Instana.SDK.Internal.ServerTiming as ServerTiming
-import           Network.Wai                       (Middleware, Response)
-import qualified Network.Wai                       as Wai
+import           Network.Wai     (Middleware)
 
-import           Instana.SDK.SDK                   (InstanaContext,
-                                                    currentTraceIdInternal,
-                                                    withHttpEntry)
+import           Instana.SDK.SDK (InstanaContext, postProcessHttpResponse,
+                                  withHttpEntry)
 
 
 {-| Run the tracing middleware given an initialized Instana SDK context. The
@@ -28,14 +24,7 @@ back end correlation.
 traceHttpEntries :: InstanaContext -> Middleware
 traceHttpEntries instana app request respond = do
   withHttpEntry instana request $ do
-    traceIdMaybe <- currentTraceIdInternal instana
-    case traceIdMaybe of
-      Just traceId ->
-        app request $ respond . addHeader traceId
-      Nothing ->
-        app request respond
+    app request $ \response -> do
+      response' <- postProcessHttpResponse instana response
+      respond $ response'
 
-
-addHeader :: Id -> Response -> Response
-addHeader traceId =
-  Wai.mapResponseHeaders $ ServerTiming.addTraceIdToServerTiming traceId

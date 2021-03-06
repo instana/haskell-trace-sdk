@@ -16,6 +16,7 @@ import           Data.Aeson                             ((.=))
 import qualified Data.Aeson                             as Aeson
 import qualified Data.ByteString.Char8                  as BSC8
 import qualified Data.ByteString.Lazy.Char8             as LBSC8
+import           Data.List                              (isInfixOf)
 import qualified Data.List                              as List
 import           Data.Maybe                             (isNothing, listToMaybe)
 import           Instana.SDK.AgentStub.TraceRequest     (From (..), Span)
@@ -173,7 +174,15 @@ runSuppressedTest urlPath = do
         then
           failIO "spans have been recorded although they should have not"   else
           assertAllIO
-            [ assertEqual "result" "{\"response\": \"ok\"}" result
+            [ assertBool
+                "downstream X-INSTANA-L"
+                (isInfixOf "\"X-INSTANA-L\":\"0\"" responseBody)
+            , assertBool
+                "no downstream X-INSTANA-T"
+                (not $ isInfixOf "X-INSTANA-T" responseBody)
+            , assertBool
+                "no downstream X-INSTANA-S"
+                (not $ isInfixOf "X-INSTANA-S" responseBody)
             ]
 
 
@@ -207,9 +216,8 @@ commonAsserts ::
   -> Maybe From
   -> Maybe String
   -> [Assertion]
-commonAsserts entrySpan exitSpan result from serverTimingValue =
-  [ assertEqual "result" "{\"response\": \"ok\"}" result
-  , assertEqual "trace ID is consistent"
+commonAsserts entrySpan exitSpan responseBody from serverTimingValue =
+  [ assertEqual "trace ID is consistent"
       (TraceRequest.t exitSpan)
       (TraceRequest.t entrySpan)
   , assertEqual "Server-Timing header with trace ID is present"
@@ -218,6 +226,23 @@ commonAsserts entrySpan exitSpan result from serverTimingValue =
   , assertEqual "exit parent ID"
       (Just $ TraceRequest.s entrySpan)
       (TraceRequest.p exitSpan)
+  , assertBool
+      ("wrong downstream X-INSTANA-T: " ++ responseBody ++
+          ", expected " ++ TraceRequest.t entrySpan)
+      (isInfixOf
+        ("\"X-INSTANA-T\":\"" ++ (TraceRequest.t entrySpan) ++ "\"")
+        responseBody
+      )
+  , assertBool
+      ("wrong downstream X-INSTANA-S: " ++ responseBody ++
+          ", expected " ++ TraceRequest.s exitSpan)
+      (isInfixOf
+        ("\"X-INSTANA-S\":\"" ++ (TraceRequest.s exitSpan) ++ "\"")
+        responseBody
+      )
+  , assertBool
+      "no downstream X-INSTANA-L"
+      (not $ isInfixOf "X-INSTANA-L" responseBody)
   , assertBool "entry timestamp" $ TraceRequest.ts entrySpan > 0
   , assertBool "entry duration" $ TraceRequest.d entrySpan > 0
   , assertEqual "entry kind" 1 (TraceRequest.k entrySpan)
@@ -263,6 +288,7 @@ bracketAsserts entrySpan =
           , "host"   .= ("127.0.0.1:1207" :: String)
           , "url"    .= ("/http/bracket/api" :: String)
           , "params" .= ("some=query&parameters=1" :: String)
+          , "status" .= (200 :: Int)
           ]
         )
       ]
@@ -280,6 +306,7 @@ lowLevelAsserts entrySpan =
           , "host"   .= ("127.0.0.1:1207" :: String)
           , "url"    .= ("/http/low/level/api" :: String)
           , "params" .= ("some=query&parameters=2" :: String)
+          , "status" .= (200 :: Int)
           ]
         )
       ]

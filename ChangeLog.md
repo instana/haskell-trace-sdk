@@ -8,6 +8,8 @@
     - `currentSpanId` (provides the span ID of the currently active span), and
     - `currentParentId` (provides the parent ID of the currently active span).
 - Remove deprecated attribute `span.ta`.
+- Fix: Pass span ID of exit span downstream with X-INSTANA-S instead of the entry span's span ID.
+- Capture HTTP status code in `withCorrelatedHttpEntry`.
 
 ## 0.5.0.1
 - No changes, only documentation updates.
