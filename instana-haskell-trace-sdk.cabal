@@ -12,7 +12,7 @@ license:        MIT
 license-file:   LICENSE
 build-type:     Simple
 stability:      experimental
-cabal-version:  >= 2.0
+cabal-version:  2.0
 
 extra-source-files:
   CHANGELOG.md
@@ -107,6 +107,8 @@ library
       Instana.SDK.Internal.Util
       Instana.SDK.Internal.Worker
       Instana.Wai.Middleware.Entry.Internal
+      Paths_instana_haskell_trace_sdk
+  autogen-modules:
       Paths_instana_haskell_trace_sdk
   default-language: Haskell2010
 
