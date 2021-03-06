@@ -35,14 +35,6 @@ jobs:
           name: Build and run tests
           command: "date && TEST_LOG_LEVEL=DEBUG stack --no-terminal test"
 
-      - run:
-          name: Verify that source distribution tarballs can be built
-          command: "date && stack sdist"
-
-      - run:
-          name: Verify that documentation can be built
-          command: "date && stack haddock --no-haddock-deps"
-
       - save_cache:
           name: Cache Dependencies
           key: v1-haskell-sdk-{{ .Environment.CIRCLE_JOB }}-{{ checksum "instana-haskell-trace-sdk.cabal" }}-{{ checksum "stack.yaml" }}-{{ checksum "package.yaml" }}
@@ -51,6 +43,14 @@ jobs:
             - "/root/.cabal"
             - "/root/.stack"
             - ".stack-work"
+
+      - run:
+          name: Verify that source distribution tarballs can be built
+          command: "date && stack sdist"
+
+      - run:
+          name: Verify that documentation can be built
+          command: "date && stack haddock --no-haddock-deps"
 
       - slack/notify:
           event: fail
