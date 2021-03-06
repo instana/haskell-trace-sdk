@@ -16,16 +16,17 @@ module Instana.SDK.IntegrationTest.HttpHelper
   ) where
 
 
-import           Control.Monad.Catch              (Handler)
-import qualified Control.Retry                    as Retry
-import qualified Data.Aeson                       as Aeson
-import           Data.ByteString                  (ByteString)
-import qualified Data.ByteString.Lazy             as LBS
-import qualified Network.HTTP.Client              as HTTP
-import           Network.HTTP.Types.Header        (Header, HeaderName)
-import           Network.HTTP.Types.Method        (Method)
+import           Control.Monad.Catch               (Handler)
+import qualified Control.Retry                     as Retry
+import qualified Data.Aeson                        as Aeson
+import           Data.ByteString                   (ByteString)
+import qualified Data.ByteString.Lazy              as LBS
+import qualified Network.HTTP.Client               as HTTP
+import           Network.HTTP.Types.Header         (Header, HeaderName)
+import           Network.HTTP.Types.Method         (Method)
 
-import           Instana.SDK.IntegrationTest.Util (putStrFlush)
+import qualified Instana.SDK.IntegrationTest.Suite as Suite
+import           Instana.SDK.IntegrationTest.Util  (putStrFlush)
 
 
 -- 100 milliseconds
@@ -91,18 +92,9 @@ appHost :: String
 appHost = "127.0.0.1"
 
 
-appPort :: Int
-appPort = 1207
-
-
-appBaseUrl :: String
-appBaseUrl =
-  "http://" ++ appHost ++ ":" ++ (show appPort) ++ "/"
-
-
-appUrl :: String -> String
-appUrl path =
-  appBaseUrl ++ path
+appUrl :: Int -> String -> String
+appUrl port path =
+  "http://" ++ appHost ++ ":" ++ (show port) ++ "/" ++ path
 
 
 defaultHeaders :: [(HeaderName, ByteString)]
@@ -123,12 +115,13 @@ requestAgentStubAndParse path method =
 
 requestAppAndParse ::
   Aeson.FromJSON a =>
-  String
+  Suite.AppUnderTest
+  -> String
   -> ByteString
   -> [Header]
   -> IO (Either String a)
-requestAppAndParse path method headers =
-  requestAndParse path method headers appUrl
+requestAppAndParse appUnderTest path method headers =
+  requestAndParse path method headers (appUrl $ Suite.port appUnderTest)
 
 
 doAgentStubRequest ::
@@ -140,12 +133,13 @@ doAgentStubRequest path method =
 
 
 doAppRequest ::
-  String
+  Suite.AppUnderTest
+  -> String
   -> Method
   -> [Header]
   -> IO (HTTP.Response LBS.ByteString)
-doAppRequest path method headers =
-  doRequest path method headers appUrl
+doAppRequest appUnderTest path method headers =
+  doRequest path method headers (appUrl $ Suite.port appUnderTest)
 
 
 requestAndParse ::

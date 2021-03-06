@@ -132,7 +132,12 @@ testHttpTracing =
         , HttpTracing.shouldCreateNonRootEntryWithLowLevelApi pid
         , HttpTracing.shouldSuppressWithLowLevelApi
         ])
-      , Suite.options = Suite.defaultOptions
+      , Suite.options = Suite.defaultOptions {
+            Suite.appsUnderTest =
+              [ Suite.testServer
+              , Suite.downstreamTarget
+              ]
+          }
       }
 
 
@@ -149,8 +154,7 @@ testWaiMiddleware =
         ])
       , Suite.options =
           Suite.defaultOptions {
-            Suite.appUnderTest =
-              "instana-haskell-test-wai-with-middleware-server"
+            Suite.appsUnderTest = [Suite.testServerWithMiddleware]
           }
       }
 

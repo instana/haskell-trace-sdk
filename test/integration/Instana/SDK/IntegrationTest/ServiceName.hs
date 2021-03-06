@@ -16,6 +16,7 @@ import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
+import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 
 
@@ -97,6 +98,7 @@ createSpansWithServiceName :: IO String
 createSpansWithServiceName = do
   response <-
     HttpHelper.doAppRequest
+      Suite.testServer
       "bracket/api/with-service-name-exit-only"
       "POST"
       []

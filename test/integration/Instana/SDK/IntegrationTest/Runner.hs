@@ -15,7 +15,8 @@ import           Test.HUnit
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (mergeCounts)
 import           Instana.SDK.IntegrationTest.Logging    (testLogger)
-import           Instana.SDK.IntegrationTest.Suite      (ConditionalSuite (..),
+import           Instana.SDK.IntegrationTest.Suite      (AppUnderTest,
+                                                         ConditionalSuite (..),
                                                          Suite)
 import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
@@ -101,22 +102,37 @@ runSuite suite = do
         , ("LOG_LEVEL", Just logLevel)
         ]
         "stack exec instana-haskell-agent-stub"
-    appCommand =
-      buildCommand
-        [ ("APP_LOG_LEVEL", Just logLevel)
-        , ("INSTANA_SERVICE_NAME", Suite.customServiceName options)
-        , ("INSTANA_LOG_LEVEL", Just logLevel)
-        ]
-        "stack exec " ++ Suite.appUnderTest options
+    appCommands =
+      map
+        (\appUnderTest ->
+          buildCommand
+            [ ("APP_LOG_LEVEL", Just logLevel)
+            , ("INSTANA_SERVICE_NAME", Suite.customServiceName options)
+            , ("INSTANA_LOG_LEVEL", Just logLevel)
+            ]
+            "stack exec " ++ (Suite.executable appUnderTest)
+        )
+        (Suite.appsUnderTest options)
+    startAllApplicationsUnderTest =
+      sequence $
+        map
+          (\cmd -> do
+            infoM testLogger $ "Running: " ++ cmd
+            -- We should rather use withCreateProcess instead of createProcess
+            -- for the apps under test, too - like for the agentStubCommand, see
+            -- below. But how to do that in a loop for an arbitrary
+            -- number of processes?
+            Process.createProcess $ Process.shell cmd
+          )
+          appCommands
+
 
   infoM testLogger $ "Running: " ++ agentStubCommand
   Process.withCreateProcess
     (Process.shell agentStubCommand)
     (\_ _ _ _ -> do
-      infoM testLogger $ "Running: " ++ appCommand
-      Process.withCreateProcess
-        (Process.shell appCommand)
-        (\_ _ _ _ -> runTests suite)
+      _ <- startAllApplicationsUnderTest
+      runTests suite
     )
 
 
@@ -125,12 +141,17 @@ runTests suite = do
   infoM testLogger "⏱  waiting for agent stub to come up"
   _ <- HttpHelper.retryRequestRecovering TestHelper.pingAgentStub
   infoM testLogger "✅ agent stub is up"
-  infoM testLogger "⏱  waiting for app to come up"
-  appPingResponse <- HttpHelper.retryRequestRecovering TestHelper.pingApp
+  appsWithPids <-
+    sequence $ map pingApp (Suite.appsUnderTest $ Suite.options suite)
+
+  -- We currently assume that there is exactly one app under test that also
+  -- connects to the agent.
   let
-    appPingBody = HTTP.responseBody appPingResponse
-    appPid = (read (LBSC8.unpack appPingBody) :: Int)
-  infoM testLogger $ "✅ app is up, PID is " ++ (show appPid)
+    appPid =
+      snd $
+        head $
+          filter (\(app, _) -> Suite.connectsToAgent app) appsWithPids
+
   results <-
     waitForAgentConnectionAndRun suite appPid
   -- The withProcess calls that starts the agent stub and the external app
@@ -145,8 +166,23 @@ runTests suite = do
   -- sure the process instances get shut down, we send an extra HTTP request to
   -- ask the processes to terminate themselves.
   _ <- TestHelper.shutDownAgentStub
-  _ <- TestHelper.shutDownApp
+  _ <- TestHelper.shutDownApps (Suite.appsUnderTest $ Suite.options suite)
   return results
+
+
+pingApp :: AppUnderTest -> IO (AppUnderTest, Int)
+pingApp appUnderTest = do
+  infoM testLogger $
+    "⏱  waiting for app " ++ Suite.executable appUnderTest ++ " to come up"
+  appPingResponse <-
+    HttpHelper.retryRequestRecovering $ TestHelper.pingApp appUnderTest
+  let
+    appPingBody = HTTP.responseBody appPingResponse
+    appPid = (read (LBSC8.unpack appPingBody) :: Int)
+  infoM testLogger $
+    "✅ app " ++ Suite.executable appUnderTest ++
+    " is up, PID is " ++ (show appPid)
+  return (appUnderTest, appPid)
 
 
 -- |Waits for the app under test to establish a connection to the agent, then

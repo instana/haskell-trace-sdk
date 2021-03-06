@@ -10,7 +10,7 @@ module Instana.SDK.IntegrationTest.TestHelper
   , resetDiscoveries
   , resetSpans
   , shutDownAgentStub
-  , shutDownApp
+  , shutDownApps
   , waitForEntityDataWithPid
   , waitForExternalAgentConnection
   , waitForDiscoveryWithPid
@@ -38,6 +38,7 @@ import           Instana.SDK.AgentStub.TraceRequest      (Span)
 import qualified Instana.SDK.AgentStub.TraceRequest      as TraceRequest
 import qualified Instana.SDK.IntegrationTest.HttpHelper  as HttpHelper
 import           Instana.SDK.IntegrationTest.Logging     (testLogger)
+import           Instana.SDK.IntegrationTest.Suite       (AppUnderTest)
 import           Instana.SDK.IntegrationTest.Util        ((|>))
 
 
@@ -57,9 +58,9 @@ pingAgentStub = do
   HttpHelper.doAgentStubRequest "stub/ping" "GET"
 
 
-pingApp :: IO (HTTP.Response LBS.ByteString)
-pingApp = do
-  HttpHelper.doAppRequest "ping" "GET" [("X-INSTANA-L", "0")]
+pingApp :: AppUnderTest -> IO (HTTP.Response LBS.ByteString)
+pingApp appUnderTest = do
+  HttpHelper.doAppRequest appUnderTest "ping" "GET" [("X-INSTANA-L", "0")]
 
 
 shutDownAgentStub :: IO ()
@@ -75,17 +76,25 @@ shutDownAgentStub = do
     (\ (_ :: HTTP.HttpException) -> return ())
 
 
-shutDownApp :: IO ()
-shutDownApp = do
-  catch
-    ( HttpHelper.doAppRequest "shutdown" "POST" [("X-INSTANA-L", "0")]
-      >> return ()
-    )
-    -- Ignore all exceptions for the shutdown request. Either the app has
-    -- already been shut down (so the request results in a network error) or, if
-    -- it is successfull, it results in an HTTP 500 because the app process
-    -- terminates before responding.
-    (\ (_ :: HTTP.HttpException) -> return ())
+shutDownApps :: [AppUnderTest] -> IO ()
+shutDownApps appsUnderTest = do
+  sequence_ $ map shutDownOneApp appsUnderTest
+  where
+    shutDownOneApp :: AppUnderTest -> IO ()
+    shutDownOneApp appUnderTest =
+      catch
+       ( HttpHelper.doAppRequest
+           appUnderTest
+           "shutdown"
+           "POST"
+           [("X-INSTANA-L", "0")]
+         >> return ()
+       )
+       -- Ignore all exceptions for the shutdown request. Either the app has
+       -- already been shut down (so the request results in a network error) or, if
+       -- it is successfull, it results in an HTTP 500 because the app process
+       -- terminates before responding.
+       (\ (_ :: HTTP.HttpException) -> return ())
 
 
 waitForExternalAgentConnection :: Bool -> Int -> IO (Either String (DiscoveryRequest, String))
