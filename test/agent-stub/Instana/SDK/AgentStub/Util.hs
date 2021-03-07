@@ -23,5 +23,5 @@ shouldSimulateConnectionLoss config startupTime now =
   -- Simulate connection loss after from 1500ms after server startup until
   -- 3500ms seconds after startup.
   Config.simulateConnectionLoss config &&
-    (now > startupTime + 1500 && now < startupTime + 3500)
+    (now > startupTime + 3000 && now < startupTime + 6000)
 

@@ -37,26 +37,30 @@ shouldReestablishLostConnection :: String -> IO Test
 shouldReestablishLostConnection _ =
   applyLabel "shouldReestablishLostConnection" $ do
 
-    --    0 ms: send span 1
-    recordSpan "haskell.dummy.connectionloss.entry-1"
-    threadDelay $ 2000 * 1000
+    -- In this test scenario, the agent is instructed to no accept any data in
+    -- the timespan from after 3000 ms after start until 6000 ms after start.
 
-    -- 1500 ms: agent stub will switch into "connection loss simulation" mode
+    --   ~0 ms: send span 1
+    recordSpan "haskell.dummy.connectionloss.entry-1"
+    threadDelay $ 3500 * 1000
+
+    -- 3000 ms: agent stub will switch into "connection loss simulation" mode
     --          (that is, spans and entity data will be rejected)
 
-    -- 2000 ms: send span 2, will be rejected, unless an entity data request
-    -- happened since 1500 ms and already triggered the reestablishing of the
+    -- 3500 ms: send span 2, will be rejected, unless an entity data request
+    -- happened since 3000 ms and already triggered the reestablishing of the
     -- connection. Otherwise this span will trigger a reconnection (but get lost
     -- in the process).
+    -- 4500 ms: span 2 will be send latest (force transmission every second)
     recordSpan "haskell.dummy.connectionloss.entry-2"
-    threadDelay $ 2000 * 1000
 
-    -- 3000 ms: span 2 will be send latest (force transmission every second)
+    threadDelay $ 4500 * 1000
 
-    -- 3500 ms: agent stub will switch off "connection loss simulation" mode
+    -- 6000 ms: agent stub will switch off "connection loss simulation" mode
 
-    -- 4000 ms: send span 3
+    -- 8000 ms: send span 3
     recordSpan "haskell.dummy.connectionloss.entry-3"
+
     -- wait for span 3 to arrive, check that 1 and 3 have been received
 
     spansResult <- TestHelper.waitForSdkSpansMatching
