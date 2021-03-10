@@ -21,7 +21,6 @@ import qualified Instana.SDK.Span.Span   as Span
 
 
 -- |A representation of the span fit for external use by clients of the SDK.
---
 data SimpleSpan = SimpleSpan
   { traceId    :: String
   , spanId     :: String
@@ -34,6 +33,7 @@ data SimpleSpan = SimpleSpan
   } deriving (Eq, Generic, Show)
 
 
+-- |Converts the internal span datastructure into the simplified format.
 convert :: Span -> SimpleSpan
 convert span_ =
   SimpleSpan

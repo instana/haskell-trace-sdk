@@ -1,15 +1,18 @@
 # Changelog for instana-haskell-trace-sdk
 
 ## Unreleased
+- Fix: Pass span ID of exit span downstream with X-INSTANA-S instead of the entry span's span ID.
+- Fix: Capture HTTP status code in `withHttpEntry` (formely `withCorrelatedHttpEntry`).
+- Breaking: Rename `Instana.SDK.SDK.withCorrelatedHttpEntry` to `withHttpEntry`. The motivation is that this function should be used by client code in almost all cases, so its name should suggest itself as the obvious choice for tracing HTTP entry spans.
+- Breaking: Rename `Instana.SDK.SDK.withHttpEntry` to `withHttpEntry_`. See above.
 - Breaking: Rename `Instana.SDK.SDK.currentTraceId` (with return type `Instana.SDK.Internal.Id.Id`) to `currentTraceIdInternal`. The function `Instana.SDK.SDK.currentTraceId` returns type `String` now.
+- Provide `Instana.SDK.SDK.postProcessHttpRespons` for cases where `withHttpEntry_` needs to be used instead of `withHttpEntry`.
 - Provide new convenience accessors `Instana.SDK.SDK`:
     - `currentSpan` (provides the currently active span in a simplified format),
     - `currentTraceId` (provides the trace ID of the currently active trace),
     - `currentSpanId` (provides the span ID of the currently active span), and
     - `currentParentId` (provides the parent ID of the currently active span).
 - Remove deprecated attribute `span.ta`.
-- Fix: Pass span ID of exit span downstream with X-INSTANA-S instead of the entry span's span ID.
-- Capture HTTP status code in `withCorrelatedHttpEntry`.
 
 ## 0.5.0.1
 - No changes, only documentation updates.

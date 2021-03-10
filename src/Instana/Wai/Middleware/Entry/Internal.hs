@@ -13,7 +13,7 @@ module Instana.Wai.Middleware.Entry.Internal
 import           Network.Wai     (Middleware)
 
 import           Instana.SDK.SDK (InstanaContext, postProcessHttpResponse,
-                                  withHttpEntry)
+                                  withHttpEntry_)
 
 
 {-| Run the tracing middleware given an initialized Instana SDK context. The
@@ -23,7 +23,7 @@ back end correlation.
 -}
 traceHttpEntries :: InstanaContext -> Middleware
 traceHttpEntries instana app request respond = do
-  withHttpEntry instana request $ do
+  withHttpEntry_ instana request $ do
     app request $ \response -> do
       response' <- postProcessHttpResponse instana response
       respond $ response'

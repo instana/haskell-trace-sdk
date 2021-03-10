@@ -48,10 +48,10 @@ module Instana.SDK.SDK
     , startHttpExit
     , startRootEntry
     , withConfiguredInstana
-    , withCorrelatedHttpEntry
     , withEntry
     , withExit
     , withHttpEntry
+    , withHttpEntry_
     , withHttpExit
     , withInstana
     , withRootEntry
@@ -230,8 +230,7 @@ initInstanaInternal conf = do
 
 
 -- |Wraps an IO action in 'startRootEntry' and 'completeEntry'. For incoming
--- HTTP requests, prefer 'withCorrelatedHttpEntry' or 'withHttpEntry'
--- instead.
+-- HTTP requests, prefer 'withHttpEntry' instead.
 withRootEntry ::
   MonadIO m =>
   InstanaContext
@@ -246,8 +245,7 @@ withRootEntry context spanType io = do
 
 
 -- |Wraps an IO action in 'startEntry' and 'completeEntry'. For incoming HTTP
--- requests, prefer 'withCorrelatedHttpEntry' or 'withHttpEntry'
--- instead.
+-- requests, prefer 'withHttpEntry' instead.
 withEntry ::
   MonadIO m =>
   InstanaContext
@@ -267,12 +265,14 @@ withEntry context traceId parentId spanType io = do
 -- Instana tracing headers
 -- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
 -- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
--- 'completeEntry', depending on the presence or absence of these headers.
+-- 'completeEntry', depending on the presence or absence of these headers. It
+-- will also capture the response HTTP status (and set the span's error count
+-- if it is 5xx). Finally, it will add (or append to) the HTTP response header
+-- (Server-Timing) that is used for website monitoring back end correlation.
+-- (The latter part is the difference to 'withHttpEntry_', plus the slightly
+-- different type signature.)
 --
--- It is recommended to use 'withCorrelatedHttpEntry' instead of this
--- function to also automatically capture the status code and add the HTTP
--- response header for website monitoring back end correlation. Alternatively,
--- you can also call 'postProcessHttpResponse' inside the 'withHttpEntry' block.
+-- This function should be preferred over 'withHttpEntry_'.
 --
 -- You do not need to handle incoming HTTP requests at all when using the
 -- Instana WAI middleware plug-in.
@@ -280,9 +280,36 @@ withHttpEntry ::
   MonadIO m =>
   InstanaContext
   -> Wai.Request
+  -> m Wai.Response
+  -> m Wai.Response
+withHttpEntry
+  context
+  request
+  io = do
+    response <- withHttpEntry_ context request $ do
+      io >>= postProcessHttpResponse context
+    return response
+
+
+-- |A variant of 'withHttpEntry' with a more general type signature, but less
+-- features. It will automatically continue the trace from incoming headers just
+-- like withHttpEntry does, but it will not capture the status code of the HTTP
+-- response or add the response header for website monitoring back end
+-- correlation (Server-Timing).
+--
+-- It is recommended to use 'withHttpEntry' instead of this function, if
+-- possible. Alternatively, you can also call 'postProcessHttpResponse' inside
+-- the 'withHttpEntry_' block to cover the two missing features mentioned above.
+--
+-- Note that you do not need to handle incoming HTTP requests at all when using
+-- the Instana WAI middleware plug-in.
+withHttpEntry_ ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Request
   -> m a
   -> m a
-withHttpEntry context request io = do
+withHttpEntry_ context request io = do
   let
     spanType = (RegisteredSpan SpanType.HaskellWaiServer)
     tracingHeaders = readHttpTracingHeaders request
@@ -313,36 +340,6 @@ withHttpEntry context request io = do
               SpanStack.pushSuppress spanStack
         )
       io
-
-
--- |A convenience function that examines the given incoming HTTP request for
--- Instana tracing headers
--- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
--- and wraps the given IO action either in 'startRootEntry' or  'startEntry' and
--- 'completeEntry', depending on the presence or absence of these headers. It
--- will also capture the response HTTP status (and set the span's error count
--- if it is 5xx). Finally, it will add (or append to) the HTTP response header
--- (Server-Timing) that is used for website monitoring back end correlation.
--- (The latter part is the difference to 'withHttpEntry', plus the slightly
--- different type signature.)
---
--- This function should be preferred over 'withHttpEntry'.
---
--- You do not need to handle incoming HTTP requests at all when using the
--- Instana WAI middleware plug-in.
-withCorrelatedHttpEntry ::
-  MonadIO m =>
-  InstanaContext
-  -> Wai.Request
-  -> m Wai.Response
-  -> m Wai.Response
-withCorrelatedHttpEntry
-  context
-  request
-  io = do
-    response <- withHttpEntry context request $ do
-      io >>= postProcessHttpResponse context
-    return response
 
 
 -- |Takes an IO action and appends another side effecto to it that will add HTTP
@@ -551,9 +548,9 @@ startHttpEntry context request = do
         )
 
 
--- |Processes the response of an HTTP entry. This should be called while the
--- HTTP entry span is still active. It can be used inside a withHttpEntry block
--- or between 'startHttpEntry' and 'completeEntry'.
+-- |Processes the response of an HTTP entry. This function needs be called while
+-- the HTTP entry span is still active. It can be used inside a 'withHttpEntry_'
+-- block or between 'startHttpEntry' and 'completeEntry'.
 --
 -- This function accomplishes two things:
 -- * It captures the HTTP status code from the response and adds it as an
@@ -564,7 +561,7 @@ startHttpEntry context request = do
 --   existing Server-Timing list.
 --
 -- Client code should rarely have the need to call this directly. Instead,
--- capture incoming HTTP requests with 'withCorrelatedHttpEntry', which does
+-- capture incoming HTTP requests with 'withHttpEntry', which does
 -- both of these things automatically.
 postProcessHttpResponse ::
   MonadIO m =>
@@ -579,11 +576,16 @@ postProcessHttpResponse context response = do
 
 -- |Captures the status code of the HTTP response and adds it to the currently
 -- active span. If the status code is >= 500, the status message is also
--- captured.
+-- captured. This function needs be called while the HTTP entry span is still
+-- active. It can be used inside a 'withHttpEntry_' block or between
+-- 'startHttpEntry' and 'completeEntry'.
 --
 -- Client code should rarely have the need to call this directly. Instead,
--- capture incoming HTTP requests with 'withCorrelatedHttpEntry', which
--- captures the status code automatically.
+-- capture incoming HTTP requests with 'withHttpEntry', which captures the
+-- status code automatically and also adds the Server-Timing header for back end
+-- web site monitoring correlation. When not using 'withHttpEntry', the function
+-- 'postProcessHttpResponse' should be preferred over this function, because it
+-- does both (capture the status code and add the Server-Timing header).
 captureHttpStatus ::
   MonadIO m =>
   InstanaContext
@@ -616,12 +618,16 @@ captureHttpStatusUnlifted context response = do
 -- |Adds an additional HTTP response header (Server-Timing) to the given HTTP
 -- response that enables website monitoring back end correlation. In case the
 -- response already has a Server-Timing header, a value is appended to the
--- existing Server-Timing list.
+-- existing Server-Timing list. This function needs be called while the HTTP
+-- entry span is still active. It can be used inside a 'withHttpEntry_' block or
+-- between 'startHttpEntry' and 'completeEntry'.
 --
 -- Client code should rarely have the need to call this directly. Instead,
--- capture incoming HTTP requests with 'withCorrelatedHttpEntry', which adds the
--- response header automatically. When not using 'withCorrelatedHttpEntry',
--- 'postProcessHttpResponse' should be preferred over this function.
+-- capture incoming HTTP requests with 'withHttpEntry', which adds the
+-- response header automatically and also captures the HTTP status code of the
+-- response. When not using 'withHttpEntry', the function
+-- 'postProcessHttpResponse' should be preferred over this function, because
+-- it does both (capture the status code and add the Server-Timing header).
 addWebsiteMonitoringBackEndCorrelation ::
   MonadIO m =>
   InstanaContext

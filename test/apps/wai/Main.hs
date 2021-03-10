@@ -328,7 +328,7 @@ httpBracketApi ::
   -> IO Wai.ResponseReceived
 httpBracketApi instana httpManager requestIn respond = do
   response <- do
-    InstanaSDK.withCorrelatedHttpEntry instana requestIn $ do
+    InstanaSDK.withHttpEntry instana requestIn $ do
       downstreamRequest <-
         HTTP.parseUrlThrow $
           "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
