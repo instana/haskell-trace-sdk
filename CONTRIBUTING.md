@@ -59,7 +59,7 @@ The agent stub can be configured with a number of environment variables:
 Publishing a New Release
 ------------------------
 
-* Make sure ChangeLog.md has an entry for the upcoming release.
+* Make sure CHANGELOG.md has an entry for the upcoming release.
 * Bump the version in:
     * `README.md` (installation instructions/extra-deps)
     * `instana-haskell-trace-sdk.cabal`
