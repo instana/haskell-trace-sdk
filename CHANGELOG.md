@@ -1,6 +1,6 @@
 # Changelog for instana-haskell-trace-sdk
 
-## Unreleased
+## 0.6.0.0
 - Fix: Pass span ID of exit span downstream with X-INSTANA-S instead of the entry span's span ID.
 - Fix: Capture HTTP status code in `withHttpEntry` (formely `withCorrelatedHttpEntry`).
 - Breaking: Rename `Instana.SDK.SDK.withCorrelatedHttpEntry` to `withHttpEntry`. The motivation is that this function should be used by client code in almost all cases, so its name should suggest itself as the obvious choice for tracing HTTP entry spans.
