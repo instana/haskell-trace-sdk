@@ -38,6 +38,9 @@ trap 'rm -r "$dir"' EXIT
 
 export PATH=$(stack path --bin-path)
 
+# Only installing stack will not suffice because it does not have the cabal
+# executable.
+# Use https://www.haskell.org/ghcup/ to install everything you need.
 ghc --version
 cabal --version
 stack --version
@@ -63,7 +66,7 @@ localpkgdb=$(stack path --local-pkg-db)
 cabal configure -v2 --builddir=$builddir --package-db=clear --package-db=global --package-db=$snapshotpkgdb --package-db=$localpkgdb
 
 # Build Hadckage compatible docs
-cabal haddock -v2 --builddir=$builddir $HYPERLINK_FLAG --html-location='/package/$pkg-$version/docs' --contents-location='/package/$pkg-$version'
+cabal haddock -v2 --builddir=$builddir $HYPERLINK_FLAG --haddock-html-location="/package/$pkg-$ver/docs" --haddock-contents-location="/package/$pkg-$ver"
 
 # Copy into right directory
 cp -R $builddir/doc/html/$pkg/ $dir/$pkg-$ver-docs
