@@ -73,5 +73,5 @@ Publishing a New Release
 
 Actually, the Hackage server should build the haddock docs after the package has been uploaded and add it to the package version. You can check if this has worked - if the individual modules on <http://hackage.haskell.org/package/instana-haskell-trace-sdk> are links to the documentation, it worked. Legend has it that this takes a few minutes - you could theoretically wait to see if the docs show up. Most of the times this does not actually work for reasons unknown. In these cases you can build the docs manually in the format Hackage expects and upload them for an already published package version by running
 ```
-bin/build-and-upload-docs.sh
+bin/build-and-upload-docs.sh $YOUR_HACKAGE_USER
 ```
