@@ -68,6 +68,7 @@ Publishing a New Release
 * Update `README.md` with API changes.
 * Update `CHANGELOG.md` (update/add entry)
 * Commit and push this change with a commit comment like `chore: version a.b.c.d`
+* Wait for the CI build for branch main.
 * Build the package with stack and upload it to Hackage:
     * `stack haddock && stack sdist && stack upload .`
 
