@@ -562,9 +562,9 @@ startHttpEntry context request = do
 -- capture incoming HTTP requests with 'withHttpEntry', which does
 -- both of these things automatically.
 --
--- Clients should make sure to call this in the context povided above, that is,
--- within 'withHttpEntry_ or between 'startHttpEntry' and 'completeHttpEntry'
--- but outside of blocks that create create an exit span, that is, outside of
+-- Clients should make sure to call this in the context provided above, that is,
+-- within 'withHttpEntry_' or between 'startHttpEntry' and 'completeHttpEntry'
+-- but outside of blocks that create an exit span, that is, outside of
 -- 'withExit', 'withHttpExit' and not between 'startExit' and 'completeExit'.
 postProcessHttpResponse ::
   MonadIO m =>
