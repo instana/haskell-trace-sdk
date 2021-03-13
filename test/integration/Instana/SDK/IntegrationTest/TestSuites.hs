@@ -151,6 +151,7 @@ testWaiMiddleware =
         , WaiMiddleware.shouldCreateNonRootEntry pid
         , WaiMiddleware.shouldAddWebsiteMonitoringCorrelation pid
         , WaiMiddleware.shouldSuppress
+        , WaiMiddleware.shouldCopeWithWrongNestingOfIoActions pid
         ])
       , Suite.options = Suite.defaultOptions {
             Suite.appsUnderTest =
