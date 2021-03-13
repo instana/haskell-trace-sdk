@@ -4,6 +4,7 @@ module Instana.SDK.IntegrationTest.WaiMiddleware
   , shouldCreateNonRootEntry
   , shouldAddWebsiteMonitoringCorrelation
   , shouldSuppress
+  , shouldCopeWithWrongNestingOfIoActions
   ) where
 
 
@@ -17,9 +18,9 @@ import qualified Data.List                              as List
 import           Data.Maybe                             (isNothing, listToMaybe)
 import           Instana.SDK.AgentStub.TraceRequest     (From (..), Span)
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
-import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
-import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel, applyLabel,
+import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
+import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import qualified Network.HTTP.Client                    as HTTP
@@ -31,7 +32,11 @@ import           Test.HUnit
 shouldCreateRootEntry :: String -> IO Test
 shouldCreateRootEntry pid =
   applyLabel "shouldCreateRootEntry" $
-    runMiddlewareTest pid [] (applyConcat [rootEntryAsserts, asserts])
+    runMiddlewareTest
+      pid
+      "api"
+      []
+      (applyConcat [rootEntryAsserts, asserts "api"])
 
 
 shouldCreateNonRootEntry :: String -> IO Test
@@ -39,10 +44,11 @@ shouldCreateNonRootEntry pid =
   applyLabel "shouldCreateNonRootEntry" $ do
     runMiddlewareTest
       pid
+      "api"
       [ ("X-INSTANA-T", "test-trace-id")
       , ("X-INSTANA-S", "test-span-id")
       ]
-      (applyConcat [nonRootEntryAsserts, asserts])
+      (applyConcat [nonRootEntryAsserts, asserts "api"])
 
 
 shouldAddWebsiteMonitoringCorrelation :: String -> IO Test
@@ -50,8 +56,9 @@ shouldAddWebsiteMonitoringCorrelation pid =
   applyLabel "shouldAddWebsiteMonitoringCorrelation" $
     runMiddlewareTest
       pid
+      "api"
       [("X-INSTANA-L", "   1 ,   correlationType = web ;  correlationId =  1234567890abcdef  ")]
-      (applyConcat [rootEntryAsserts, asserts, correlationAsserts])
+      (applyConcat [rootEntryAsserts, asserts "api", correlationAsserts])
 
 
 shouldSuppress :: IO Test
@@ -60,9 +67,23 @@ shouldSuppress =
     runSuppressedTest "api"
 
 
-runMiddlewareTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
-runMiddlewareTest pid headers extraAsserts =
-  runTest pid "api?some=query&parameters=1" headers extraAsserts
+shouldCopeWithWrongNestingOfIoActions :: String -> IO Test
+shouldCopeWithWrongNestingOfIoActions pid =
+  applyLabel "shouldCopeWithWrongNestingOfIoActions" $
+    runMiddlewareTest
+    pid
+    "wrong-nesting"
+    []
+    (applyConcat [rootEntryAsserts, asserts "wrong-nesting"])
+
+
+runMiddlewareTest ::
+  String
+  -> String
+  -> [Header]
+  -> (Span -> [Assertion]) -> IO Test
+runMiddlewareTest pid route headers extraAsserts =
+  runTest pid (route ++ "?some=query&parameters=1") headers extraAsserts
 
 
 runTest :: String -> String -> [Header] -> (Span -> [Assertion]) -> IO Test
@@ -101,7 +122,13 @@ runTest pid urlPath headers extraAsserts = do
             Just entrySpan = maybeEntrySpan
             Just exitSpan = maybeExitSpan
           assertAllIO $
-            (commonAsserts entrySpan exitSpan responseBody from serverTimingValue) ++
+            (commonAsserts
+              entrySpan
+              exitSpan
+              responseBody
+              from
+              serverTimingValue
+            ) ++
             (extraAsserts entrySpan)
 
 
@@ -218,14 +245,14 @@ commonAsserts entrySpan exitSpan responseBody from serverTimingValue =
   ]
 
 
-asserts :: Span -> [Assertion]
-asserts entrySpan =
+asserts :: String -> Span -> [Assertion]
+asserts route entrySpan =
   [ assertEqual "entry data"
     ( Aeson.object
       [ "http"       .= (Aeson.object
           [ "method" .= ("GET" :: String)
           , "host"   .= ("127.0.0.1:1207" :: String)
-          , "url"    .= ("/api" :: String)
+          , "url"    .= (("/" ++ route) :: String)
           , "params" .= ("some=query&parameters=1" :: String)
           , "status" .= (200 :: Int)
           ]

@@ -86,7 +86,8 @@ import           Instana.SDK.Internal.Command        (Command)
 import qualified Instana.SDK.Internal.Command        as Command
 import           Instana.SDK.Internal.Config         (FinalConfig)
 import qualified Instana.SDK.Internal.Config         as InternalConfig
-import           Instana.SDK.Internal.Context        (ConnectionState (..), InternalContext (InternalContext))
+import           Instana.SDK.Internal.Context        (ConnectionState (..),
+                                                      InternalContext (InternalContext))
 import qualified Instana.SDK.Internal.Context        as InternalContext
 import           Instana.SDK.Internal.Id             (Id)
 import qualified Instana.SDK.Internal.Id             as Id
@@ -282,10 +283,7 @@ withHttpEntry ::
   -> Wai.Request
   -> m Wai.Response
   -> m Wai.Response
-withHttpEntry
-  context
-  request
-  io = do
+withHttpEntry context request io = do
     response <- withHttpEntry_ context request $ do
       io >>= postProcessHttpResponse context
     return response
@@ -563,6 +561,11 @@ startHttpEntry context request = do
 -- Client code should rarely have the need to call this directly. Instead,
 -- capture incoming HTTP requests with 'withHttpEntry', which does
 -- both of these things automatically.
+--
+-- Clients should make sure to call this in the context povided above, that is,
+-- within 'withHttpEntry_ or between 'startHttpEntry' and 'completeHttpEntry'
+-- but outside of blocks that create create an exit span, that is, outside of
+-- 'withExit', 'withHttpExit' and not between 'startExit' and 'completeExit'.
 postProcessHttpResponse ::
   MonadIO m =>
   InstanaContext
@@ -606,7 +609,7 @@ captureHttpStatusUnlifted context response = do
   let
     (HTTPTypes.Status statusCode statusMessage) =
       Wai.responseStatus response
-  addRegisteredDataAt context "http.status" statusCode
+  addRegisteredDataToEntryAt context "http.status" statusCode
   when
     (statusCode >= 500 )
     (addRegisteredDataAt context "http.message" $
@@ -946,6 +949,21 @@ addRegisteredDataAt context path value =
     (\span_ -> Span.addRegisteredDataAt path value span_)
 
 
+-- |Adds additional meta data to the currently active entry span, even if the
+-- currently active span is an exit child of that entry span.
+--
+-- Note that this should only be used for registered spans, not for SDK spans.
+addRegisteredDataToEntryAt ::
+  (MonadIO m, Aeson.ToJSON a) =>
+  InstanaContext
+  -> Text
+  -> a
+  -> m ()
+addRegisteredDataToEntryAt context path value =
+  liftIO $ modifyCurrentEntrySpan context
+    (\span_ -> Span.addRegisteredDataAt path value span_)
+
+
 -- |Adds additional data to the currently active registered span. Call this
 -- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
 -- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
@@ -1222,10 +1240,39 @@ modifyCurrentSpan context fn = do
       )
 
 
--- |Applies the given function to the given span.
+-- |Applies the given function to the top item on the given span stack.
 mapCurrentSpan :: (Span -> Span) -> Maybe SpanStack -> SpanStack
 mapCurrentSpan fn stack =
   Maybe.fromMaybe
     SpanStack.empty
     ((SpanStack.mapTop fn) <$> stack)
+
+
+-- |Applies the given function to the currently active entry span, even if the
+-- currently active span is an exit child of that entry span. The entry span
+-- will be replaced with the result of the given function.
+modifyCurrentEntrySpan ::
+  InstanaContext
+  -> (Span -> Span)
+  -> IO ()
+modifyCurrentEntrySpan context fn = do
+  threadId <- Concurrent.myThreadId
+  STM.atomically $
+    STM.modifyTVar' (InternalContext.currentSpans context)
+      (\currentSpansPerThread ->
+        let
+          stack = Map.lookup threadId currentSpansPerThread
+          modifiedStack = mapCurrentEntrySpan fn stack
+        in
+        Map.insert threadId modifiedStack currentSpansPerThread
+      )
+
+
+-- |Applies the given function to the entry span (if present) on the given span
+-- stack, even if there is already an exit span on top of it.
+mapCurrentEntrySpan :: (Span -> Span) -> Maybe SpanStack -> SpanStack
+mapCurrentEntrySpan fn stack =
+  Maybe.fromMaybe
+    SpanStack.empty
+    ((SpanStack.mapEntry fn) <$> stack)
 

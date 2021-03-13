@@ -15,6 +15,7 @@ import qualified Instana.SDK.Span.ExitSpan      as ExitSpan
 import           Instana.SDK.Span.RootEntry     (RootEntry (RootEntry))
 import qualified Instana.SDK.Span.RootEntry     as RootEntry
 import           Instana.SDK.Span.Span          (Span (..), SpanKind (..))
+import qualified Instana.SDK.Span.Span          as Span
 
 
 allTests :: Test
@@ -56,6 +57,16 @@ allTests =
     , TestLabel "popPopShouldReturnEntry" popPopShouldReturnEntry
     , TestLabel "popPeekShouldReturnEntry" popPeekShouldReturnEntry
     , TestLabel "popPopShouldLeaveEmpty" popPopShouldLeaveEmpty
+    , TestLabel "mapTopShouldMapEmptyToEmpty" mapTopShouldMapEmptyToEmpty
+    , TestLabel "mapTopShouldMapSuppressedToSuppressed"
+        mapTopShouldMapSuppressedToSuppressed
+    , TestLabel "mapTopShouldApplyFnToEntry" mapTopShouldApplyFnToEntry
+    , TestLabel "mapTopShouldApplyFnToExit" mapTopShouldApplyFnToExit
+    , TestLabel "mapEntryShouldMapEmptyToEmpty" mapEntryShouldMapEmptyToEmpty
+    , TestLabel "mapEntryShouldMapSuppressedToSuppressed"
+        mapEntryShouldMapSuppressedToSuppressed
+    , TestLabel "mapEntryShouldApplyFnToEntry" mapEntryShouldApplyFnToEntry
+    , TestLabel "mapEntryShouldApplyFnToExit" mapEntryShouldApplyFnToExit
     ]
 
 
@@ -274,9 +285,91 @@ popPopShouldLeaveEmpty =
       fst $ SpanStack.pop entryAndExit
 
 
+mapTopShouldMapEmptyToEmpty :: Test
+mapTopShouldMapEmptyToEmpty =
+  TestCase $
+    assertBool "mapTop maps empty to empty" $
+      SpanStack.isEmpty $
+        SpanStack.mapTop increaseEc empty
+
+
+mapTopShouldMapSuppressedToSuppressed :: Test
+mapTopShouldMapSuppressedToSuppressed =
+  TestCase $
+    assertBool "mapTop maps suppressd to suppressd" $
+      SpanStack.isSuppressed $
+        SpanStack.mapTop increaseEc suppressed
+
+
+mapTopShouldApplyFnToEntry :: Test
+mapTopShouldApplyFnToEntry =
+  TestCase $
+    assertEqual "mapTop should apply the function to the entry"
+      (SpanStack.push
+        (Entry (RootEntrySpan (rootEntry { RootEntry.errorCount = 1 })))
+        empty)
+      (SpanStack.mapTop increaseEc entryOnly)
+
+
+mapTopShouldApplyFnToExit :: Test
+mapTopShouldApplyFnToExit =
+  TestCase $
+    assertEqual "mapTop should apply the function to the exit"
+      (SpanStack.push
+        (Exit (exitSpan { ExitSpan.errorCount = 1 }))
+        entryOnly
+      )
+      (SpanStack.mapTop increaseEc entryAndExit)
+
+
+mapEntryShouldMapEmptyToEmpty :: Test
+mapEntryShouldMapEmptyToEmpty =
+  TestCase $
+    assertBool "mapEntry maps empty to empty" $
+      SpanStack.isEmpty $
+        SpanStack.mapEntry increaseEc empty
+
+
+mapEntryShouldMapSuppressedToSuppressed :: Test
+mapEntryShouldMapSuppressedToSuppressed =
+  TestCase $
+    assertBool "mapEntry maps suppressd to suppressd" $
+      SpanStack.isSuppressed $
+        SpanStack.mapEntry increaseEc suppressed
+
+
+mapEntryShouldApplyFnToEntry :: Test
+mapEntryShouldApplyFnToEntry =
+  TestCase $
+    assertEqual "mapEntry should apply the function to the entry"
+      (SpanStack.push
+        (Entry (RootEntrySpan (rootEntry { RootEntry.errorCount = 1 })))
+        empty)
+      (SpanStack.mapEntry increaseEc entryOnly)
+
+
+mapEntryShouldApplyFnToExit :: Test
+mapEntryShouldApplyFnToExit =
+  TestCase $
+    assertEqual
+      "mapEntry should apply the function to the entry when an exit is present"
+      (SpanStack.push
+        (Exit exitSpan)
+        (SpanStack.push
+          (Entry (RootEntrySpan (rootEntry { RootEntry.errorCount = 1 })))
+          empty)
+        )
+      (SpanStack.mapEntry increaseEc entryAndExit)
+
+
 empty :: SpanStack
 empty =
   SpanStack.empty
+
+
+suppressed :: SpanStack
+suppressed =
+  SpanStack.suppress
 
 
 entryOnly :: SpanStack
@@ -291,7 +384,11 @@ entryAndExit =
 
 entrySpan :: EntrySpan
 entrySpan =
-  RootEntrySpan $
+  RootEntrySpan rootEntry
+
+
+rootEntry :: RootEntry
+rootEntry =
     RootEntry
       { RootEntry.spanAndTraceId  = Id.fromString "traceId"
       , RootEntry.spanName        = "test.entry"
@@ -315,6 +412,11 @@ exitSpan =
     , ExitSpan.serviceName = Nothing
     , ExitSpan.spanData    = emptyValue
     }
+
+
+increaseEc :: Span -> Span
+increaseEc =
+  Span.addToErrorCount 1
 
 
 emptyValue :: Value

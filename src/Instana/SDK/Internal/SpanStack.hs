@@ -9,6 +9,7 @@ module Instana.SDK.Internal.SpanStack
   , entry
   , isEmpty
   , isSuppressed
+  , mapEntry
   , mapTop
   , peek
   , pop
@@ -219,4 +220,22 @@ mapTop fn stack =
     newTop = fn oldTop
   in
   push newTop remainder
+
+
+{-|Modifies the entry span in place by applying the given function to it. This
+is a no op if the span stack is empty. This function will never modify the exit
+span.
+-}
+mapEntry :: (Span -> Span) -> SpanStack -> SpanStack
+mapEntry _ None =
+  None
+mapEntry _ Suppressed =
+  Suppressed
+mapEntry fn (EntryOnly entrySpan) =
+  mapTop fn (EntryOnly entrySpan)
+mapEntry fn (EntryAndExit oldEntrySpan oldExitSpan) =
+  let
+    (Entry newEntrySpan) = fn (Entry oldEntrySpan)
+  in
+  EntryAndExit newEntrySpan oldExitSpan
 

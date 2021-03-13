@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## Unreleased
+- Fix: Capture HTTP status code in `postProcessHttpRespons` even if an the currently active span is an exit.
+
 ## 0.6.0.0
 - Fix: Pass span ID of exit span downstream with X-INSTANA-S instead of the entry span's span ID.
 - Fix: Capture HTTP status code in `withHttpEntry` (formely `withCorrelatedHttpEntry`).

@@ -20,10 +20,9 @@ import           System.Log.Formatter
 import           System.Log.Handler           (setFormatter)
 import           System.Log.Handler.Simple    (GenericHandler, fileHandler,
                                                streamHandler)
-import           System.Log.Logger            (Priority (..), rootLoggerName,
-                                               setHandlers, setLevel,
-                                               updateGlobalLogger)
-import           System.Log.Logger            (infoM)
+import           System.Log.Logger            (Priority (..), infoM,
+                                               rootLoggerName, setHandlers,
+                                               setLevel, updateGlobalLogger)
 import qualified System.Posix.Process         as Posix
 import           System.Posix.Types           (CPid)
 
@@ -44,6 +43,8 @@ application instana httpManager pid request respond = do
       ping respond pid
     ("GET", ["api"]) ->
       apiUnderTest instana httpManager request respond
+    ("GET", ["wrong-nesting"]) ->
+      apiUnderTestWithWrongNesting instana httpManager request respond
     ("POST", ["shutdown"]) ->
       shutDown respond
     _ ->
@@ -82,15 +83,49 @@ apiUnderTest instana httpManager _ respond = do
     instana
     downstreamRequest
     (\req -> do
-      dowstreamRequest' <- HTTP.httpLbs req httpManager
-      threadDelay $ 1000 -- make sure there is a duration > 0
-      return dowstreamRequest'
+      -- make sure there is a duration > 0
+      threadDelay $ 1000
+      -- execute downstream request
+      HTTP.httpLbs req httpManager
     )
   respond $
     Wai.responseLBS
       HTTPTypes.status200
       [("Content-Type", "application/json; charset=UTF-8")]
       (HTTP.responseBody downstreamResponse)
+
+
+-- | In this handler, sending the response to the incoming HTTP request is
+-- nested within the withHttpExit call. Technically, it is a wrong usage pattern
+-- but we have some mechanisms in place to cope with it.
+apiUnderTestWithWrongNesting ::
+  InstanaContext
+  -> HTTP.Manager
+  -> Wai.Request
+  -> (Wai.Response -> IO Wai.ResponseReceived)
+  -> IO Wai.ResponseReceived
+apiUnderTestWithWrongNesting instana httpManager _ respond = do
+  downstreamRequest <-
+    HTTP.parseUrlThrow $
+      "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+  InstanaSDK.withHttpExit
+    instana
+    downstreamRequest
+    (\req -> do
+      -- make sure there is a duration > 0
+      threadDelay $ 1000
+      -- execute downstream request
+      downstreamResponse <- HTTP.httpLbs req httpManager
+      -- Send response within withHttpExit block. This is wrong because it will
+      -- finish the HTTP entry while the HTTP exit is still active. Wai's
+      -- respond callback should be called outside of withHttpExit. But the SDK
+      -- can cope with it to some degree.
+      respond $
+        Wai.responseLBS
+          HTTPTypes.status200
+          [("Content-Type", "application/json; charset=UTF-8")]
+          (HTTP.responseBody downstreamResponse)
+    )
 
 
 shutDown ::
