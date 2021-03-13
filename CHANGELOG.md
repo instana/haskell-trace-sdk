@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## Unreleased
+- Fix: Ignore incoming X-INSTANA-T/-S if website monitoring correlation data is present.
+
 ## 0.6.1.0
 - Fix: Capture HTTP status code in `postProcessHttpRespons` even if an the currently active span is an exit.
 
