@@ -314,11 +314,19 @@ withHttpEntry_ context request io = do
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
     level = TracingHeaders.level tracingHeaders
+    (traceId', spanId') =
+      case TracingHeaders.correlationId tracingHeaders of
+        Nothing ->
+          (traceId, spanId)
+        Just _ ->
+          (Nothing, Nothing)
+
+
   case level of
     TracingHeaders.Trace -> do
       let
         io' = addDataFromRequest context request io
-      case (traceId, spanId) of
+      case (traceId', spanId') of
         (Just t, Just s) ->
           withEntry context t s spanType io'
         _                -> do
@@ -522,9 +530,17 @@ startHttpEntry context request = do
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
     level = TracingHeaders.level tracingHeaders
+    -- ignore incoming X-INSTANA-T/-S if eum correlation data is present
+    (traceId', spanId') =
+      case TracingHeaders.correlationId tracingHeaders of
+        Nothing ->
+          (traceId, spanId)
+        Just _ ->
+          (Nothing, Nothing)
+
   case level of
     TracingHeaders.Trace ->
-      case (traceId, spanId) of
+      case (traceId', spanId') of
         (Just t, Just s) -> do
           startEntry context t s spanType
           addHttpData context request

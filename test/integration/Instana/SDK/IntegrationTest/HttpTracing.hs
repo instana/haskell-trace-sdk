@@ -2,10 +2,12 @@
 module Instana.SDK.IntegrationTest.HttpTracing
   ( shouldCreateRootEntryWithBracketApi
   , shouldAddWebsiteMonitoringCorrelationWithBracketApi
+  , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi
   , shouldCreateNonRootEntryWithBracketApi
   , shouldSuppressWithBracketApi
   , shouldCreateRootEntryWithLowLevelApi
   , shouldAddWebsiteMonitoringCorrelationWithLowLevelApi
+  , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi
   , shouldCreateNonRootEntryWithLowLevelApi
   , shouldSuppressWithLowLevelApi
   ) where
@@ -21,9 +23,9 @@ import qualified Data.List                              as List
 import           Data.Maybe                             (isNothing, listToMaybe)
 import           Instana.SDK.AgentStub.TraceRequest     (From (..), Span)
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
-import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
-import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel, applyLabel,
+import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
+import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 import qualified Network.HTTP.Client                    as HTTP
@@ -47,6 +49,18 @@ shouldAddWebsiteMonitoringCorrelationWithBracketApi pid =
     runBracketTest
       pid
       [("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")]
+      (applyConcat [rootEntryAsserts, bracketAsserts, correlationAsserts])
+
+
+shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi :: String -> IO Test
+shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi pid =
+  applyLabel "shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi" $
+    runBracketTest
+      pid
+      [ ("X-INSTANA-T", "test-trace-id")
+      , ("X-INSTANA-S", "test-span-id")
+      , ("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")
+      ]
       (applyConcat [rootEntryAsserts, bracketAsserts, correlationAsserts])
 
 
@@ -82,6 +96,18 @@ shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid =
     runLowLevelTest
       pid
       [("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")]
+      (applyConcat [rootEntryAsserts, lowLevelAsserts, correlationAsserts])
+
+
+shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi :: String -> IO Test
+shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi pid =
+  applyLabel "shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi" $
+    runLowLevelTest
+      pid
+      [ ("X-INSTANA-T", "test-trace-id")
+      , ("X-INSTANA-S", "test-span-id")
+      , ("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")
+      ]
       (applyConcat [rootEntryAsserts, lowLevelAsserts, correlationAsserts])
 
 
