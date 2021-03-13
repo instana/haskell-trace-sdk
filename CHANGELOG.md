@@ -1,6 +1,6 @@
 # Changelog for instana-haskell-trace-sdk
 
-## Unreleased
+## 0.6.1.0
 - Fix: Capture HTTP status code in `postProcessHttpRespons` even if an the currently active span is an exit.
 
 ## 0.6.0.0
