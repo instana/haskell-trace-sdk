@@ -12,6 +12,7 @@ module Instana.SDK.Span.RootEntry
   , setServiceName
   , setCorrelationType
   , setCorrelationId
+  , setSynthetic
   ) where
 
 
@@ -39,6 +40,8 @@ data RootEntry =
     , errorCount      :: Int
       -- |An attribute for overriding the name of the service in Instana
     , serviceName     :: Maybe Text
+      -- |A flag indicating that this span represents a synthetic call
+    , synthetic       :: Bool
       -- |The website monitoring correlation type
     , correlationType :: Maybe Text
       -- |The website monitoring correlation ID
@@ -72,6 +75,12 @@ addToErrorCount increment rootEntry =
 setServiceName :: Text -> RootEntry -> RootEntry
 setServiceName serviceName_ rootEntry =
   rootEntry { serviceName = Just serviceName_ }
+
+
+-- |Set the synthetic flag.
+setSynthetic :: Bool -> RootEntry -> RootEntry
+setSynthetic synthetic_ rootEntry =
+  rootEntry { synthetic = synthetic_ }
 
 
 -- |Set the website monitoring correlation type.

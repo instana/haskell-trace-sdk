@@ -5,7 +5,7 @@ module Instana.SDK.AgentStub.TraceRequest where
 
 
 import           Data.Aeson          (FromJSON, ToJSON, Value (Object), (.:),
-                                      (.=))
+                                      (.:?), (.=))
 import qualified Data.Aeson          as Aeson
 import qualified Data.HashMap.Strict as HM
 import           Data.Text           (Text)
@@ -49,6 +49,7 @@ data Span =
     , ec       :: Int          -- errorCount
     , crtp     :: Maybe String -- correlation type
     , crid     :: Maybe String -- correlation id
+    , sy       :: Maybe Bool   -- synthetic
     , spanData :: Aeson.Value  -- spanData
     , f        :: Maybe From   -- from
     } deriving (Eq, Show, Generic)
@@ -58,18 +59,19 @@ instance FromJSON Span where
   parseJSON = Aeson.withObject "span" $
     \decodedObject ->
       Span
-        <$> decodedObject .: "t"
-        <*> decodedObject .: "s"
-        <*> decodedObject .: "p"
-        <*> decodedObject .: "n"
-        <*> decodedObject .: "ts"
-        <*> decodedObject .: "d"
-        <*> decodedObject .: "k"
-        <*> decodedObject .: "ec"
-        <*> decodedObject .: "crtp"
-        <*> decodedObject .: "crid"
-        <*> decodedObject .: "data"
-        <*> decodedObject .: "f"
+        <$> decodedObject .:  "t"
+        <*> decodedObject .:  "s"
+        <*> decodedObject .:  "p"
+        <*> decodedObject .:  "n"
+        <*> decodedObject .:  "ts"
+        <*> decodedObject .:  "d"
+        <*> decodedObject .:  "k"
+        <*> decodedObject .:  "ec"
+        <*> decodedObject .:  "crtp"
+        <*> decodedObject .:  "crid"
+        <*> decodedObject .:? "sy"
+        <*> decodedObject .:  "data"
+        <*> decodedObject .:  "f"
 
 
 instance ToJSON Span where
@@ -84,6 +86,7 @@ instance ToJSON Span where
     , "ec"   .= ec sp
     , "crtp" .= crtp sp
     , "crid" .= crid sp
+    , "sy"   .= sy sp
     , "data" .= spanData sp
     , "f"    .= f sp
     ]

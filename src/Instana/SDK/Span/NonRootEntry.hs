@@ -8,6 +8,7 @@ module Instana.SDK.Span.NonRootEntry
   , addData
   , addToErrorCount
   , setServiceName
+  , setSynthetic
   ) where
 
 
@@ -39,6 +40,8 @@ data NonRootEntry =
     , errorCount  :: Int
       -- |An attribute for overriding the name of the service in Instana
     , serviceName :: Maybe Text
+      -- |A flag indicating that this span represents a synthetic call
+    , synthetic   :: Bool
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
     , spanData    :: Value
@@ -58,6 +61,12 @@ addToErrorCount increment nonRootEntry =
 setServiceName :: Text -> NonRootEntry -> NonRootEntry
 setServiceName serviceName_ nonRootEntry =
   nonRootEntry { serviceName = Just serviceName_ }
+
+
+-- |Set the synthetic flag.
+setSynthetic :: Bool -> NonRootEntry -> NonRootEntry
+setSynthetic synthetic_ nonRootEntry =
+  nonRootEntry { synthetic = synthetic_ }
 
 
 -- |Add a value to the span's data section.

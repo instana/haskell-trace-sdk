@@ -15,9 +15,11 @@ module Instana.SDK.Span.EntrySpan
   , setCorrelationId
   , setCorrelationType
   , setServiceName
+  , setSynthetic
   , spanData
   , spanId
   , spanName
+  , synthetic
   , timestamp
   , traceId
   ) where
@@ -153,6 +155,25 @@ setCorrelationId correlationId_ entrySpan =
       RootEntrySpan $ RootEntry.setCorrelationId correlationId_ entry
     NonRootEntrySpan _ ->
       entrySpan
+
+
+-- |The synthetic flag.
+synthetic :: EntrySpan -> Bool
+synthetic entrySpan =
+  case entrySpan of
+    RootEntrySpan entry    -> RootEntry.synthetic entry
+    NonRootEntrySpan entry -> NonRootEntry.synthetic entry
+
+
+-- |Set the synthetic flag. This should only be set on entry spans. It will be
+-- silently ignored for other types of spans.
+setSynthetic :: Bool -> EntrySpan -> EntrySpan
+setSynthetic synthetic_ entrySpan =
+  case entrySpan of
+    RootEntrySpan entry ->
+      RootEntrySpan $ RootEntry.setSynthetic synthetic_ entry
+    NonRootEntrySpan entry ->
+      NonRootEntrySpan $ NonRootEntry.setSynthetic synthetic_ entry
 
 
 -- |Optional additional span data.

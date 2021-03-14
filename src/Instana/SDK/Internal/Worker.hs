@@ -139,6 +139,8 @@ queueEntrySpan entrySpan context = do
       , WireSpan.serviceName     = EntrySpan.serviceName entrySpan
       , WireSpan.correlationType = EntrySpan.correlationType entrySpan
       , WireSpan.correlationId   = EntrySpan.correlationId entrySpan
+      , WireSpan.synthetic       =
+          if EntrySpan.synthetic entrySpan then Just True else Nothing
       , WireSpan.spanData        = EntrySpan.spanData entrySpan
       }
 
@@ -162,6 +164,7 @@ queueExitSpan exitSpan context = do
       , WireSpan.serviceName     = ExitSpan.serviceName exitSpan
       , WireSpan.correlationType = Nothing
       , WireSpan.correlationId   = Nothing
+      , WireSpan.synthetic       = Nothing
       , WireSpan.spanData        = ExitSpan.spanData exitSpan
       }
 

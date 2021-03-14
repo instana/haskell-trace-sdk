@@ -124,14 +124,16 @@ testHttpTracing =
       { Suite.label = "HTTP Tracing"
       , Suite.tests = (\pid -> [
           HttpTracing.shouldCreateRootEntryWithBracketApi pid
-        , HttpTracing.shouldCreateNonRootEntryWithBracketApi pid
         , HttpTracing.shouldAddWebsiteMonitoringCorrelationWithBracketApi pid
         , HttpTracing.shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi pid
+        , HttpTracing.shouldCreateNonRootEntryWithBracketApi pid
+        , HttpTracing.shouldSetSpanSyWithBracketApi pid
         , HttpTracing.shouldSuppressWithBracketApi
         , HttpTracing.shouldCreateRootEntryWithLowLevelApi pid
         , HttpTracing.shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid
         , HttpTracing.shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi pid
         , HttpTracing.shouldCreateNonRootEntryWithLowLevelApi pid
+        , HttpTracing.shouldSetSpanSyWithLowLevelApi pid
         , HttpTracing.shouldSuppressWithLowLevelApi
         ])
       , Suite.options = Suite.defaultOptions {
