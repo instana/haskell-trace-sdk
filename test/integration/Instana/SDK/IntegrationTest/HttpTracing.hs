@@ -4,11 +4,13 @@ module Instana.SDK.IntegrationTest.HttpTracing
   , shouldAddWebsiteMonitoringCorrelationWithBracketApi
   , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi
   , shouldCreateNonRootEntryWithBracketApi
+  , shouldSetSpanSyWithBracketApi
   , shouldSuppressWithBracketApi
   , shouldCreateRootEntryWithLowLevelApi
   , shouldAddWebsiteMonitoringCorrelationWithLowLevelApi
   , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi
   , shouldCreateNonRootEntryWithLowLevelApi
+  , shouldSetSpanSyWithLowLevelApi
   , shouldSuppressWithLowLevelApi
   ) where
 
@@ -40,7 +42,7 @@ shouldCreateRootEntryWithBracketApi pid =
     runBracketTest
       pid
       []
-      (applyConcat [rootEntryAsserts, bracketAsserts])
+      (applyConcat [rootEntryAsserts, bracketAsserts, notSyntheticAssert])
 
 
 shouldAddWebsiteMonitoringCorrelationWithBracketApi :: String -> IO Test
@@ -49,7 +51,12 @@ shouldAddWebsiteMonitoringCorrelationWithBracketApi pid =
     runBracketTest
       pid
       [("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")]
-      (applyConcat [rootEntryAsserts, bracketAsserts, correlationAsserts])
+      (applyConcat [
+          rootEntryAsserts
+        , bracketAsserts
+        , correlationAsserts
+        , notSyntheticAssert
+      ])
 
 
 shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi :: String -> IO Test
@@ -61,7 +68,12 @@ shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi
       , ("X-INSTANA-S", "test-span-id")
       , ("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")
       ]
-      (applyConcat [rootEntryAsserts, bracketAsserts, correlationAsserts])
+      (applyConcat [
+          rootEntryAsserts
+        , bracketAsserts
+        , correlationAsserts
+        , notSyntheticAssert
+      ])
 
 
 shouldCreateNonRootEntryWithBracketApi :: String -> IO Test
@@ -72,7 +84,19 @@ shouldCreateNonRootEntryWithBracketApi pid =
       [ ("X-INSTANA-T", "test-trace-id")
       , ("X-INSTANA-S", "test-span-id")
       ]
-      (applyConcat [nonRootEntryAsserts, bracketAsserts])
+      (applyConcat [nonRootEntryAsserts, bracketAsserts, notSyntheticAssert])
+
+
+shouldSetSpanSyWithBracketApi :: String -> IO Test
+shouldSetSpanSyWithBracketApi pid =
+  applyLabel "shouldSetSpanSyWithBracketApi" $ do
+    runBracketTest
+      pid
+      [ ("X-INSTANA-T", "test-trace-id")
+      , ("X-INSTANA-S", "test-span-id")
+      , ("X-INSTANA-SYNTHETIC", "1")
+      ]
+      (applyConcat [nonRootEntryAsserts, bracketAsserts, syntheticAssert])
 
 
 shouldSuppressWithBracketApi :: IO Test
@@ -87,7 +111,11 @@ shouldCreateRootEntryWithLowLevelApi pid =
     runLowLevelTest
       pid
       []
-      (applyConcat [rootEntryAsserts, lowLevelAsserts])
+      (applyConcat [
+          rootEntryAsserts
+        , lowLevelAsserts
+        , notSyntheticAssert
+      ])
 
 
 shouldAddWebsiteMonitoringCorrelationWithLowLevelApi :: String -> IO Test
@@ -96,7 +124,7 @@ shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid =
     runLowLevelTest
       pid
       [("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")]
-      (applyConcat [rootEntryAsserts, lowLevelAsserts, correlationAsserts])
+      (applyConcat [rootEntryAsserts, lowLevelAsserts, correlationAsserts, notSyntheticAssert])
 
 
 shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi :: String -> IO Test
@@ -108,7 +136,7 @@ shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelAp
       , ("X-INSTANA-S", "test-span-id")
       , ("X-INSTANA-L", "1,correlationType=web;correlationId=1234567890abcdef")
       ]
-      (applyConcat [rootEntryAsserts, lowLevelAsserts, correlationAsserts])
+      (applyConcat [rootEntryAsserts, lowLevelAsserts, correlationAsserts, notSyntheticAssert])
 
 
 shouldCreateNonRootEntryWithLowLevelApi :: String -> IO Test
@@ -119,7 +147,23 @@ shouldCreateNonRootEntryWithLowLevelApi pid =
       [ ("X-INSTANA-T", "test-trace-id")
       , ("X-INSTANA-S", "test-span-id")
       ]
-      (applyConcat [nonRootEntryAsserts, lowLevelAsserts])
+      (applyConcat [
+          nonRootEntryAsserts
+        , lowLevelAsserts
+        , notSyntheticAssert
+      ])
+
+
+shouldSetSpanSyWithLowLevelApi :: String -> IO Test
+shouldSetSpanSyWithLowLevelApi pid =
+  applyLabel "shouldSetSpanSyWithLowLevelApi" $ do
+    runLowLevelTest
+      pid
+      [ ("X-INSTANA-T", "test-trace-id")
+      , ("X-INSTANA-S", "test-span-id")
+      , ("X-INSTANA-SYNTHETIC", "1")
+      ]
+      (applyConcat [nonRootEntryAsserts, lowLevelAsserts, syntheticAssert])
 
 
 shouldSuppressWithLowLevelApi :: IO Test
@@ -338,6 +382,18 @@ lowLevelAsserts entrySpan =
       ]
     )
     (TraceRequest.spanData entrySpan)
+  ]
+
+
+syntheticAssert :: Span -> [Assertion]
+syntheticAssert span_ =
+  [ assertEqual "span.sy" (Just True) (TraceRequest.sy span_)
+  ]
+
+
+notSyntheticAssert :: Span -> [Assertion]
+notSyntheticAssert span_ =
+  [ assertEqual "span.sy" Nothing (TraceRequest.sy span_)
   ]
 
 

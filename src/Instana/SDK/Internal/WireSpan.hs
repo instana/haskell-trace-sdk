@@ -99,6 +99,7 @@ data QueuedSpan = QueuedSpan
   , serviceName     :: Maybe Text
   , correlationType :: Maybe Text
   , correlationId   :: Maybe Text
+  , synthetic       :: Maybe Bool
   , spanData        :: Value
   } deriving (Eq, Generic, Show)
 
@@ -141,6 +142,7 @@ instance ToJSON WireSpan where
       , "ec"    .= errorCount span_
       , "crtp"  .= correlationType span_
       , "crid"  .= correlationId span_
+      , "sy"    .= synthetic span_
       , "data"  .= spanData_
       , "f"     .= From pid_ agentUuid_
       ]

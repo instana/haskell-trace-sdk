@@ -126,4 +126,3 @@ shouldParseXInstanaL1WithOddlyFormattedCorrelation =
     assertEqual "correlation type" (Just "web") correlationType
     assertEqual "correlation ID" (Just "1234567890abcdef") correlationId
 
-

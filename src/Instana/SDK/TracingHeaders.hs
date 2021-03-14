@@ -11,6 +11,7 @@ module Instana.SDK.TracingHeaders
   , parseXInstanaL
   , spanIdHeaderName
   , stringToTracingLevel
+  , syntheticHeaderName
   , traceIdHeaderName
   , tracingLevelToString
   ) where
@@ -34,6 +35,11 @@ spanIdHeaderName = "X-INSTANA-S"
 -- |X-INSTANA-L
 levelHeaderName :: HTTPHeader.HeaderName
 levelHeaderName = "X-INSTANA-L"
+
+
+-- |X-INSTANA-SYNTHETIC
+syntheticHeaderName :: HTTPHeader.HeaderName
+syntheticHeaderName = "X-INSTANA-SYNTHETIC"
 
 
 -- |Tracing level.
@@ -106,5 +112,7 @@ data TracingHeaders  =
     , correlationType :: Maybe String
       -- |eum correlation ID
     , correlationId   :: Maybe String
+      -- |synthetic flag
+    , synthetic       :: Bool
     } deriving (Eq, Generic, Show)
 

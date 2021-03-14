@@ -20,10 +20,12 @@ module Instana.SDK.Span.Span
   , setCorrelationId
   , setCorrelationType
   , setServiceName
+  , setSynthetic
   , spanData
   , spanId
   , spanKind
   , spanName
+  , synthetic
   , timestamp
   , traceId
   ) where
@@ -179,6 +181,25 @@ setCorrelationId correlationId_ span_ =
   case span_ of
     Entry entry ->
       Entry $ EntrySpan.setCorrelationId correlationId_ entry
+    Exit _ ->
+      span_
+
+
+-- |The synthetic flag.
+synthetic :: Span -> Bool
+synthetic span_ =
+  case span_ of
+    Entry entry -> EntrySpan.synthetic entry
+    Exit _      -> False
+
+
+-- |Set the synthetic flag. This should only be set on entry spans. It will be
+-- silently ignored for other types of spans.
+setSynthetic :: Bool -> Span -> Span
+setSynthetic synthetic_ span_ =
+  case span_ of
+    Entry entry ->
+      Entry $ EntrySpan.setSynthetic synthetic_ entry
     Exit _ ->
       span_
 

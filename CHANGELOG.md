@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Fix: Ignore incoming X-INSTANA-T/-S if website monitoring correlation data is present.
+- Add support for X-INSTANA-SYNTHETIC
 
 ## 0.6.1.0
 - Fix: Capture HTTP status code in `postProcessHttpRespons` even if an the currently active span is an exit.

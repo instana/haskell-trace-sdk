@@ -268,6 +268,7 @@ entrySpan =
         , RootEntry.timestamp       = 1514761200000
         , RootEntry.errorCount      = 0
         , RootEntry.serviceName     = Nothing
+        , RootEntry.synthetic       = False
         , RootEntry.correlationType = Nothing
         , RootEntry.correlationId   = Nothing
         , RootEntry.spanData        = initialData

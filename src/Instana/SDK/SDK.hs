@@ -42,6 +42,7 @@ module Instana.SDK.SDK
     , setCorrelationId
     , setCorrelationType
     , setServiceName
+    , setSynthetic
     , startEntry
     , startExit
     , startHttpEntry
@@ -313,6 +314,7 @@ withHttpEntry_ context request io = do
     tracingHeaders = readHttpTracingHeaders request
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
+    synthetic = TracingHeaders.synthetic tracingHeaders
     level = TracingHeaders.level tracingHeaders
     (traceId', spanId') =
       case TracingHeaders.correlationId tracingHeaders of
@@ -321,11 +323,10 @@ withHttpEntry_ context request io = do
         Just _ ->
           (Nothing, Nothing)
 
-
   case level of
     TracingHeaders.Trace -> do
       let
-        io' = addDataFromRequest context request io
+        io' = addDataFromRequest context request synthetic io
       case (traceId', spanId') of
         (Just t, Just s) ->
           withEntry context t s spanType io'
@@ -350,19 +351,31 @@ withHttpEntry_ context request io = do
 
 -- |Takes an IO action and appends another side effecto to it that will add HTTP
 -- data from the given request to the current span.
-addDataFromRequest :: MonadIO m => InstanaContext -> Wai.Request -> m a -> m a
-addDataFromRequest context request originalIO =
-  originalIO >>= addHttpDataInIO context request
+addDataFromRequest ::
+  MonadIO m =>
+  InstanaContext ->
+  Wai.Request ->
+  Bool ->
+  m a ->
+  m a
+addDataFromRequest context request synthetic originalIO =
+  originalIO >>= addHttpDataInIO context request synthetic
 
 
-addHttpDataInIO :: MonadIO m => InstanaContext -> Wai.Request -> a -> m a
-addHttpDataInIO context request ioResult = do
-  addHttpData context request
+addHttpDataInIO ::
+  MonadIO m =>
+  InstanaContext ->
+  Wai.Request ->
+  Bool ->
+  a ->
+  m a
+addHttpDataInIO context request synthetic ioResult = do
+  addHttpData context request synthetic
   return ioResult
 
 
-addHttpData :: MonadIO m => InstanaContext -> Wai.Request -> m ()
-addHttpData context request = do
+addHttpData :: MonadIO m => InstanaContext -> Wai.Request -> Bool -> m ()
+addHttpData context request synthetic = do
   let
     host :: String
     host =
@@ -380,6 +393,7 @@ addHttpData context request = do
         ]
       ]
     )
+  setSynthetic context synthetic
 
 
 addCorrelationTypeAndIdToSpan ::
@@ -457,6 +471,7 @@ startRootEntry context spanType = do
             , RootEntry.timestamp       = timestamp
             , RootEntry.errorCount      = 0
             , RootEntry.serviceName     = Nothing
+            , RootEntry.synthetic       = False
             , RootEntry.correlationType = Nothing
             , RootEntry.correlationId   = Nothing
             , RootEntry.spanData        = SpanType.initialData EntryKind spanType
@@ -498,6 +513,7 @@ startEntry context traceId parentId spanType = do
             , NonRootEntry.timestamp   = timestamp
             , NonRootEntry.errorCount  = 0
             , NonRootEntry.serviceName = Nothing
+            , NonRootEntry.synthetic   = False
             , NonRootEntry.spanData    = SpanType.initialData EntryKind spanType
             }
     pushSpan
@@ -529,6 +545,7 @@ startHttpEntry context request = do
     tracingHeaders = readHttpTracingHeaders request
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
+    synthetic = TracingHeaders.synthetic tracingHeaders
     level = TracingHeaders.level tracingHeaders
     -- ignore incoming X-INSTANA-T/-S if eum correlation data is present
     (traceId', spanId') =
@@ -543,10 +560,10 @@ startHttpEntry context request = do
       case (traceId', spanId') of
         (Just t, Just s) -> do
           startEntry context t s spanType
-          addHttpData context request
+          addHttpData context request synthetic
         _                -> do
           startRootEntry context spanType
-          addHttpData context request
+          addHttpData context request synthetic
           addCorrelationTypeAndIdToSpan context tracingHeaders $ return ()
 
     TracingHeaders.Suppress -> do
@@ -901,6 +918,14 @@ setCorrelationId context correlationId_ =
     (\span_ -> Span.setCorrelationId correlationId_ span_)
 
 
+-- |Set the synthetic flag. This should only be set on entry spans. It will be
+-- silently ignored for other types of spans.
+setSynthetic :: MonadIO m => InstanaContext -> Bool -> m ()
+setSynthetic context synthetic =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.setSynthetic synthetic span_)
+
+
 -- |Adds additional custom tags to the currently active span. Call this
 -- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
 -- inside the IO action given to with withEntry/withExit/withRootEntry.
@@ -1016,6 +1041,10 @@ readHttpTracingHeaders request =
       |> (<$>) BSC8.unpack
     (level, correlationType, correlationId) =
       TracingHeaders.parseXInstanaL xInstanaLValue
+    synthetic =
+      headers
+      |> List.lookup TracingHeaders.syntheticHeaderName
+      |> (<$>) BSC8.unpack
   in
   TracingHeaders
     { TracingHeaders.traceId = traceId
@@ -1023,6 +1052,7 @@ readHttpTracingHeaders request =
     , TracingHeaders.level = level
     , TracingHeaders.correlationType = correlationType
     , TracingHeaders.correlationId = correlationId
+    , TracingHeaders.synthetic = synthetic == (Just "1")
     }
 
 
