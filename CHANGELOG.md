@@ -1,6 +1,6 @@
 # Changelog for instana-haskell-trace-sdk
 
-## Unreleased
+## 0.6.2.0
 - Fix: Ignore incoming X-INSTANA-T/-S if website monitoring correlation data is present.
 - Add support for X-INSTANA-SYNTHETIC
 
