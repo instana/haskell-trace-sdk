@@ -5,7 +5,7 @@
 - Add support for X-INSTANA-SYNTHETIC
 
 ## 0.6.1.0
-- Fix: Capture HTTP status code in `postProcessHttpRespons` even if an the currently active span is an exit.
+- Fix: Capture HTTP status code in `postProcessHttpRespons` even if the currently active span is an exit.
 
 ## 0.6.0.0
 - Fix: Pass span ID of exit span downstream with X-INSTANA-S instead of the entry span's span ID.

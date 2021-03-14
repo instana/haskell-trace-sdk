@@ -70,8 +70,8 @@ Publishing a New Release
 * Wait for the CI build for branch main.
 * Build the package with stack and upload it to Hackage:
     * `stack haddock && stack sdist && stack upload .`
+    * Checkt that the package version is available on  <http://hackage.haskell.org/package/instana-haskell-trace-sdk>.
+    * Run `bin/build-and-upload-docs.sh` to upload the haddock documentation.
 
-Actually, the Hackage server should build the haddock docs after the package has been uploaded and add it to the package version. You can check if this has worked - if the individual modules on <http://hackage.haskell.org/package/instana-haskell-trace-sdk> are links to the documentation, it worked. Legend has it that this takes a few minutes - you could theoretically wait to see if the docs show up. Most of the times this does not actually work for reasons unknown. In these cases you can build the docs manually in the format Hackage expects and upload them for an already published package version by running
-```
-bin/build-and-upload-docs.sh $YOUR_HACKAGE_USER
-```
+Legend has it that the Hackage server should build the haddock docs after the package has been uploaded and add it to the package version. You could check if this has worked - if the individual modules on <http://hackage.haskell.org/package/instana-haskell-trace-sdk> are links to the documentation, it worked. Allegedly, this takes a few minutes. In fact, this has never worked once, for reasons unknown. The script `bin/build-and-upload-docs.sh` takes care of that.
+
