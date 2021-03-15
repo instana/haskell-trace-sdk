@@ -1,7 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Instana.SDK.IntegrationTest.ServiceName
-  ( shouldUseServiceNameEnvVar
-  ) where
+module Instana.SDK.IntegrationTest.ServiceName (allTests) where
 
 
 import           Data.Aeson                             ((.=))
@@ -13,11 +11,17 @@ import           Test.HUnit
 
 import           Instana.SDK.AgentStub.TraceRequest     (From (..))
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
-import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
+import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
+
+
+allTests :: String -> [IO Test]
+allTests pid =
+  [ shouldUseServiceNameEnvVar pid
+  ]
 
 
 shouldUseServiceNameEnvVar :: String -> IO Test

@@ -33,12 +33,7 @@ testBracketApi =
   Run $
     Suite
       { Suite.label = "Bracket API"
-      , Suite.tests = (\pid ->
-         [ BracketApi.shouldRecordSpans pid
-         , BracketApi.shouldRecordNonRootEntry pid
-         , BracketApi.shouldMergeTags pid
-         , BracketApi.shouldSetServiceName pid
-         ])
+      , Suite.tests = BracketApi.allTests
       , Suite.options = Suite.defaultOptions
       }
 
@@ -48,11 +43,7 @@ testLowLevelApi =
   Run $
     Suite
       { Suite.label = "Low Level API"
-      , Suite.tests = (\pid ->
-         [ LowLevelApi.shouldRecordSpans pid
-         , LowLevelApi.shouldRecordNonRootEntry pid
-         , LowLevelApi.shouldMergeTags pid
-         ])
+      , Suite.tests = LowLevelApi.allTests
       , Suite.options = Suite.defaultOptions
       }
 
@@ -110,9 +101,7 @@ testServiceName =
   Run $
     Suite
       { Suite.label = "INSTANA_SERVICE_NAME env var"
-      , Suite.tests = (\pid ->
-         [ ServiceName.shouldUseServiceNameEnvVar pid
-         ])
+      , Suite.tests = ServiceName.allTests
       , Suite.options = Suite.withCustomServiceName "Custom Service Name"
       }
 
@@ -122,20 +111,7 @@ testHttpTracing =
   Run $
     Suite
       { Suite.label = "HTTP Tracing"
-      , Suite.tests = (\pid -> [
-          HttpTracing.shouldCreateRootEntryWithBracketApi pid
-        , HttpTracing.shouldAddWebsiteMonitoringCorrelationWithBracketApi pid
-        , HttpTracing.shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi pid
-        , HttpTracing.shouldCreateNonRootEntryWithBracketApi pid
-        , HttpTracing.shouldSetSpanSyWithBracketApi pid
-        , HttpTracing.shouldSuppressWithBracketApi
-        , HttpTracing.shouldCreateRootEntryWithLowLevelApi pid
-        , HttpTracing.shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid
-        , HttpTracing.shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi pid
-        , HttpTracing.shouldCreateNonRootEntryWithLowLevelApi pid
-        , HttpTracing.shouldSetSpanSyWithLowLevelApi pid
-        , HttpTracing.shouldSuppressWithLowLevelApi
-        ])
+      , Suite.tests = HttpTracing.allTests
       , Suite.options = Suite.defaultOptions {
             Suite.appsUnderTest =
               [ Suite.testServer
@@ -150,13 +126,7 @@ testWaiMiddleware =
   Run $
     Suite
       { Suite.label = "WAI Middleware"
-      , Suite.tests = (\pid -> [
-          WaiMiddleware.shouldCreateRootEntry pid
-        , WaiMiddleware.shouldCreateNonRootEntry pid
-        , WaiMiddleware.shouldAddWebsiteMonitoringCorrelation pid
-        , WaiMiddleware.shouldSuppress
-        , WaiMiddleware.shouldCopeWithWrongNestingOfIoActions pid
-        ])
+      , Suite.tests = WaiMiddleware.allTests
       , Suite.options = Suite.defaultOptions {
             Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware

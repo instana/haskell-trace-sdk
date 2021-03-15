@@ -1,11 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Instana.SDK.IntegrationTest.WaiMiddleware
-  ( shouldCreateRootEntry
-  , shouldCreateNonRootEntry
-  , shouldAddWebsiteMonitoringCorrelation
-  , shouldSuppress
-  , shouldCopeWithWrongNestingOfIoActions
-  ) where
+module Instana.SDK.IntegrationTest.WaiMiddleware (allTests) where
 
 
 import           Control.Concurrent                     (threadDelay)
@@ -27,6 +21,16 @@ import qualified Network.HTTP.Client                    as HTTP
 import           Network.HTTP.Types                     (Header)
 import qualified Network.HTTP.Types.Header
 import           Test.HUnit
+
+
+allTests :: String -> [IO Test]
+allTests pid =
+  [ shouldCreateRootEntry pid
+  , shouldCreateNonRootEntry pid
+  , shouldAddWebsiteMonitoringCorrelation pid
+  , shouldSuppress
+  , shouldCopeWithWrongNestingOfIoActions pid
+  ]
 
 
 shouldCreateRootEntry :: String -> IO Test
