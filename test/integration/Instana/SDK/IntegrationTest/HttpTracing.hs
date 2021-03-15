@@ -1,18 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Instana.SDK.IntegrationTest.HttpTracing
-  ( shouldCreateRootEntryWithBracketApi
-  , shouldAddWebsiteMonitoringCorrelationWithBracketApi
-  , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi
-  , shouldCreateNonRootEntryWithBracketApi
-  , shouldSetSpanSyWithBracketApi
-  , shouldSuppressWithBracketApi
-  , shouldCreateRootEntryWithLowLevelApi
-  , shouldAddWebsiteMonitoringCorrelationWithLowLevelApi
-  , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi
-  , shouldCreateNonRootEntryWithLowLevelApi
-  , shouldSetSpanSyWithLowLevelApi
-  , shouldSuppressWithLowLevelApi
-  ) where
+module Instana.SDK.IntegrationTest.HttpTracing (allTests) where
 
 
 import           Control.Concurrent                     (threadDelay)
@@ -34,6 +21,23 @@ import qualified Network.HTTP.Client                    as HTTP
 import           Network.HTTP.Types                     (Header)
 import qualified Network.HTTP.Types.Header
 import           Test.HUnit
+
+
+allTests :: String -> [IO Test]
+allTests pid =
+  [ shouldCreateRootEntryWithBracketApi pid
+  , shouldAddWebsiteMonitoringCorrelationWithBracketApi pid
+  , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithBracketApi pid
+  , shouldCreateNonRootEntryWithBracketApi pid
+  , shouldSetSpanSyWithBracketApi pid
+  , shouldSuppressWithBracketApi
+  , shouldCreateRootEntryWithLowLevelApi pid
+  , shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid
+  , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi pid
+  , shouldCreateNonRootEntryWithLowLevelApi pid
+  , shouldSetSpanSyWithLowLevelApi pid
+  , shouldSuppressWithLowLevelApi
+  ]
 
 
 shouldCreateRootEntryWithBracketApi :: String -> IO Test
