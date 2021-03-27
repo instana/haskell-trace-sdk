@@ -5,15 +5,21 @@ module Instana.SDK.IntegrationTest.Runner (runSuites) where
 import qualified Data.ByteString.Lazy.Char8             as LBSC8
 import           Data.List                              as List
 import qualified Data.Maybe                             as Maybe
+import qualified Data.Text                              as T
 import qualified Network.HTTP.Client                    as HTTP
 import           System.Environment                     (lookupEnv)
 import           System.Exit                            as Exit
 import           System.Log.Logger                      (infoM)
 import           System.Process                         as Process
-import           Test.HUnit
+import           Test.HUnit                             (Counts (Counts),
+                                                         Test (TestLabel, TestList),
+                                                         assertFailure)
+import qualified Test.HUnit                             as HUnit
+import qualified Test.HUnit.Text                        as HUnitText
 
+import           Instana.SDK.IntegrationTest.HUnitExtra (SuiteResult,
+                                                         mergeTestResults)
 import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
-import           Instana.SDK.IntegrationTest.HUnitExtra (mergeCounts)
 import           Instana.SDK.IntegrationTest.Logging    (testLogger)
 import           Instana.SDK.IntegrationTest.Suite      (AppUnderTest,
                                                          ConditionalSuite (..),
@@ -46,29 +52,50 @@ runSuites allSuites = do
       "Running " ++ show (List.length allSuites) ++ " test suite(s)."
   results <- sequence actions
   let
-    mergedResults = mergeCounts results
-    caseCount = cases mergedResults + skippedDueToExlusive
-    triedCount = tried mergedResults
-    errCount = errors mergedResults
-    failCount = failures mergedResults
-  infoM testLogger $
+    (mergedCounts, mergedReport) = mergeTestResults results
+    caseCount = HUnit.cases mergedCounts + skippedDueToExlusive
+    triedCount = HUnit.tried mergedCounts
+    errCount = HUnit.errors mergedCounts
+    failCount = HUnit.failures mergedCounts
+  if errCount > 0 && failCount > 0 then do
+    logReport mergedReport
+    logSummary caseCount triedCount errCount failCount
+    Exit.die "😱 😭 There have been errors and failures! 😱 😭"
+  else if errCount > 0 then do
+    logReport mergedReport
+    logSummary caseCount triedCount errCount failCount
+    Exit.die "😱 There have been errors! 😱"
+  else if failCount > 0 then do
+    logReport mergedReport
+    logSummary caseCount triedCount errCount failCount
+    Exit.die "😭 There have been test failures. 😭"
+  else do
+    logSummary caseCount triedCount errCount failCount
+    infoM testLogger "🎉 All tests have passed. 🎉"
+  return mergedCounts
+
+
+logReport :: [String] -> IO ()
+logReport report = do
+  _ <- sequence $
+    map
+      (\reportLine -> infoM testLogger reportLine)
+      ("COLLECTED FAILURES:" : report)
+  return ()
+
+
+logSummary :: Int -> Int -> Int -> Int -> IO ()
+logSummary caseCount triedCount errCount failCount =
+ infoM testLogger $
     "SUMMARY: Cases: " ++ show caseCount ++
     "  Tried: " ++ show triedCount ++
     "  Errors: " ++ show errCount ++
     "  Failures: " ++ show failCount
-  if errCount > 0 && failCount > 0 then
-    Exit.die "😱 😭 There have been errors and failures! 😱 😭"
-  else if errCount > 0 then
-    Exit.die "😱 There have been errors! 😱"
-  else if failCount > 0 then
-    Exit.die "😭 There have been test failures. 😭"
-  else infoM testLogger "🎉 All tests have passed. 🎉"
-  return mergedResults
 
 
 {-| Runs the suite unless it is skipped.
 -}
-runConditionalSuite :: ConditionalSuite -> IO Counts
+runConditionalSuite :: ConditionalSuite -> IO SuiteResult
 runConditionalSuite conditionalSuite = do
   case conditionalSuite of
     Run suite       ->
@@ -76,12 +103,12 @@ runConditionalSuite conditionalSuite = do
     Exclusive suite ->
       runSuite suite
     Skip _          ->
-      return $ Counts 1 0 0 0
+      return $ (Counts 1 0 0 0, [])
 
 
 {-| Starts the app under test and the agent stub, then runs the test suite.
 -}
-runSuite :: Suite -> IO Counts
+runSuite :: Suite -> IO SuiteResult
 runSuite suite = do
   let
     suiteLabel = Suite.label suite
@@ -109,6 +136,8 @@ runSuite suite = do
             [ ("APP_LOG_LEVEL", Just logLevel)
             , ("INSTANA_SERVICE_NAME", Suite.customServiceName options)
             , ("INSTANA_LOG_LEVEL", Just logLevel)
+            , ("INSTANA_DISABLE_W3C_TRACE_CORRELATION",
+               booleanEnv $ Suite.disableW3cTraceCorrelation options)
             ]
             "stack exec " ++ (Suite.executable appUnderTest)
         )
@@ -136,7 +165,7 @@ runSuite suite = do
     )
 
 
-runTests :: Suite -> IO Counts
+runTests :: Suite -> IO SuiteResult
 runTests suite = do
   infoM testLogger "⏱  waiting for agent stub to come up"
   _ <- HttpHelper.retryRequestRecovering TestHelper.pingAgentStub
@@ -187,7 +216,7 @@ pingApp appUnderTest = do
 
 -- |Waits for the app under test to establish a connection to the agent, then
 -- runs the tests of the given suite.
-waitForAgentConnectionAndRun :: Suite -> Int -> IO Counts
+waitForAgentConnectionAndRun :: Suite -> Int -> IO SuiteResult
 waitForAgentConnectionAndRun suite appPid = do
   let
     options = Suite.options suite
@@ -204,10 +233,44 @@ waitForAgentConnectionAndRun suite appPid = do
       runTestSuite pid suite
 
 
-runTestSuite :: String -> Suite -> IO Counts
+collectReport :: HUnit.PutText (Int, [String])
+collectReport = HUnit.PutText addToReport (0, [])
+
+
+-- inspired by
+-- https://hackage.haskell.org/package/HUnit-1.6.2.0/docs/src/Test.HUnit.Text.html#putTextToHandle
+-- to avoid excessive output of progress lines
+-- Cases/Tried/Errors/Failures lines, while adding the capability to collect
+-- report lines for printing a summary after all suites have been ran.
+addToReport :: String -> Bool -> (Int, [String]) -> IO (Int, [String])
+-- persistent test report lines, print and collect
+addToReport line True (cnt, lines_) = do
+  putStrLn (erase cnt ++ line);
+  if T.isPrefixOf (T.pack "Cases: ") (T.pack line) then
+    -- Do not collect the test progress lines "Cases: 24 Tried: 24 ..."
+    return $ (0, lines_)
+  else
+    -- Collect everything else, most importantly, detailed info about
+    -- failed assertions
+    return $ (0, lines_ ++ [line])
+-- non-persistent progress lines, print but don't collect
+addToReport line False (_, lines_) = do
+  putStr ('\r' : line)
+  return (length line, lines_)
+
+
+erase :: Int -> String
+erase cnt =
+  if cnt == 0 then "" else "\r" ++ replicate cnt ' ' ++ "\r"
+
+
+runTestSuite :: String -> Suite -> IO SuiteResult
 runTestSuite pid suite = do
   integrationTestsIO <- wrapSuite pid suite
-  runTestTT integrationTestsIO
+  (counts, (_, report)) <- HUnitText.runTestText
+    collectReport
+    integrationTestsIO
+  return (counts, report)
 
 
 wrapSuite :: String -> Suite -> IO Test

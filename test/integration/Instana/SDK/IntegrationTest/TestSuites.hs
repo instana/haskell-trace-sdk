@@ -1,20 +1,22 @@
 module Instana.SDK.IntegrationTest.TestSuites (allSuites) where
 
 
-import qualified Instana.SDK.IntegrationTest.BracketApi    as BracketApi
-import qualified Instana.SDK.IntegrationTest.Connection    as Connection
-import qualified Instana.SDK.IntegrationTest.HttpTracing   as HttpTracing
-import qualified Instana.SDK.IntegrationTest.LowLevelApi   as LowLevelApi
-import qualified Instana.SDK.IntegrationTest.Metrics       as Metrics
-import qualified Instana.SDK.IntegrationTest.ServiceName   as ServiceName
-import           Instana.SDK.IntegrationTest.Suite         (ConditionalSuite (..),
-                                                            Suite (..))
-import qualified Instana.SDK.IntegrationTest.Suite         as Suite
-import qualified Instana.SDK.IntegrationTest.WaiMiddleware as WaiMiddleware
+import qualified Data.Aeson                                 as Aeson
+import qualified Instana.SDK.IntegrationTest.BracketApi     as BracketApi
+import qualified Instana.SDK.IntegrationTest.Connection     as Connection
+import qualified Instana.SDK.IntegrationTest.HttpTracing    as HttpTracing
+import qualified Instana.SDK.IntegrationTest.LowLevelApi    as LowLevelApi
+import qualified Instana.SDK.IntegrationTest.Metrics        as Metrics
+import qualified Instana.SDK.IntegrationTest.ServiceName    as ServiceName
+import qualified Instana.SDK.IntegrationTest.SpecCompliance as SpecCompliance
+import           Instana.SDK.IntegrationTest.Suite          (ConditionalSuite (..),
+                                                             Suite (..))
+import qualified Instana.SDK.IntegrationTest.Suite          as Suite
+import qualified Instana.SDK.IntegrationTest.WaiMiddleware  as WaiMiddleware
 
 
-allSuites :: [ConditionalSuite]
-allSuites =
+allSuites :: Aeson.Array -> [ConditionalSuite]
+allSuites specificationComplianceTestCases =
   [ testBracketApi
   , testLowLevelApi
   , testConnectionEstablishment
@@ -24,6 +26,24 @@ allSuites =
   , testServiceName
   , testHttpTracing
   , testWaiMiddleware
+  , testSpecComplianceW3cOn
+      specificationComplianceTestCases
+      "Low Level API"
+      "http/low/level/api"
+  , testSpecComplianceW3cOff
+      specificationComplianceTestCases
+      "Low Level API"
+      "http/low/level/api"
+  , testSpecComplianceW3cOn
+      specificationComplianceTestCases
+      "Bracket API"
+      "http/bracket/api"
+  , testSpecComplianceW3cOff
+      specificationComplianceTestCases
+      "Bracket API"
+      "http/bracket/api"
+  , testSpecComplianceW3cOnWaiMiddleware specificationComplianceTestCases "api"
+  , testSpecComplianceW3cOffWaiMiddleware specificationComplianceTestCases "api"
   , testMetrics
   ]
 
@@ -121,6 +141,48 @@ testHttpTracing =
       }
 
 
+testSpecComplianceW3cOn :: Aeson.Array -> String -> String -> ConditionalSuite
+testSpecComplianceW3cOn specificationComplianceTestCases apiLabel route =
+  Run $
+    Suite
+      { Suite.label =
+          "Specification Compliance (WC3 Trace Correlation On/" ++
+          apiLabel ++ ")"
+      , Suite.tests =
+          SpecCompliance.allTestsW3cCorrelationOn
+            specificationComplianceTestCases
+            Suite.testServer
+            route
+      , Suite.options = Suite.defaultOptions {
+            Suite.appsUnderTest =
+              [ Suite.testServer
+              , Suite.downstreamTarget
+              ]
+          }
+      }
+
+
+testSpecComplianceW3cOff :: Aeson.Array -> String -> String -> ConditionalSuite
+testSpecComplianceW3cOff specificationComplianceTestCases apiLabel route =
+  Run $
+    Suite
+      { Suite.label =
+          "Specification Compliance (WC3 Trace Correlation Off/" ++
+          apiLabel ++ ")"
+      , Suite.tests =
+          SpecCompliance.allTestsW3cCorrelationOff
+            specificationComplianceTestCases
+            Suite.testServer
+            route
+      , Suite.options = Suite.withW3cTraceCorrelationDisabled {
+            Suite.appsUnderTest =
+              [ Suite.testServer
+              , Suite.downstreamTarget
+              ]
+          }
+      }
+
+
 testWaiMiddleware :: ConditionalSuite
 testWaiMiddleware =
   Run $
@@ -128,6 +190,52 @@ testWaiMiddleware =
       { Suite.label = "WAI Middleware"
       , Suite.tests = WaiMiddleware.allTests
       , Suite.options = Suite.defaultOptions {
+            Suite.appsUnderTest =
+              [ Suite.testServerWithMiddleware
+              , Suite.downstreamTarget
+              ]
+          }
+      }
+
+
+testSpecComplianceW3cOnWaiMiddleware ::
+  Aeson.Array
+  -> String
+  -> ConditionalSuite
+testSpecComplianceW3cOnWaiMiddleware specificationComplianceTestCases route =
+  Run $
+    Suite
+      { Suite.label =
+          "Specification Compliance (WC3 Trace Correlation On/WAI Middleware)"
+      , Suite.tests =
+          SpecCompliance.allTestsW3cCorrelationOn
+            specificationComplianceTestCases
+            Suite.testServerWithMiddleware
+            route
+      , Suite.options = Suite.defaultOptions {
+            Suite.appsUnderTest =
+              [ Suite.testServerWithMiddleware
+              , Suite.downstreamTarget
+              ]
+          }
+      }
+
+
+testSpecComplianceW3cOffWaiMiddleware ::
+  Aeson.Array
+  -> String
+  -> ConditionalSuite
+testSpecComplianceW3cOffWaiMiddleware specificationComplianceTestCases route =
+  Run $
+    Suite
+      { Suite.label =
+          "Specification Compliance (WC3 Trace Correlation Off/WAI Middleware)"
+      , Suite.tests =
+          SpecCompliance.allTestsW3cCorrelationOff
+            specificationComplianceTestCases
+            Suite.testServerWithMiddleware
+            route
+      , Suite.options = Suite.withW3cTraceCorrelationDisabled {
             Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware
               , Suite.downstreamTarget

@@ -258,7 +258,10 @@ test-suite instana-haskell-trace-sdk-integration-tests
   build-depends:
       base >=4.7 && <5
     , aeson
+    , array
     , bytestring
+    , case-insensitive
+    , directory
     , exceptions
     , hslogger
     , HUnit
@@ -266,10 +269,13 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , http-types
     , instana-haskell-trace-sdk
     , process
+    , regex-base
+    , regex-tdfa
     , retry
     , text
     , unix
     , unordered-containers
+    , vector
   other-modules:
       Instana.SDK.AgentStub.DiscoveryRequest
     , Instana.SDK.AgentStub.EntityDataRequest
@@ -284,6 +290,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , Instana.SDK.IntegrationTest.Metrics
     , Instana.SDK.IntegrationTest.Runner
     , Instana.SDK.IntegrationTest.ServiceName
+    , Instana.SDK.IntegrationTest.SpecCompliance
     , Instana.SDK.IntegrationTest.Suite
     , Instana.SDK.IntegrationTest.TestHelper
     , Instana.SDK.IntegrationTest.TestSuites
