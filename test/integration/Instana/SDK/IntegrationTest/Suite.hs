@@ -12,6 +12,7 @@ module Instana.SDK.IntegrationTest.Suite
   , withCustomServiceName
   , withPidTranslation
   , withStartupDelay
+  , withW3cTraceCorrelationDisabled
   ) where
 
 
@@ -30,11 +31,12 @@ data Suite =
 -- |Describes options for running a test suite.
 data SuiteOptions =
   SuiteOptions
-    { usePidTranslation      :: Bool
-    , startupDelay           :: Bool
-    , simulateConnectionLoss :: Bool
-    , customServiceName      :: Maybe String
-    , appsUnderTest          :: [AppUnderTest]
+    { usePidTranslation          :: Bool
+    , startupDelay               :: Bool
+    , simulateConnectionLoss     :: Bool
+    , customServiceName          :: Maybe String
+    , disableW3cTraceCorrelation :: Bool
+    , appsUnderTest              :: [AppUnderTest]
     }
 
 
@@ -50,11 +52,12 @@ data AppUnderTest =
 defaultOptions :: SuiteOptions
 defaultOptions =
   SuiteOptions
-    { usePidTranslation      = False
-    , startupDelay           = False
-    , simulateConnectionLoss = False
-    , appsUnderTest          = [testServer]
-    , customServiceName      = Nothing
+    { usePidTranslation           = False
+    , startupDelay                = False
+    , simulateConnectionLoss      = False
+    , customServiceName           = Nothing
+    , disableW3cTraceCorrelation  = False
+    , appsUnderTest               = [testServer]
     }
 
 
@@ -103,6 +106,11 @@ withConnectionLoss =
 withCustomServiceName :: String -> SuiteOptions
 withCustomServiceName serviceName =
   defaultOptions { customServiceName = Just serviceName }
+
+
+withW3cTraceCorrelationDisabled :: SuiteOptions
+withW3cTraceCorrelationDisabled =
+  defaultOptions { disableW3cTraceCorrelation = True }
 
 
 data ConditionalSuite =

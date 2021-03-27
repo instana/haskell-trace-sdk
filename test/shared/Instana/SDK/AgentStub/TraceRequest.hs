@@ -37,6 +37,28 @@ instance ToJSON From where
     ]
 
 
+data InstanaAncestor = InstanaAncestor
+  { traceId  :: Maybe String
+  , parentId :: Maybe String
+  } deriving (Eq, Generic, Show)
+
+
+instance FromJSON InstanaAncestor where
+  parseJSON = Aeson.withObject "InstanaAncestor" $
+    \obj ->
+      InstanaAncestor
+        <$> obj .: "t"
+        <*> obj .: "p"
+
+
+instance ToJSON InstanaAncestor where
+  toJSON :: InstanaAncestor -> Value
+  toJSON instanaAncestor = Aeson.object
+    [ "t" .= traceId instanaAncestor
+    , "p" .= parentId instanaAncestor
+    ]
+
+
 data Span =
   Span
     { t        :: String       -- traceId
@@ -47,6 +69,9 @@ data Span =
     , d        :: Int          -- duration
     , k        :: Int          -- kind
     , ec       :: Int          -- errorCount
+    , ia       :: Maybe InstanaAncestor -- instana ancestor
+    , tp       :: Maybe Bool   -- traceparent has been used for trace continuity
+    , lt       :: Maybe String -- long trace ID
     , crtp     :: Maybe String -- correlation type
     , crid     :: Maybe String -- correlation id
     , sy       :: Maybe Bool   -- synthetic
@@ -67,6 +92,9 @@ instance FromJSON Span where
         <*> decodedObject .:  "d"
         <*> decodedObject .:  "k"
         <*> decodedObject .:  "ec"
+        <*> decodedObject .:? "ia"
+        <*> decodedObject .:? "tp"
+        <*> decodedObject .:? "lt"
         <*> decodedObject .:  "crtp"
         <*> decodedObject .:  "crid"
         <*> decodedObject .:? "sy"
@@ -84,6 +112,9 @@ instance ToJSON Span where
     , "d"    .= d sp
     , "k"    .= k sp
     , "ec"   .= ec sp
+    , "ia"   .= ia sp
+    , "tp"   .= tp sp
+    , "lt"   .= lt sp
     , "crtp" .= crtp sp
     , "crid" .= crid sp
     , "sy"   .= sy sp

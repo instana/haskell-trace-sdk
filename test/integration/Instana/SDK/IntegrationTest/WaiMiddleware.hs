@@ -146,8 +146,8 @@ runSuppressedTest urlPath = do
       [("X-INSTANA-L", "0")]
   let
     responseBody = LBSC8.unpack $ HTTP.responseBody response
-  -- wait a second, then check that no spans have been recorded
-  threadDelay $ 10 * 1000
+  -- wait a few seconds, then check that no spans have been recorded
+  threadDelay $ 5 * 1000 * 1000
   spansResults <-
     TestHelper.waitForRegisteredSpansMatching []
   case spansResults of
