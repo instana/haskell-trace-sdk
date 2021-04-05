@@ -22,6 +22,7 @@ import           Data.Text               (Text)
 import           GHC.Generics
 
 import           Instana.SDK.Internal.Id (Id)
+import qualified Instana.SDK.Internal.Id as Id
 
 
 -- |Direction of the call.
@@ -99,6 +100,8 @@ data QueuedSpan = QueuedSpan
   , serviceName     :: Maybe Text
   , correlationType :: Maybe Text
   , correlationId   :: Maybe Text
+  , tpFlag          :: Maybe Bool
+  , instanaAncestor :: Maybe (String, String)
   , synthetic       :: Maybe Bool
   , spanData        :: Value
   } deriving (Eq, Generic, Show)
@@ -118,10 +121,25 @@ instance ToJSON WireSpan where
   toJSON :: WireSpan -> Value
   toJSON wireSpan =
     let
+      tId = traceId span_
+      longTraceId =
+        case kind span_ of
+          Entry -> Id.longTraceId tId
+          _     -> Nothing
       span_ = queuedSpan wireSpan
       pid_ = pid wireSpan
       agentUuid_ = agentUuid wireSpan
       serviceNameConfig_ = serviceNameConfig wireSpan
+      ia =
+        case instanaAncestor span_ of
+          Just (iaTId, iaPId) ->
+            Just $ Aeson.object
+              [ "t" .= iaTId
+              , "p" .= iaPId
+              ]
+          Nothing ->
+            Nothing
+
       spanData_ =
         case (serviceName span_ <|> serviceNameConfig_) of
           Just service ->
@@ -132,7 +150,7 @@ instance ToJSON WireSpan where
             spanData span_
     in
     Aeson.object
-      [ "t"     .= traceId span_
+      [ "t"     .= tId
       , "s"     .= spanId span_
       , "p"     .= parentId span_
       , "n"     .= spanName span_
@@ -143,6 +161,9 @@ instance ToJSON WireSpan where
       , "crtp"  .= correlationType span_
       , "crid"  .= correlationId span_
       , "sy"    .= synthetic span_
+      , "lt"    .= longTraceId
+      , "tp"    .= tpFlag span_
+      , "ia"    .= ia
       , "data"  .= spanData_
       , "f"     .= From pid_ agentUuid_
       ]

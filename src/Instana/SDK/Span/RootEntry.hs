@@ -13,15 +13,17 @@ module Instana.SDK.Span.RootEntry
   , setCorrelationType
   , setCorrelationId
   , setSynthetic
+  , setW3cTraceContext
   ) where
 
 
-import           Data.Aeson              (Value)
-import qualified Data.Aeson.Extra.Merge  as AesonExtra
-import           Data.Text               (Text)
+import           Data.Aeson                           (Value)
+import qualified Data.Aeson.Extra.Merge               as AesonExtra
+import           Data.Text                            (Text)
 import           GHC.Generics
 
-import           Instana.SDK.Internal.Id (Id)
+import           Instana.SDK.Internal.Id              (Id)
+import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
 
 
 -- |An entry span that is the root span of a trace.
@@ -49,6 +51,10 @@ data RootEntry =
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
     , spanData        :: Value
+      -- |The W3C Trace Context. An entry span only has an associated W3C trace
+      -- context, if W3C trace context headers have been received.
+    , w3cTraceContext :: Maybe W3CTraceContext
+
     } deriving (Eq, Generic, Show)
 
 
@@ -75,6 +81,12 @@ addToErrorCount increment rootEntry =
 setServiceName :: Text -> RootEntry -> RootEntry
 setServiceName serviceName_ rootEntry =
   rootEntry { serviceName = Just serviceName_ }
+
+
+-- |Attaches a W3C trace context to the span.
+setW3cTraceContext :: W3CTraceContext -> RootEntry -> RootEntry
+setW3cTraceContext w3cTraceContext_ rootEntry =
+  rootEntry { w3cTraceContext = Just w3cTraceContext_ }
 
 
 -- |Set the synthetic flag.

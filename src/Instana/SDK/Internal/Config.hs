@@ -17,7 +17,7 @@ module Instana.SDK.Internal.Config
 
 
 import           Control.Applicative ((<|>))
-import           Data.Maybe          (fromMaybe)
+import           Data.Maybe          (fromMaybe, isJust)
 import           GHC.Generics
 import           System.Environment  (lookupEnv)
 import           Text.Read           (readMaybe)
@@ -31,9 +31,19 @@ agentHostKey :: String
 agentHostKey = "INSTANA_AGENT_HOST"
 
 
+-- |Default agent host/IP
+defaultAgentHost :: String
+defaultAgentHost = "127.0.0.1"
+
+
 -- |Environment variable for the agent port
 agentPortKey :: String
 agentPortKey = "INSTANA_AGENT_PORT"
+
+
+-- |Default agent port
+defaultAgentPort :: Int
+defaultAgentPort = 42699
 
 
 -- |Environment variable for the service name override.
@@ -46,29 +56,14 @@ forceTransmissionAfterKey :: String
 forceTransmissionAfterKey = "INSTANA_FORCE_TRANSMISSION_STARTING_AFTER"
 
 
--- |Environment variable for the force-transmision-at setting
-forceTransmissionStartingAtKey :: String
-forceTransmissionStartingAtKey = "INSTANA_FORCE_TRANSMISSION_STARTING_AT"
-
-
--- |Environment variable for the max-buffered-spans setting
-maxBufferedSpansKey :: String
-maxBufferedSpansKey = "INSTANA_MAX_BUFFERED_SPANS"
-
-
--- |Default agent host/IP
-defaultAgentHost :: String
-defaultAgentHost = "127.0.0.1"
-
-
--- |Default agent port
-defaultAgentPort :: Int
-defaultAgentPort = 42699
-
-
 -- |Default force-transmission-after setting
 defaultForceTransmissionAfter :: Int
 defaultForceTransmissionAfter = 1000
+
+
+-- |Environment variable for the force-transmision-at setting
+forceTransmissionStartingAtKey :: String
+forceTransmissionStartingAtKey = "INSTANA_FORCE_TRANSMISSION_STARTING_AT"
 
 
 -- |Default force-transmission-at setting
@@ -76,9 +71,25 @@ defaultForceTransmissionStartingAt :: Int
 defaultForceTransmissionStartingAt = 500
 
 
+-- |Environment variable for the max-buffered-spans setting
+maxBufferedSpansKey :: String
+maxBufferedSpansKey = "INSTANA_MAX_BUFFERED_SPANS"
+
+
 -- |Default max-buffered-spans setting
 defaultMaxBufferedSpans :: Int
 defaultMaxBufferedSpans = 1000
+
+
+-- |Environment variable to disable trace correlation via W3C trace context
+-- headers.
+disableW3cTraceCorrelationKey :: String
+disableW3cTraceCorrelationKey = "INSTANA_DISABLE_W3C_TRACE_CORRELATION"
+
+
+-- |Default value for disable W3C trace correlation.
+defaultDisableW3cTraceCorrelation :: Bool
+defaultDisableW3cTraceCorrelation = False
 
 
 -- |The config after evaluating and merging user provided config, environment
@@ -90,6 +101,7 @@ data FinalConfig = FinalConfig
   , forceTransmissionAfter      :: Int
   , forceTransmissionStartingAt :: Int
   , maxBufferedSpans            :: Int
+  , disableW3cTraceCorrelation  :: Bool
   } deriving (Eq, Generic, Show)
 
 
@@ -101,6 +113,7 @@ mkFinalConfig ::
   -> Int
   -> Int
   -> Int
+  -> Bool
   -> FinalConfig
 mkFinalConfig
   agentHost_
@@ -108,7 +121,8 @@ mkFinalConfig
   serviceName_
   forceTransmissionAfter_
   forceTransmissionStartingAt_
-  maxBufferedSpans_ =
+  maxBufferedSpans_
+  disableW3cTraceCorrelation_ =
   FinalConfig
     { agentHost = agentHost_
     , agentPort = agentPort_
@@ -116,6 +130,7 @@ mkFinalConfig
     , forceTransmissionAfter = forceTransmissionAfter_
     , forceTransmissionStartingAt = forceTransmissionStartingAt_
     , maxBufferedSpans = maxBufferedSpans_
+    , disableW3cTraceCorrelation = disableW3cTraceCorrelation_
     }
 
 
@@ -128,6 +143,7 @@ readConfigFromEnvironment = do
   forceTransmissionAfterEnv <- lookupEnv forceTransmissionAfterKey
   forceTransmissionStartingAtEnv <- lookupEnv forceTransmissionStartingAtKey
   maxBufferedSpansEnv <- lookupEnv maxBufferedSpansKey
+  disableW3cTraceCorrelationEnv <- lookupEnv disableW3cTraceCorrelationKey
   let
     -- parse numeric config values via readMaybe to Int if they were set,
     -- otherwise they remain Nothing
@@ -137,6 +153,7 @@ readConfigFromEnvironment = do
     forceTransmissionStartingAtParsed =
       forceTransmissionStartingAtEnv >>= readMaybe
     maxBufferedSpansParsed = maxBufferedSpansEnv >>= readMaybe
+    disableW3cTraceCorrelationParsed = isJust disableW3cTraceCorrelationEnv
   return $
     Config.defaultConfig
       { Config.agentHost = agentHostEnv
@@ -145,6 +162,7 @@ readConfigFromEnvironment = do
       , Config.forceTransmissionAfter = forceTransmissionAfterParsed
       , Config.forceTransmissionStartingAt = forceTransmissionStartingAtParsed
       , Config.maxBufferedSpans = maxBufferedSpansParsed
+      , Config.disableW3cTraceCorrelation = disableW3cTraceCorrelationParsed
       }
 
 
@@ -177,6 +195,9 @@ applyDefaults config =
        fromMaybe
          defaultMaxBufferedSpans
          (Config.maxBufferedSpans config)
+   , disableW3cTraceCorrelation =
+       defaultDisableW3cTraceCorrelation ||
+       (Config.disableW3cTraceCorrelation config)
    }
 
 
@@ -203,6 +224,10 @@ mergeConfigs userConfig configFromEnv =
       , Config.maxBufferedSpans =
           (Config.maxBufferedSpans userConfig) <|>
           (Config.maxBufferedSpans configFromEnv)
+      , Config.disableW3cTraceCorrelation =
+          (Config.disableW3cTraceCorrelation userConfig) ||
+          (Config.disableW3cTraceCorrelation configFromEnv)
       }
   in
     applyDefaults merged
+

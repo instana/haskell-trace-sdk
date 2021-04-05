@@ -11,6 +11,7 @@ import qualified Instana.SDK.Internal.SecretsTest                   as SecretsTe
 import qualified Instana.SDK.Internal.ServerTimingTest              as ServerTimingTest
 import qualified Instana.SDK.Internal.SpanStackTest                 as SpanStackTest
 import qualified Instana.SDK.Internal.SpanTest                      as SpanTest
+import qualified Instana.SDK.Internal.W3CTraceContextTest           as W3CTraceContextTest
 import qualified Instana.SDK.TracingHeadersTest                     as TracingHeadersTest
 
 import           Test.HUnit
@@ -35,5 +36,6 @@ allTests =
     , SpanStackTest.allTests
     , SpanTest.allTests
     , TracingHeadersTest.allTests
+    , W3CTraceContextTest.allTests
     ]
 

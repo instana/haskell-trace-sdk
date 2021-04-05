@@ -38,12 +38,15 @@ import           Instana.SDK.Internal.Context                     (AgentConnecti
                                                                    ConnectionState (..),
                                                                    InternalContext)
 import qualified Instana.SDK.Internal.Context                     as InternalContext
+import qualified Instana.SDK.Internal.Id                          as Id
 import           Instana.SDK.Internal.Logging                     (instanaLogger)
 import qualified Instana.SDK.Internal.Metrics.Collector           as MetricsCollector
 import qualified Instana.SDK.Internal.Metrics.Compression         as MetricsCompression
 import qualified Instana.SDK.Internal.Metrics.Deltas              as Deltas
 import qualified Instana.SDK.Internal.Metrics.Sample              as Sample
 import qualified Instana.SDK.Internal.URL                         as URL
+import           Instana.SDK.Internal.W3CTraceContext             (InstanaKeyValuePair (..))
+import qualified Instana.SDK.Internal.W3CTraceContext             as W3CTraceContext
 import           Instana.SDK.Internal.WireSpan                    (QueuedSpan (QueuedSpan),
                                                                    SpanKind (Entry, Exit),
                                                                    WireSpan (WireSpan))
@@ -125,6 +128,21 @@ queueEntrySpan entrySpan context = do
   now <- round . (* 1000) <$> getPOSIXTime
   let
     timestamp = EntrySpan.timestamp entrySpan
+    instanaAncestor =
+      case ( EntrySpan.tpFlag entrySpan
+           , W3CTraceContext.instanaKeyValuePair =<<
+             W3CTraceContext.traceState <$>
+             EntrySpan.w3cTraceContext entrySpan
+           ) of
+        ( True
+          , Just (InstanaKeyValuePair { instanaTraceId, instanaParentId })) ->
+          Just ( Id.longOrShortTraceId instanaTraceId
+               , Id.toString instanaParentId
+               )
+
+        _ ->
+          Nothing
+
   queueSpan
     context
     QueuedSpan
@@ -139,6 +157,9 @@ queueEntrySpan entrySpan context = do
       , WireSpan.serviceName     = EntrySpan.serviceName entrySpan
       , WireSpan.correlationType = EntrySpan.correlationType entrySpan
       , WireSpan.correlationId   = EntrySpan.correlationId entrySpan
+      , WireSpan.tpFlag          =
+          if EntrySpan.tpFlag entrySpan then Just True else Nothing
+      , WireSpan.instanaAncestor = instanaAncestor
       , WireSpan.synthetic       =
           if EntrySpan.synthetic entrySpan then Just True else Nothing
       , WireSpan.spanData        = EntrySpan.spanData entrySpan
@@ -164,6 +185,8 @@ queueExitSpan exitSpan context = do
       , WireSpan.serviceName     = ExitSpan.serviceName exitSpan
       , WireSpan.correlationType = Nothing
       , WireSpan.correlationId   = Nothing
+      , WireSpan.tpFlag          = Nothing
+      , WireSpan.instanaAncestor = Nothing
       , WireSpan.synthetic       = Nothing
       , WireSpan.spanData        = ExitSpan.spanData exitSpan
       }

@@ -9,15 +9,18 @@ module Instana.SDK.Span.NonRootEntry
   , addToErrorCount
   , setServiceName
   , setSynthetic
+  , setTpFlag
+  , setW3cTraceContext
   ) where
 
 
-import           Data.Aeson              (Value)
-import qualified Data.Aeson.Extra.Merge  as AesonExtra
-import           Data.Text               (Text)
+import           Data.Aeson                           (Value)
+import qualified Data.Aeson.Extra.Merge               as AesonExtra
+import           Data.Text                            (Text)
 import           GHC.Generics
 
-import           Instana.SDK.Internal.Id (Id)
+import           Instana.SDK.Internal.Id              (Id)
+import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
 
 
 -- |An entry span that is not the root span of a trace.
@@ -25,26 +28,32 @@ data NonRootEntry =
   NonRootEntry
     {
       -- |The trace ID
-      traceId     :: Id
+      traceId         :: Id
       -- |The span ID
-    , spanId      :: Id
+    , spanId          :: Id
       -- |The ID of the parent span
-    , parentId    :: Id
+    , parentId        :: Id
       -- |The span name/type, e.g. a short string like "haskell.wai.server",
       -- "haskell.http.client". For SDK spans this is always "sdk", the actual
       -- name is then in span.data.sdk.name.
-    , spanName    :: Text
+    , spanName        :: Text
       -- |The time the span started
-    , timestamp   :: Int
+    , timestamp       :: Int
       -- |The number of errors that occured during processing
-    , errorCount  :: Int
+    , errorCount      :: Int
       -- |An attribute for overriding the name of the service in Instana
-    , serviceName :: Maybe Text
+    , serviceName     :: Maybe Text
       -- |A flag indicating that this span represents a synthetic call
-    , synthetic   :: Bool
+    , synthetic       :: Bool
       -- |Additional data for the span. Must be provided as an
       -- 'Data.Aeson.Value'.
-    , spanData    :: Value
+    , spanData        :: Value
+      -- |The W3C Trace Context. An entry span only has an associated W3C trace
+      -- context, if W3C trace context headers have been received.
+    , w3cTraceContext :: Maybe W3CTraceContext
+      -- |The span.tp flag. A span with span.tp = True has inherited the
+      -- trace ID/parent ID from W3C trace context instead of Instana headers.
+    , tpFlag          :: Bool
     } deriving (Eq, Generic, Show)
 
 
@@ -61,6 +70,19 @@ addToErrorCount increment nonRootEntry =
 setServiceName :: Text -> NonRootEntry -> NonRootEntry
 setServiceName serviceName_ nonRootEntry =
   nonRootEntry { serviceName = Just serviceName_ }
+
+
+-- |Attaches a W3C trace context to the span.
+setW3cTraceContext :: W3CTraceContext -> NonRootEntry -> NonRootEntry
+setW3cTraceContext w3cTraceContext_ nonRootEntry =
+  nonRootEntry { w3cTraceContext = Just w3cTraceContext_ }
+
+
+-- |Set the span.tp flag. A span with span.tp = True has inherited the trace ID/
+-- parent ID from W3C trace context instead of Instana headers.
+setTpFlag :: NonRootEntry -> NonRootEntry
+setTpFlag nonRootEntry =
+  nonRootEntry { tpFlag = True }
 
 
 -- |Set the synthetic flag.
