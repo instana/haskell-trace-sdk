@@ -5,14 +5,8 @@ Description : Provides configuration records that can be used to control the ini
 -}
 module Instana.SDK.Config
   -- Maintenance note: accessor functions need to be reexported in SDK.hs
-  ( Config
-  , agentHost
-  , agentPort
+  ( Config(..)
   , defaultConfig
-  , forceTransmissionAfter
-  , forceTransmissionStartingAt
-  , maxBufferedSpans
-  , serviceName
   ) where
 
 
@@ -42,6 +36,8 @@ data Config = Config
     -- buffering excessive amounts of spans. It must be larger than
     -- forceTransmissionStartingAt.
   , maxBufferedSpans            :: Maybe Int
+    -- | Disables continuing traces from W3C trace context (traceparent header).
+  , disableW3cTraceCorrelation  :: Bool
   } deriving (Eq, Generic)
 
 
@@ -58,5 +54,6 @@ defaultConfig =
     , forceTransmissionAfter = Nothing
     , forceTransmissionStartingAt = Nothing
     , maxBufferedSpans = Nothing
+    , disableW3cTraceCorrelation = False
     }
 

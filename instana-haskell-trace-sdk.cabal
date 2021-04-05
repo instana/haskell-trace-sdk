@@ -92,7 +92,6 @@ library
       Instana.SDK.Internal.Command
       Instana.SDK.Internal.Config
       Instana.SDK.Internal.Context
-      Instana.SDK.Internal.WireSpan
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging
       Instana.SDK.Internal.Metrics.Collector
@@ -101,10 +100,12 @@ library
       Instana.SDK.Internal.Metrics.Sample
       Instana.SDK.Internal.Retry
       Instana.SDK.Internal.Secrets
-      Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.ServerTiming
+      Instana.SDK.Internal.SpanStack
       Instana.SDK.Internal.URL
       Instana.SDK.Internal.Util
+      Instana.SDK.Internal.W3CTraceContext
+      Instana.SDK.Internal.WireSpan
       Instana.SDK.Internal.Worker
       Instana.Wai.Middleware.Entry.Internal
       Paths_instana_haskell_trace_sdk
@@ -154,6 +155,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , aeson
     , aeson-extra
     , bytestring
+    , case-insensitive
     , directory
     , ekg-core
     , http-types
@@ -166,6 +168,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , scientific
     , text
     , unordered-containers
+    , wai
   other-modules:
       -- the actual tests
       Instana.SDK.Internal.AgentConnection.SchedFileTest
@@ -178,6 +181,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.ServerTimingTest
       Instana.SDK.Internal.SpanStackTest
       Instana.SDK.Internal.SpanTest
+      Instana.SDK.Internal.W3CTraceContextTest
       Instana.SDK.TracingHeadersTest
       -- modules under test
       Instana.SDK.Internal.Config
@@ -192,6 +196,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Span.SimpleSpan
       Instana.SDK.Span.Span
       Instana.SDK.TracingHeaders
+      Instana.SDK.Internal.W3CTraceContext
       -- dependencies of modules under test
       Instana.SDK.Config
       Instana.SDK.Internal.Metrics.Sample

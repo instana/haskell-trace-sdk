@@ -17,19 +17,22 @@ module Instana.SDK.Internal.SpanStack
   , push
   , pushSuppress
   , readTraceId
+  , readW3cTraceContext
   , suppress
   ) where
 
 import           GHC.Generics
 
-import           Instana.SDK.Internal.Id    (Id)
-import           Instana.SDK.Internal.Util  ((|>))
-import           Instana.SDK.Span.EntrySpan (EntrySpan)
-import qualified Instana.SDK.Span.EntrySpan as EntrySpan
-import           Instana.SDK.Span.ExitSpan  (ExitSpan)
-import           Instana.SDK.Span.Span      (Span (..), SpanKind (..))
+import           Instana.SDK.Internal.Id              (Id)
+import           Instana.SDK.Internal.Util            ((|>))
+import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
+import           Instana.SDK.Span.EntrySpan           (EntrySpan)
+import qualified Instana.SDK.Span.EntrySpan           as EntrySpan
+import           Instana.SDK.Span.ExitSpan            (ExitSpan)
+import qualified Instana.SDK.Span.ExitSpan            as ExitSpan
+import           Instana.SDK.Span.Span                (Span (..), SpanKind (..))
 
---
+
 -- Implementation Note
 -- ===================
 --
@@ -38,7 +41,7 @@ import           Instana.SDK.Span.Span      (Span (..), SpanKind (..))
 -- doing actual async IO, for example). Since Haskell's standard vehicle for
 -- concurrency (Control.Concurrent#forkIO and friends) uses green threads (and
 -- not OS level threads) doing multiple things in one thread at the same time is
--- not very common, in fact I haven't seen it in the wild yet.
+-- not very common, in fact, I haven't seen it in the wild yet.
 --
 -- Under this assumptions there can be at most two current spans per thread, an
 -- entry and an exit. A new exit can only be started once the IO action related
@@ -57,7 +60,7 @@ data SpanStack =
     None
     -- |Indicates that we are currently processing a request that had
     -- X-INSTANA-L=0 set and that should not record any spans.
-  | Suppressed
+  | Suppressed W3CTraceContext
     -- |Indicates that we are currently processing an entry.
   | EntryOnly EntrySpan
     -- |Indicates that currently an exit is in progress.
@@ -80,9 +83,9 @@ entry entrySpan =
     |> push (Entry entrySpan)
 
 
-{-|Creates an span stack with a suppressed marker.
+{-|Creates a span stack with a suppressed marker.
 -}
-suppress :: SpanStack
+suppress :: W3CTraceContext -> SpanStack
 suppress =
   Suppressed
 
@@ -97,19 +100,22 @@ isEmpty t =
 {-|Checks if tracing is currently suppressed.
 -}
 isSuppressed :: SpanStack -> Bool
-isSuppressed t =
-  t == Suppressed
+isSuppressed stack =
+  case stack of
+    Suppressed _ -> True
+    _            -> False
 
 
 {-|Pushes a span onto the stack. Invalid calls are ignored (like pushing an
-exit onto an empty span or an entry span onto an already existing entry span.
+exit onto an empty stack or an entry span onto an already existing entry span.
 -}
 push :: Span -> SpanStack -> SpanStack
 push (Entry entrySpan) None =
   EntryOnly entrySpan
 -- a new incoming entry can lift the suppression, an exit can't
-push (Entry entrySpan) Suppressed =
+push (Entry entrySpan) (Suppressed _) =
   EntryOnly entrySpan
+-- pushing an exit child onto an entry parent is valid
 push (Exit exitSpan) (EntryOnly entrySpan) =
   EntryAndExit entrySpan exitSpan
 -- ignore invalid calls/invalid state
@@ -119,14 +125,18 @@ push _ current =
 
 {-|Pushes a suppressed marker onto the stack. This is only valid if the span
 stack is currently empty, otherwise the span stack is returned unmodified.
+
+When pushing the suppressed marker, the w3c trace context for the request in
+progress must still be provided.
 -}
-pushSuppress :: SpanStack -> SpanStack
-pushSuppress None =
-  Suppressed
-pushSuppress Suppressed =
-  Suppressed
+pushSuppress :: W3CTraceContext -> SpanStack -> SpanStack
+pushSuppress w3cTraceContext None =
+  Suppressed w3cTraceContext
+pushSuppress w3cTraceContext (Suppressed _) =
+  -- this effectively overwrites/discards the previous W3C trace context
+  Suppressed w3cTraceContext
 -- ignore invalid calls/invalid state
-pushSuppress current =
+pushSuppress _ current =
   current
 
 
@@ -136,7 +146,7 @@ stack after poppint the top element.
 pop :: SpanStack -> (SpanStack, Maybe Span)
 pop None =
   (None, Nothing)
-pop Suppressed =
+pop (Suppressed _) =
   (None, Nothing)
 pop (EntryOnly entrySpan) =
   (None, Just $ Entry entrySpan)
@@ -154,14 +164,14 @@ the stack.
 popWhenMatches :: SpanKind -> SpanStack -> (SpanStack, Maybe Span, Maybe String)
 popWhenMatches _ None =
   (None, Nothing, Nothing)
-popWhenMatches EntryKind Suppressed =
+popWhenMatches EntryKind (Suppressed _) =
   -- This effectively unsuppresses - we started an entry that was suppressed and
   -- now we are asked to complete this very entry, so the suppression is lifted
   -- and we are back to a pristine state, ready to start the next entry when the
   -- next request comes in.
   (None, Nothing, Nothing)
-popWhenMatches _ Suppressed =
-  (Suppressed, Nothing, Nothing)
+popWhenMatches _ (Suppressed w3cTraceContext)  =
+  (Suppressed w3cTraceContext, Nothing, Nothing)
 popWhenMatches expectedKind stack =
   case (expectedKind, peek stack) of
     (EntryKind, Just (Entry _)) ->
@@ -185,7 +195,7 @@ popWhenMatches expectedKind stack =
 peek :: SpanStack -> Maybe Span
 peek None =
   Nothing
-peek Suppressed =
+peek (Suppressed _) =
   Nothing
 peek (EntryOnly entrySpan) =
   Just $ Entry entrySpan
@@ -198,12 +208,26 @@ peek (EntryAndExit _ exitSpan) =
 readTraceId :: SpanStack -> Maybe Id
 readTraceId None =
   Nothing
-readTraceId Suppressed =
+readTraceId (Suppressed _) =
   Nothing
 readTraceId (EntryOnly entrySpan) =
   Just $ EntrySpan.traceId entrySpan
 readTraceId (EntryAndExit entrySpan _) =
   Just $ EntrySpan.traceId entrySpan
+
+
+{-|Reads the W3C trace context from the current span or suppression marker,
+if any.
+-}
+readW3cTraceContext :: SpanStack -> Maybe W3CTraceContext
+readW3cTraceContext None =
+  Nothing
+readW3cTraceContext (Suppressed w3cTraceContext) =
+  Just w3cTraceContext
+readW3cTraceContext (EntryOnly entrySpan) =
+  EntrySpan.w3cTraceContext entrySpan
+readW3cTraceContext (EntryAndExit _ exitSpan) =
+  Just $ ExitSpan.w3cTraceContext exitSpan
 
 
 {-|Modifies the top element in place by applying the given function to it. This
@@ -212,8 +236,8 @@ is a no op if the span stack is empty.
 mapTop :: (Span -> Span) -> SpanStack -> SpanStack
 mapTop _ None =
   None
-mapTop _ Suppressed =
-  Suppressed
+mapTop _ (Suppressed w3cTraceContext) =
+  Suppressed w3cTraceContext
 mapTop fn stack =
   let
     (remainder, Just oldTop) = pop stack
@@ -229,8 +253,8 @@ span.
 mapEntry :: (Span -> Span) -> SpanStack -> SpanStack
 mapEntry _ None =
   None
-mapEntry _ Suppressed =
-  Suppressed
+mapEntry _ (Suppressed w3cTraceContext) =
+  Suppressed w3cTraceContext
 mapEntry fn (EntryOnly entrySpan) =
   mapTop fn (EntryOnly entrySpan)
 mapEntry fn (EntryAndExit oldEntrySpan oldExitSpan) =

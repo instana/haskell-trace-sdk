@@ -272,6 +272,7 @@ entrySpan =
         , RootEntry.correlationType = Nothing
         , RootEntry.correlationId   = Nothing
         , RootEntry.spanData        = initialData
+        , RootEntry.w3cTraceContext = Nothing
         }
 
 

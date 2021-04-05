@@ -9,17 +9,25 @@ module Instana.SDK.TracingHeaders
   , TracingLevel(..)
   , levelHeaderName
   , parseXInstanaL
+  , readHttpTracingHeaders
   , spanIdHeaderName
   , stringToTracingLevel
   , syntheticHeaderName
   , traceIdHeaderName
+  , traceparentHeaderName
+  , tracestateHeaderName
   , tracingLevelToString
   ) where
 
 
+import qualified Data.ByteString.Char8     as BSC8
+import qualified Data.List                 as List
 import           GHC.Generics
 import qualified Network.HTTP.Types.Header as HTTPHeader
+import qualified Network.Wai               as Wai
 import           Text.Regex.PCRE           ((=~))
+
+import           Instana.SDK.Internal.Util ((|>))
 
 
 -- |X-INSTANA-T
@@ -40,6 +48,16 @@ levelHeaderName = "X-INSTANA-L"
 -- |X-INSTANA-SYNTHETIC
 syntheticHeaderName :: HTTPHeader.HeaderName
 syntheticHeaderName = "X-INSTANA-SYNTHETIC"
+
+
+-- |traceparent
+traceparentHeaderName :: HTTPHeader.HeaderName
+traceparentHeaderName = "traceparent"
+
+
+-- |tracestate
+tracestateHeaderName :: HTTPHeader.HeaderName
+tracestateHeaderName = "tracestate"
 
 
 -- |Tracing level.
@@ -114,5 +132,57 @@ data TracingHeaders  =
     , correlationId   :: Maybe String
       -- |synthetic flag
     , synthetic       :: Bool
+      -- |W3C Trace Context traceparent
+    , traceparent     :: Maybe String
+      -- |W3C Trace Context tracestate
+    , tracestate      :: Maybe String
     } deriving (Eq, Generic, Show)
+
+
+-- |Reads the Instana tracing headers
+-- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers) from
+-- the given request.
+readHttpTracingHeaders :: Wai.Request -> TracingHeaders
+readHttpTracingHeaders request =
+  let
+    headers = Wai.requestHeaders request
+    -- lookup is automatically case insensitive because
+    -- HeaderName = CI ByteString (CI -> Case Insensitive String)
+    tId =
+      headers
+      |> List.lookup traceIdHeaderName
+      |> (<$>) BSC8.unpack
+    sId =
+      headers
+      |> List.lookup spanIdHeaderName
+      |> (<$>) BSC8.unpack
+    xInstanaLValue =
+      headers
+      |> List.lookup levelHeaderName
+      |> (<$>) BSC8.unpack
+    (lvl, crtp, crid) =
+      parseXInstanaL xInstanaLValue
+    sy =
+      headers
+      |> List.lookup syntheticHeaderName
+      |> (<$>) BSC8.unpack
+    tp =
+      headers
+      |> List.lookup traceparentHeaderName
+      |> (<$>) BSC8.unpack
+    ts =
+      headers
+      |> List.lookup tracestateHeaderName
+      |> (<$>) BSC8.unpack
+  in
+  TracingHeaders
+    { traceId = tId
+    , spanId = sId
+    , level = lvl
+    , correlationType = crtp
+    , correlationId = crid
+    , synthetic = sy == (Just "1")
+    , traceparent = tp
+    , tracestate = ts
+    }
 

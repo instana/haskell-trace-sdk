@@ -59,68 +59,76 @@ module Instana.SDK.SDK
     ) where
 
 
-import           Control.Concurrent                  (ThreadId)
-import qualified Control.Concurrent                  as Concurrent
-import           Control.Concurrent.STM              (STM)
-import qualified Control.Concurrent.STM              as STM
-import           Control.Monad                       (join, when)
-import           Control.Monad.IO.Class              (MonadIO, liftIO)
-import           Data.Aeson                          (Value, (.=))
-import qualified Data.Aeson                          as Aeson
-import qualified Data.ByteString.Char8               as BSC8
-import qualified Data.List                           as List
-import qualified Data.Map.Strict                     as Map
-import qualified Data.Maybe                          as Maybe
-import qualified Data.Sequence                       as Seq
-import           Data.Text                           (Text)
-import qualified Data.Text                           as T
-import           Data.Time.Clock.POSIX               (getPOSIXTime)
-import qualified Network.HTTP.Client                 as HTTP
-import qualified Network.HTTP.Types                  as HTTPTypes
-import qualified Network.Socket                      as Socket
-import qualified Network.Wai                         as Wai
-import           System.Log.Logger                   (warningM)
-import qualified System.Posix.Process                as Process
+import           Control.Concurrent                   (ThreadId)
+import qualified Control.Concurrent                   as Concurrent
+import           Control.Concurrent.STM               (STM)
+import qualified Control.Concurrent.STM               as STM
+import           Control.Monad                        (join, when)
+import           Control.Monad.IO.Class               (MonadIO, liftIO)
+import           Data.Aeson                           (Value, (.=))
+import qualified Data.Aeson                           as Aeson
+import qualified Data.ByteString.Char8                as BSC8
+import qualified Data.List                            as List
+import qualified Data.Map.Strict                      as Map
+import qualified Data.Maybe                           as Maybe
+import qualified Data.Sequence                        as Seq
+import           Data.Text                            (Text)
+import qualified Data.Text                            as T
+import           Data.Time.Clock.POSIX                (getPOSIXTime)
+import qualified Network.HTTP.Client                  as HTTP
+import qualified Network.HTTP.Types                   as HTTPTypes
+import qualified Network.Socket                       as Socket
+import qualified Network.Wai                          as Wai
+import           System.Log.Logger                    (warningM)
+import qualified System.Posix.Process                 as Process
 
 import           Instana.SDK.Config
-import           Instana.SDK.Internal.Command        (Command)
-import qualified Instana.SDK.Internal.Command        as Command
-import           Instana.SDK.Internal.Config         (FinalConfig)
-import qualified Instana.SDK.Internal.Config         as InternalConfig
-import           Instana.SDK.Internal.Context        (ConnectionState (..),
-                                                      InternalContext (InternalContext))
-import qualified Instana.SDK.Internal.Context        as InternalContext
-import           Instana.SDK.Internal.Id             (Id)
-import qualified Instana.SDK.Internal.Id             as Id
-import           Instana.SDK.Internal.Logging        (instanaLogger)
-import qualified Instana.SDK.Internal.Logging        as Logging
-import qualified Instana.SDK.Internal.Metrics.Sample as Sample
-import qualified Instana.SDK.Internal.Secrets        as Secrets
-import qualified Instana.SDK.Internal.ServerTiming   as ServerTiming
-import           Instana.SDK.Internal.SpanStack      (SpanStack)
-import qualified Instana.SDK.Internal.SpanStack      as SpanStack
-import           Instana.SDK.Internal.Util           ((|>))
-import qualified Instana.SDK.Internal.Worker         as Worker
-import           Instana.SDK.Span.EntrySpan          (EntrySpan (..))
-import           Instana.SDK.Span.ExitSpan           (ExitSpan (ExitSpan))
-import qualified Instana.SDK.Span.ExitSpan           as ExitSpan
-import           Instana.SDK.Span.NonRootEntry       (NonRootEntry (NonRootEntry))
-import qualified Instana.SDK.Span.NonRootEntry       as NonRootEntry
-import           Instana.SDK.Span.RootEntry          (RootEntry (RootEntry))
-import qualified Instana.SDK.Span.RootEntry          as RootEntry
-import           Instana.SDK.Span.SimpleSpan         (SimpleSpan)
-import qualified Instana.SDK.Span.SimpleSpan         as SimpleSpan
-import           Instana.SDK.Span.Span               (Span (..), SpanKind (..))
-import qualified Instana.SDK.Span.Span               as Span
-import           Instana.SDK.Span.SpanType           (SpanType (RegisteredSpan))
-import qualified Instana.SDK.Span.SpanType           as SpanType
-import           Instana.SDK.TracingHeaders          (TracingHeaders (TracingHeaders))
-import qualified Instana.SDK.TracingHeaders          as TracingHeaders
+import           Instana.SDK.Internal.Command         (Command)
+import qualified Instana.SDK.Internal.Command         as Command
+import           Instana.SDK.Internal.Config          (FinalConfig)
+import qualified Instana.SDK.Internal.Config          as InternalConfig
+import           Instana.SDK.Internal.Context         (ConnectionState (..),
+                                                       InternalContext (InternalContext))
+import qualified Instana.SDK.Internal.Context         as InternalContext
+import           Instana.SDK.Internal.Id              (Id)
+import qualified Instana.SDK.Internal.Id              as Id
+import           Instana.SDK.Internal.Logging         (instanaLogger)
+import qualified Instana.SDK.Internal.Logging         as Logging
+import qualified Instana.SDK.Internal.Metrics.Sample  as Sample
+import qualified Instana.SDK.Internal.Secrets         as Secrets
+import qualified Instana.SDK.Internal.ServerTiming    as ServerTiming
+import           Instana.SDK.Internal.SpanStack       (SpanStack)
+import qualified Instana.SDK.Internal.SpanStack       as SpanStack
+import           Instana.SDK.Internal.Util            ((|>))
+import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
+import qualified Instana.SDK.Internal.W3CTraceContext as W3CTraceContext
+import qualified Instana.SDK.Internal.Worker          as Worker
+import           Instana.SDK.Span.EntrySpan           (EntrySpan (..))
+import qualified Instana.SDK.Span.EntrySpan           as EntrySpan
+import           Instana.SDK.Span.ExitSpan            (ExitSpan (ExitSpan))
+import qualified Instana.SDK.Span.ExitSpan            as ExitSpan
+import           Instana.SDK.Span.NonRootEntry        (NonRootEntry (NonRootEntry))
+import qualified Instana.SDK.Span.NonRootEntry        as NonRootEntry
+import           Instana.SDK.Span.RootEntry           (RootEntry (RootEntry))
+import qualified Instana.SDK.Span.RootEntry           as RootEntry
+import           Instana.SDK.Span.SimpleSpan          (SimpleSpan)
+import qualified Instana.SDK.Span.SimpleSpan          as SimpleSpan
+import           Instana.SDK.Span.Span                (Span (..), SpanKind (..))
+import qualified Instana.SDK.Span.Span                as Span
+import           Instana.SDK.Span.SpanType            (SpanType (RegisteredSpan))
+import qualified Instana.SDK.Span.SpanType            as SpanType
+import           Instana.SDK.TracingHeaders           (TracingHeaders,
+                                                       readHttpTracingHeaders)
+import qualified Instana.SDK.TracingHeaders           as TracingHeaders
 
 
 {-| A container for all the things the Instana SDK needs to do its work.
 -}
 type InstanaContext = InternalContext
+
+
+httpServerSpan :: SpanType
+httpServerSpan = RegisteredSpan SpanType.HaskellWaiServer
 
 
 {-| Initializes the Instana SDK and the connection to the Instana agent.
@@ -263,6 +271,24 @@ withEntry context traceId parentId spanType io = do
   return result
 
 
+-- |Wraps an IO action in 'startEntry' and 'completeEntry'. This internal method
+-- accepts Id values instead of String values for trace ID/parent ID, to allow
+-- span.lt to be transported alongside the shortened trace ID.
+withEntry' ::
+  MonadIO m =>
+  InstanaContext
+  -> Id
+  -> Id
+  -> SpanType
+  -> m a
+  -> m a
+withEntry' context traceId parentId spanType io = do
+  startEntry' context traceId parentId spanType
+  result <- io
+  completeEntry context
+  return result
+
+
 -- |A convenience function that examines the given incoming HTTP request for
 -- Instana tracing headers
 -- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
@@ -308,117 +334,78 @@ withHttpEntry_ ::
   -> Wai.Request
   -> m a
   -> m a
-withHttpEntry_ context request io = do
-  let
-    spanType = (RegisteredSpan SpanType.HaskellWaiServer)
-    tracingHeaders = readHttpTracingHeaders request
-    traceId = TracingHeaders.traceId tracingHeaders
-    spanId = TracingHeaders.spanId tracingHeaders
-    synthetic = TracingHeaders.synthetic tracingHeaders
-    level = TracingHeaders.level tracingHeaders
-    (traceId', spanId') =
-      case TracingHeaders.correlationId tracingHeaders of
-        Nothing ->
-          (traceId, spanId)
-        Just _ ->
-          (Nothing, Nothing)
-
-  case level of
-    TracingHeaders.Trace -> do
-      let
-        io' = addDataFromRequest context request synthetic io
-      case (traceId', spanId') of
-        (Just t, Just s) ->
-          withEntry context t s spanType io'
-        _                -> do
-          withRootEntry context spanType $
-            addCorrelationTypeAndIdToSpan context tracingHeaders io'
-
-    TracingHeaders.Suppress -> do
-      liftIO $ pushSpan
-        context
-        (\stack ->
-          case stack of
-            Nothing ->
-              -- We did not initialise the span stack for this thread, do it
-              -- now.
-              SpanStack.suppress
-            Just spanStack ->
-              SpanStack.pushSuppress spanStack
-        )
-      io
-
-
--- |Takes an IO action and appends another side effecto to it that will add HTTP
--- data from the given request to the current span.
-addDataFromRequest ::
-  MonadIO m =>
-  InstanaContext ->
-  Wai.Request ->
-  Bool ->
-  m a ->
-  m a
-addDataFromRequest context request synthetic originalIO =
-  originalIO >>= addHttpDataInIO context request synthetic
-
-
-addHttpDataInIO ::
-  MonadIO m =>
-  InstanaContext ->
-  Wai.Request ->
-  Bool ->
-  a ->
-  m a
-addHttpDataInIO context request synthetic ioResult = do
-  addHttpData context request synthetic
-  return ioResult
-
-
-addHttpData :: MonadIO m => InstanaContext -> Wai.Request -> Bool -> m ()
-addHttpData context request synthetic = do
-  let
-    host :: String
-    host =
-      Wai.requestHeaderHost request
-      |> fmap BSC8.unpack
-      |> Maybe.fromMaybe ""
-  addRegisteredData
+withHttpEntry_ context request io =
+  commonHttpHandling
     context
-    (Aeson.object [ "http" .=
-      Aeson.object
-        [ "method" .= Wai.requestMethod request |> BSC8.unpack
-        , "url"    .= Wai.rawPathInfo request |> BSC8.unpack
-        , "host"   .= host
-        , "params" .= (processQueryString $ Wai.rawQueryString request)
-        ]
-      ]
-    )
-  setSynthetic context synthetic
+    request
+    HttpTracingHandlers
+      { continueFromInstanaHeaders = withHttpEntryContinueFromInstanaHeaders
+      , continueFromTraceParent = withHttpEntryContinueFromTraceParent
+      , continueFromTraceStateInstanaKeyValuePair =
+          withHttpEntryContinueFromTraceStateInstanaKeyValuePair
+      , createRoot = withHttpEntryRoot
+      }
+    io
 
 
-addCorrelationTypeAndIdToSpan ::
-  MonadIO m =>
-  InstanaContext
+-- |A variant of 'withHttpEntry' that continues a trace from Instana headers
+-- (X-INSTANA-T, X-INSTANA-S and X-INSTANA-L).
+withHttpEntryContinueFromInstanaHeaders ::
+  MonadIO m
+  => InstanaContext
+  -> String
+  -> String
+  -> m a
+  -> m a
+withHttpEntryContinueFromInstanaHeaders context t s io =
+  withEntry context t s httpServerSpan io
+
+
+-- |A variant of 'withHttpEntry' that continues a trace from the W3C trace
+-- context headers traceparent.
+withHttpEntryContinueFromTraceParent ::
+  MonadIO m
+  => InstanaContext
+  -> W3CTraceContext
+  -> m a
+  -> m a
+withHttpEntryContinueFromTraceParent context w3cTraceContext io =
+  let
+    traceParent = W3CTraceContext.traceParent w3cTraceContext
+  in
+  withEntry'
+    context
+    (W3CTraceContext.traceId traceParent)
+    (W3CTraceContext.parentId traceParent)
+    httpServerSpan
+    (setSpanTpFlag context >> io)
+
+
+-- |A variant of 'withHttpEntry' that continues a trace from the Instana
+-- key-value pair from the tracestate header.
+withHttpEntryContinueFromTraceStateInstanaKeyValuePair ::
+  MonadIO m
+  => InstanaContext
+  -> Id
+  -> Id
+  -> m a
+  -> m a
+withHttpEntryContinueFromTraceStateInstanaKeyValuePair context t s io =
+  withEntry' context t s httpServerSpan io
+
+
+-- |A variant of 'withHttpEntry' that does not continue a trace but starts a
+-- new trace.
+withHttpEntryRoot ::
+  MonadIO m
+  => InstanaContext
   -> TracingHeaders
   -> m a
   -> m a
-addCorrelationTypeAndIdToSpan context tracingHeaders ioResult = do
-  let
-    correlationType = TracingHeaders.correlationType tracingHeaders
-    correlationId = TracingHeaders.correlationId tracingHeaders
-  case (correlationType, correlationId) of
-    (Nothing, Nothing) ->
-      ioResult
-    (Just crtp, Nothing) -> do
-      setCorrelationType context (T.pack crtp)
-      ioResult
-    (Nothing, Just crid) -> do
-      setCorrelationId context (T.pack crid)
-      ioResult
-    (Just crtp, Just crid) -> do
-      setCorrelationType context (T.pack crtp)
-      setCorrelationId context (T.pack crid)
-      ioResult
+withHttpEntryRoot context tracingHeaders io =
+  withRootEntry context httpServerSpan $
+    addCorrelationTypeAndIdToSpan context tracingHeaders
+    >> io
 
 
 -- |Wraps an IO action in 'startExit' and 'completeExit'.
@@ -475,6 +462,7 @@ startRootEntry context spanType = do
             , RootEntry.correlationType = Nothing
             , RootEntry.correlationId   = Nothing
             , RootEntry.spanData        = SpanType.initialData EntryKind spanType
+            , RootEntry.w3cTraceContext = Nothing
             }
     pushSpan
       context
@@ -499,6 +487,24 @@ startEntry ::
   -> SpanType
   -> m ()
 startEntry context traceId parentId spanType = do
+  let
+    tId = Id.fromString traceId
+    pId = Id.fromString parentId
+  startEntry' context tId pId spanType
+
+
+-- |Creates a preliminary/incomplete entry span, which should later be completed
+-- by calling 'completeEntry'. This internal method accepts Id values instead of
+-- String values for trace ID/parent ID, to allow span.lt to be transported
+-- alongside the shortened trace ID.
+startEntry' ::
+  MonadIO m =>
+  InstanaContext
+  -> Id
+  -> Id
+  -> SpanType
+  -> m ()
+startEntry' context traceId parentId spanType = do
   liftIO $ do
     timestamp <- round . (* 1000) <$> getPOSIXTime
     spanId <- Id.generate
@@ -506,22 +512,25 @@ startEntry context traceId parentId spanType = do
       newSpan =
         NonRootEntrySpan $
           NonRootEntry
-            { NonRootEntry.traceId     = Id.fromString traceId
-            , NonRootEntry.spanId      = spanId
-            , NonRootEntry.parentId    = Id.fromString parentId
-            , NonRootEntry.spanName    = SpanType.spanName spanType
-            , NonRootEntry.timestamp   = timestamp
-            , NonRootEntry.errorCount  = 0
-            , NonRootEntry.serviceName = Nothing
-            , NonRootEntry.synthetic   = False
-            , NonRootEntry.spanData    = SpanType.initialData EntryKind spanType
+            { NonRootEntry.traceId         = traceId
+            , NonRootEntry.spanId          = spanId
+            , NonRootEntry.parentId        = parentId
+            , NonRootEntry.spanName        = SpanType.spanName spanType
+            , NonRootEntry.timestamp       = timestamp
+            , NonRootEntry.errorCount      = 0
+            , NonRootEntry.serviceName     = Nothing
+            , NonRootEntry.synthetic       = False
+            , NonRootEntry.spanData        = SpanType.initialData EntryKind spanType
+            , NonRootEntry.w3cTraceContext = Nothing
+            , NonRootEntry.tpFlag          = False
             }
     pushSpan
       context
       (\stack ->
         case stack of
           Nothing ->
-            -- We did not initialise the span stack for this thread, do it now.
+            -- We did not initialise the span stack for this thread yet, do
+            -- it now.
             SpanStack.entry newSpan
           Just spanStack ->
             spanStack
@@ -540,14 +549,134 @@ startHttpEntry ::
   -> Wai.Request
   -> m ()
 startHttpEntry context request = do
+  commonHttpHandling
+    context
+    request
+    HttpTracingHandlers
+      { continueFromInstanaHeaders = startHttpEntryContinueFromInstanaHeaders
+      , continueFromTraceParent = startHttpEntryContinueFromTraceParent
+      , continueFromTraceStateInstanaKeyValuePair =
+          startHttpEntryContinueFromTraceStateInstanaKeyValuePair
+      , createRoot = startHttpEntryRoot
+      }
+    (return ())
+
+
+-- |A variant of 'startHttpEntry' that continues a trace from Instana headers
+-- (X-INSTANA-T, X-INSTANA-S and X-INSTANA-L).
+startHttpEntryContinueFromInstanaHeaders ::
+  MonadIO m
+  => InstanaContext
+  -> String
+  -> String
+  -> m a
+  -> m a
+startHttpEntryContinueFromInstanaHeaders context t s io = do
+  startEntry context t s httpServerSpan
+  io
+
+
+-- |A variant of 'startHttpEntry' that continues a trace from the W3C trace
+-- context headers traceparent.
+startHttpEntryContinueFromTraceParent ::
+  MonadIO m
+  => InstanaContext
+  -> W3CTraceContext
+  -> m a
+  -> m a
+startHttpEntryContinueFromTraceParent context w3cTraceContext io = do
   let
-    spanType = (RegisteredSpan SpanType.HaskellWaiServer)
+    traceParent = W3CTraceContext.traceParent w3cTraceContext
+  startEntry'
+    context
+    (W3CTraceContext.traceId traceParent)
+    (W3CTraceContext.parentId traceParent)
+    httpServerSpan
+  (setSpanTpFlag context >> io)
+
+
+-- |A variant of 'startHttpEntry' that continues a trace from the Instana
+-- key-value pair from the tracestate header.
+startHttpEntryContinueFromTraceStateInstanaKeyValuePair ::
+  MonadIO m
+  => InstanaContext
+  -> Id
+  -> Id
+  -> m a
+  -> m a
+startHttpEntryContinueFromTraceStateInstanaKeyValuePair
+    context
+    t
+    s
+    io = do
+  startEntry'
+    context
+    t
+    s
+    httpServerSpan
+  io
+
+
+-- |A variant of 'startHttpEntry' that does not continue a trace but starts a
+-- new trace.
+startHttpEntryRoot ::
+  MonadIO m
+  => InstanaContext
+  -> TracingHeaders
+  -> m a
+  -> m a
+startHttpEntryRoot context tracingHeaders io = do
+  startRootEntry context httpServerSpan
+  addCorrelationTypeAndIdToSpan context tracingHeaders
+  io
+
+
+-- |A set of handlers to continue a trace from incoming headers or create a
+-- new trace, which can be either used from withHttpEntry or startHttpEntry.
+data HttpTracingHandlers m a = HttpTracingHandlers
+  { continueFromInstanaHeaders ::
+      InstanaContext
+      -> String
+      -> String
+      -> m a
+      -> m a
+  , continueFromTraceParent ::
+      InstanaContext
+      -> W3CTraceContext
+      -> m a
+      -> m a
+  , continueFromTraceStateInstanaKeyValuePair ::
+      InstanaContext
+      -> Id
+      -> Id
+      -> m a
+      -> m a
+  , createRoot ::
+      InstanaContext
+      -> TracingHeaders
+      -> m a
+      -> m a
+  }
+
+
+-- |Bundles common handling for startHttpEntry and withHttpEntry.
+commonHttpHandling ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Request
+  -> HttpTracingHandlers m a
+  -> m a
+  -> m a
+commonHttpHandling context request httpTracingHandlers io = do
+  let
     tracingHeaders = readHttpTracingHeaders request
     traceId = TracingHeaders.traceId tracingHeaders
     spanId = TracingHeaders.spanId tracingHeaders
-    synthetic = TracingHeaders.synthetic tracingHeaders
     level = TracingHeaders.level tracingHeaders
-    -- ignore incoming X-INSTANA-T/-S if eum correlation data is present
+    traceparent = TracingHeaders.traceparent tracingHeaders
+    tracestate = TracingHeaders.tracestate tracingHeaders
+
+    -- discard incoming X-INSTANA-T/-S if eum correlation data is present
     (traceId', spanId') =
       case TracingHeaders.correlationId tracingHeaders of
         Nothing ->
@@ -555,28 +684,189 @@ startHttpEntry context request = do
         Just _ ->
           (Nothing, Nothing)
 
-  case level of
-    TracingHeaders.Trace ->
-      case (traceId', spanId') of
-        (Just t, Just s) -> do
-          startEntry context t s spanType
-          addHttpData context request synthetic
-        _                -> do
-          startRootEntry context spanType
-          addHttpData context request synthetic
-          addCorrelationTypeAndIdToSpan context tracingHeaders $ return ()
+    w3cTraceContext =
+      case traceparent of
+        Just tp ->
+          W3CTraceContext.decode tp tracestate
+        Nothing ->
+          Nothing
 
-    TracingHeaders.Suppress -> do
-      liftIO $ pushSpan
+  case level of
+
+    TracingHeaders.Trace ->
+      executeTracedHttpRequest
         context
-        (\stack ->
-          case stack of
-            Nothing ->
-              -- We did not initialise the span stack for this thread, do it now.
-              SpanStack.suppress
-            Just spanStack ->
-              SpanStack.pushSuppress spanStack
-        )
+        request
+        httpTracingHandlers
+        tracingHeaders
+        w3cTraceContext
+        traceId'
+        spanId'
+        io
+
+    TracingHeaders.Suppress ->
+      executeSuppressedHttpRequest context w3cTraceContext io
+
+
+-- |Evaluates the incoming headers (Instana headers and W3C trace context) and
+-- decides from which set of headers to continue the trace (or to start a new
+-- trace).
+executeTracedHttpRequest ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Request
+  -> HttpTracingHandlers m a
+  -> TracingHeaders
+  -> Maybe W3CTraceContext
+  -> Maybe String
+  -> Maybe String
+  -> m a
+  -> m a
+executeTracedHttpRequest
+    context
+    request
+    httpTracingHandlers
+    tracingHeaders
+    w3cTraceContext
+    traceId
+    spanId
+    io = do
+  let
+    synthetic = TracingHeaders.synthetic tracingHeaders
+
+    io' =
+      (setW3cTraceContext context w3cTraceContext)
+      >> io
+      >>= (\ioResult -> do
+        addHttpData context request synthetic
+        return ioResult
+      )
+
+    w3cTsInKvPair =
+      join $
+        W3CTraceContext.instanaKeyValuePair <$>
+          W3CTraceContext.traceState <$> w3cTraceContext
+    tIdFromW3cInKvPair = W3CTraceContext.instanaTraceId <$> w3cTsInKvPair
+    pIdFromW3cInKvPair = W3CTraceContext.instanaParentId <$> w3cTsInKvPair
+
+    w3cTraceCorrelationDisabled =
+      InternalConfig.disableW3cTraceCorrelation . InternalContext.config $
+        context
+
+  case ( traceId
+       , spanId
+       , w3cTraceContext
+       , w3cTraceCorrelationDisabled
+       , tIdFromW3cInKvPair
+       , pIdFromW3cInKvPair
+       ) of
+
+    (Just t, Just s, _, _, _, _) ->
+      (continueFromInstanaHeaders httpTracingHandlers)
+        context
+        t
+        s
+        io'
+
+    (_, _, Just w3cCtx, False, _, _) ->
+      (continueFromTraceParent httpTracingHandlers)
+        context
+        w3cCtx
+        io'
+
+    (_, _, _, True, Just t, Just s) ->
+      (continueFromTraceStateInstanaKeyValuePair httpTracingHandlers)
+        context
+        t
+        s
+        io'
+
+    _                ->
+      (createRoot httpTracingHandlers)
+        context
+        tracingHeaders
+        io'
+
+
+-- |Handles an incoming HTTP request when tracing is suppressed.
+executeSuppressedHttpRequest ::
+  MonadIO m =>
+  InstanaContext
+  -> Maybe W3CTraceContext
+  -> m a
+  -> m a
+executeSuppressedHttpRequest context maybeW3cTraceContext io = do
+  liftIO $ do
+    w3cTraceContext <-
+      case maybeW3cTraceContext of
+        Just w3cCtx ->
+          return w3cCtx
+        Nothing -> do
+          W3CTraceContext.initBogusContextForSuppressedRequest
+    pushSpan
+      context
+      (\stack ->
+        case stack of
+          Nothing ->
+            -- We did not initialise the span stack for this thread, do it
+            -- now.
+            SpanStack.suppress w3cTraceContext
+          Just spanStack ->
+            SpanStack.pushSuppress w3cTraceContext spanStack
+      )
+  io
+
+
+addHttpData ::
+  MonadIO m =>
+  InstanaContext ->
+  Wai.Request ->
+  Bool ->
+  m ()
+addHttpData context request synthetic = do
+  let
+    host :: String
+    host =
+      Wai.requestHeaderHost request
+      |> fmap BSC8.unpack
+      |> Maybe.fromMaybe ""
+  addRegisteredData
+    context
+    (Aeson.object [ "http" .=
+      Aeson.object
+        [ "method" .= Wai.requestMethod request |> BSC8.unpack
+        , "url"    .= Wai.rawPathInfo request |> BSC8.unpack
+        , "host"   .= host
+        , "params" .= (processQueryString $ Wai.rawQueryString request)
+        ]
+      ]
+    )
+  setSynthetic context synthetic
+
+
+-- |Adds website correlation annotations to the HTTP entry span.
+addCorrelationTypeAndIdToSpan ::
+  MonadIO m =>
+  InstanaContext
+  -> TracingHeaders
+  -> m ()
+addCorrelationTypeAndIdToSpan context tracingHeaders = do
+  let
+    correlationType = TracingHeaders.correlationType tracingHeaders
+    correlationId = TracingHeaders.correlationId tracingHeaders
+  case (correlationType, correlationId) of
+    (Nothing, Nothing) ->
+      return ()
+    (Just crtp, Nothing) -> do
+      setCorrelationType context (T.pack crtp)
+      return ()
+    (Nothing, Just crid) -> do
+      setCorrelationId context (T.pack crid)
+      return ()
+    (Just crtp, Just crid) -> do
+      setCorrelationType context (T.pack crtp)
+      setCorrelationId context (T.pack crid)
+      return ()
 
 
 -- |Processes the response of an HTTP entry. This function needs be called while
@@ -596,9 +886,9 @@ startHttpEntry context request = do
 -- both of these things automatically.
 --
 -- Clients should make sure to call this in the context provided above, that is,
--- within 'withHttpEntry_' or between 'startHttpEntry' and 'completeHttpEntry'
--- but outside of blocks that create an exit span, that is, outside of
--- 'withExit', 'withHttpExit' and not between 'startExit' and 'completeExit'.
+-- within 'withHttpEntry_' or between 'startHttpEntry' and 'completeEntry' but
+-- outside of blocks that create an exit span, that is, outside of 'withExit',
+-- 'withHttpExit' and not between 'startExit' and 'completeExit'.
 postProcessHttpResponse ::
   MonadIO m =>
   InstanaContext
@@ -683,13 +973,15 @@ addWebsiteMonitoringBackEndCorrelationUnlifted ::
   -> IO Wai.Response
 addWebsiteMonitoringBackEndCorrelationUnlifted context response = do
   traceIdMaybe <- currentTraceIdInternal context
-  case traceIdMaybe of
-    Nothing -> return response
-    Just traceId  ->
+  suppressed <- isSuppressed context
+  case (traceIdMaybe, suppressed) of
+    (Just traceId, False) ->
       return $
         Wai.mapResponseHeaders
         (ServerTiming.addTraceIdToServerTiming traceId)
         response
+    _ ->
+      return response
 
 
 -- |Creates a preliminary/incomplete exit span, which should later be completed
@@ -711,15 +1003,30 @@ startExit context spanType = do
           spanId <- Id.generate
           timestamp <- round . (* 1000) <$> getPOSIXTime
           let
+            parentW3cTraceContext = EntrySpan.w3cTraceContext parent
+            w3cTraceContext =
+              case parentW3cTraceContext of
+                Just w3cCtx ->
+                  W3CTraceContext.inheritFrom
+                    w3cCtx
+                    (EntrySpan.traceId parent)
+                    spanId
+                Nothing ->
+                  W3CTraceContext.exitSpanContextFromIds
+                    (EntrySpan.traceId parent)
+                    spanId
             newSpan =
               ExitSpan
-                { ExitSpan.parentSpan  = parent
-                , ExitSpan.spanId      = spanId
-                , ExitSpan.spanName    = SpanType.spanName spanType
-                , ExitSpan.timestamp   = timestamp
-                , ExitSpan.errorCount  = 0
-                , ExitSpan.serviceName = Nothing
-                , ExitSpan.spanData    = SpanType.initialData ExitKind spanType
+                { ExitSpan.parentSpan      = parent
+                , ExitSpan.spanId          = spanId
+                , ExitSpan.spanName        = SpanType.spanName spanType
+                , ExitSpan.timestamp       = timestamp
+                , ExitSpan.errorCount      = 0
+                , ExitSpan.serviceName     = Nothing
+                , ExitSpan.spanData        = SpanType.initialData
+                                               ExitKind
+                                               spanType
+                , ExitSpan.w3cTraceContext = w3cTraceContext
                 }
           pushSpan
             context
@@ -918,6 +1225,31 @@ setCorrelationId context correlationId_ =
     (\span_ -> Span.setCorrelationId correlationId_ span_)
 
 
+-- |Attaches a W3C trace context to the currently active span.
+setW3cTraceContext ::
+  MonadIO m =>
+  InstanaContext ->
+  Maybe W3CTraceContext ->
+  m ()
+setW3cTraceContext context w3cTraceContext =
+  liftIO $ do
+    case w3cTraceContext of
+      Just w3cCtx ->
+        modifyCurrentSpan context
+          (\span_ -> Span.setW3cTraceContext w3cCtx span_)
+      Nothing ->
+        return ()
+
+
+-- |Sets the tp flag on the current span to mark it as a span that has
+-- inherited the trace ID/parent ID from W3C trace context instead of Instana
+-- headers.
+setSpanTpFlag :: MonadIO m => InstanaContext -> m ()
+setSpanTpFlag context =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.setTpFlag span_)
+
+
 -- |Set the synthetic flag. This should only be set on entry spans. It will be
 -- silently ignored for other types of spans.
 setSynthetic :: MonadIO m => InstanaContext -> Bool -> m ()
@@ -1018,44 +1350,6 @@ addRegisteredData context value =
     (\span_ -> Span.addRegisteredData value span_)
 
 
--- |Reads the Instana tracing headers
--- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers) from
--- the given request.
-readHttpTracingHeaders :: Wai.Request -> TracingHeaders
-readHttpTracingHeaders request =
-  let
-    headers = Wai.requestHeaders request
-    -- lookup is automatically case insensitive because
-    -- HeaderName = CI ByteString (CI -> Case Insensitive String)
-    traceId =
-      headers
-      |> List.lookup TracingHeaders.traceIdHeaderName
-      |> (<$>) BSC8.unpack
-    spanId =
-      headers
-      |> List.lookup TracingHeaders.spanIdHeaderName
-      |> (<$>) BSC8.unpack
-    xInstanaLValue =
-      headers
-      |> List.lookup TracingHeaders.levelHeaderName
-      |> (<$>) BSC8.unpack
-    (level, correlationType, correlationId) =
-      TracingHeaders.parseXInstanaL xInstanaLValue
-    synthetic =
-      headers
-      |> List.lookup TracingHeaders.syntheticHeaderName
-      |> (<$>) BSC8.unpack
-  in
-  TracingHeaders
-    { TracingHeaders.traceId = traceId
-    , TracingHeaders.spanId = spanId
-    , TracingHeaders.level = level
-    , TracingHeaders.correlationType = correlationType
-    , TracingHeaders.correlationId = correlationId
-    , TracingHeaders.synthetic = synthetic == (Just "1")
-    }
-
-
 -- |Adds the Instana tracing headers
 -- (https://docs.instana.io/core_concepts/tracing/#http-tracing-headers)
 -- from the currently active span to the given HTTP client request.
@@ -1069,43 +1363,70 @@ addHttpTracingHeaders context request =
     suppressed <- isSuppressed context
     traceId <- currentTraceIdInternal context
     spanId <- currentSpanIdInternal context
+    w3cTraceContext <- currentW3cTraceContext context
     let
       originalHeaders = HTTP.requestHeaders request
-      updatedRequest =
-        case (traceId, spanId, suppressed) of
-          (_, _, True) ->
-            request {
-              HTTP.requestHeaders =
-                ((TracingHeaders.levelHeaderName, "0") : originalHeaders)
-            }
-          (Just tId, Just sId, False) ->
-            request {
-              HTTP.requestHeaders =
-                (originalHeaders ++
-                  [ (TracingHeaders.traceIdHeaderName, Id.toByteString tId)
-                  , (TracingHeaders.spanIdHeaderName, Id.toByteString sId)
-                  ]
-                )
-            }
-          (Just tId, Nothing, False) ->
-            request {
-              HTTP.requestHeaders =
-                (originalHeaders ++
-                  [ (TracingHeaders.traceIdHeaderName, Id.toByteString tId)
-                  ]
-                )
-            }
-          (Nothing, Just sId, False) ->
-            request {
-              HTTP.requestHeaders =
-                (originalHeaders ++
-                  [ (TracingHeaders.spanIdHeaderName, Id.toByteString sId)
-                  ]
-                )
-            }
-          _ ->
-            request
-    return updatedRequest
+    case (traceId, spanId, suppressed) of
+      (_, _, True) -> do
+          suppressedW3cTraceContext <-
+            case w3cTraceContext of
+              Just w3cCtx -> do
+                bogusParentId <- Id.generate
+                return $
+                  W3CTraceContext.inheritFromForSuppressed
+                    w3cCtx
+                    bogusParentId
+              Nothing -> do
+                bogusTraceIdFromStack <- currentTraceIdInternal context
+                bogusTraceId <-
+                  case bogusTraceIdFromStack of
+                    Just tId -> return tId
+                    Nothing  -> Id.generate
+                bogusParentId <- Id.generate
+                return $ W3CTraceContext.createExitContextForSuppressed bogusTraceId bogusParentId
+          return $ request {
+            HTTP.requestHeaders =
+              ((TracingHeaders.levelHeaderName, "0") : originalHeaders)
+              ++ (w3cTraceContextToHeaders $ Just suppressedW3cTraceContext)
+          }
+
+      (Just tId, Just sId, False) ->
+        return $ request {
+          HTTP.requestHeaders =
+            (originalHeaders ++
+              [ (TracingHeaders.traceIdHeaderName, Id.toByteString tId)
+              , (TracingHeaders.spanIdHeaderName, Id.toByteString sId)
+              ]
+              ++ w3cTraceContextToHeaders w3cTraceContext
+            )
+        }
+      (Just tId, Nothing, False) ->
+        return $ request {
+          HTTP.requestHeaders =
+            (originalHeaders ++
+              [ (TracingHeaders.traceIdHeaderName, Id.toByteString tId)
+              ]
+              ++ w3cTraceContextToHeaders w3cTraceContext
+            )
+        }
+      (Nothing, Just sId, False) ->
+        return $ request {
+          HTTP.requestHeaders =
+            (originalHeaders ++
+              [ (TracingHeaders.spanIdHeaderName, Id.toByteString sId)
+              ]
+              ++ w3cTraceContextToHeaders w3cTraceContext
+            )
+        }
+      _ ->
+        return request
+
+
+w3cTraceContextToHeaders :: Maybe W3CTraceContext -> [HTTPTypes.Header]
+w3cTraceContextToHeaders w3cTraceContext =
+  case w3cTraceContext of
+    Just w3cCtx -> W3CTraceContext.toHeaders w3cCtx
+    Nothing     -> []
 
 
 -- |Sends a command to the worker thread.
@@ -1241,6 +1562,15 @@ isSuppressed :: InstanaContext -> IO Bool
 isSuppressed context = do
   suppressedMaybe <- readFromSpanStack context SpanStack.isSuppressed
   return $ Maybe.fromMaybe False suppressedMaybe
+
+
+-- |Retrieves the W3C trace context attached to currently active span in the
+-- current thread.
+currentW3cTraceContext :: InstanaContext -> IO (Maybe W3CTraceContext)
+currentW3cTraceContext context = do
+  w3cTraceContextMaybe <-
+    readFromSpanStack context SpanStack.readW3cTraceContext
+  return $ join w3cTraceContextMaybe
 
 
 -- |Reads a value from the currently active span stack.

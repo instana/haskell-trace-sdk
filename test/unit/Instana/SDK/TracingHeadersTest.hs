@@ -3,6 +3,8 @@
 module Instana.SDK.TracingHeadersTest (allTests) where
 
 
+import qualified Data.CaseInsensitive       as CI
+import qualified Network.Wai                as Wai
 import           Test.HUnit
 
 import           Instana.SDK.TracingHeaders (TracingLevel (..))
@@ -12,7 +14,12 @@ import qualified Instana.SDK.TracingHeaders as TracingHeaders
 allTests :: Test
 allTests =
   TestList
-    [ TestLabel
+    [ TestLabel "shouldReadHeaders" shouldReadHeaders
+    , TestLabel
+        "shouldReadHeaderNamesCaseInsensitive"
+        shouldReadHeaderNamesCaseInsensitive
+    , TestLabel "shouldReadDefaultValues" shouldReadDefaultValues
+    , TestLabel
         "shouldParseNonExistingXInstanaL"
         shouldParseNonExistingXInstanaL
     , TestLabel "shouldParseXInstanaL1" shouldParseXInstanaL1
@@ -31,6 +38,128 @@ allTests =
     ]
 
 
+shouldReadDefaultValues :: Test
+shouldReadDefaultValues =
+  let
+    tracingHeaders =
+      TracingHeaders.readHttpTracingHeaders Wai.defaultRequest
+  in
+  TestCase $ do
+    assertEqual "trace ID"
+      Nothing
+      (TracingHeaders.traceId tracingHeaders)
+    assertEqual "span ID"
+      Nothing
+      (TracingHeaders.spanId tracingHeaders)
+    assertEqual "level" Trace (TracingHeaders.level tracingHeaders)
+    assertEqual "correlationType"
+      Nothing
+      (TracingHeaders.correlationType tracingHeaders)
+    assertEqual "correlationId"
+      Nothing
+      (TracingHeaders.correlationId tracingHeaders)
+    assertEqual "synthetic"
+      False
+      (TracingHeaders.synthetic tracingHeaders)
+    assertEqual "traceparent"
+      Nothing
+      (TracingHeaders.traceparent tracingHeaders)
+    assertEqual "tracestate"
+      Nothing
+      (TracingHeaders.tracestate tracingHeaders)
+
+
+shouldReadHeaders :: Test
+shouldReadHeaders =
+  let
+    tracingHeaders =
+      TracingHeaders.readHttpTracingHeaders $
+        Wai.defaultRequest
+          { Wai.requestHeaders =
+              [ (CI.mk "X-INSTANA-T", "1234567890abcdef")
+              , (CI.mk "X-INSTANA-S", "abcdef1234567890")
+              , (CI.mk "X-INSTANA-L", "1")
+              , (CI.mk "X-INSTANA-SYNTHETIC", "1")
+              , (CI.mk "traceparent",
+                  "00-00000000000000001234567890abcdef-abcdef1234567890-01"
+                )
+              , (CI.mk "tracestate",
+                  "foo=bar,in=1234567890abcdef;abcdef1234567890,beep=bop"
+                )
+              ]
+          }
+  in
+  TestCase $ do
+    assertEqual "trace ID"
+      (Just "1234567890abcdef")
+      (TracingHeaders.traceId tracingHeaders)
+    assertEqual "span ID"
+      (Just "abcdef1234567890")
+      (TracingHeaders.spanId tracingHeaders)
+    assertEqual "level" Trace (TracingHeaders.level tracingHeaders)
+    assertEqual "correlationType"
+      Nothing
+      (TracingHeaders.correlationType tracingHeaders)
+    assertEqual "correlationId"
+      Nothing
+      (TracingHeaders.correlationId tracingHeaders)
+    assertEqual "synthetic"
+      True
+      (TracingHeaders.synthetic tracingHeaders)
+    assertEqual "traceparent"
+      (Just "00-00000000000000001234567890abcdef-abcdef1234567890-01")
+      (TracingHeaders.traceparent tracingHeaders)
+    assertEqual "tracestate"
+      (Just "foo=bar,in=1234567890abcdef;abcdef1234567890,beep=bop")
+      (TracingHeaders.tracestate tracingHeaders)
+
+
+shouldReadHeaderNamesCaseInsensitive :: Test
+shouldReadHeaderNamesCaseInsensitive =
+  let
+    tracingHeaders =
+      TracingHeaders.readHttpTracingHeaders $
+        Wai.defaultRequest
+          { Wai.requestHeaders =
+              [ (CI.mk "x-inSTanA-t", "1234567890abcdef")
+              , (CI.mk "X-Instana-S", "abcdef1234567890")
+              , (CI.mk "x-instana-synthetic", "1")
+              , (CI.mk "TRACEPARENT",
+                  "00-00000000000000001234567890abcdef-abcdef1234567890-01"
+                )
+              , (CI.mk "TRACESTATE",
+                  "foo=bar,in=1234567890abcdef;abcdef1234567890,beep=bop"
+                )
+              ]
+          }
+  in
+  TestCase $ do
+    assertEqual "trace ID"
+      (Just "1234567890abcdef")
+      (TracingHeaders.traceId tracingHeaders)
+    assertEqual "span ID"
+      (Just "abcdef1234567890")
+      (TracingHeaders.spanId tracingHeaders)
+    assertEqual "level" Trace (TracingHeaders.level tracingHeaders)
+    assertEqual "correlationType"
+      Nothing
+      (TracingHeaders.correlationType tracingHeaders)
+    assertEqual "correlationId"
+      Nothing
+      (TracingHeaders.correlationId tracingHeaders)
+    assertEqual "synthetic"
+      True
+      (TracingHeaders.synthetic tracingHeaders)
+    assertEqual "traceparent"
+      (Just "00-00000000000000001234567890abcdef-abcdef1234567890-01")
+      (TracingHeaders.traceparent tracingHeaders)
+    assertEqual "tracestate"
+      (Just "foo=bar,in=1234567890abcdef;abcdef1234567890,beep=bop")
+      (TracingHeaders.tracestate tracingHeaders)
+
+
+
+
 shouldParseNonExistingXInstanaL :: Test
 shouldParseNonExistingXInstanaL =
   let
@@ -38,7 +167,7 @@ shouldParseNonExistingXInstanaL =
       TracingHeaders.parseXInstanaL Nothing
   in
   TestCase $ do
-    assertEqual "level" level Trace
+    assertEqual "level" Trace level
     assertEqual "correlation type" Nothing correlationType
     assertEqual "correlation ID" Nothing correlationId
 
@@ -50,7 +179,7 @@ shouldParseXInstanaL1 =
       TracingHeaders.parseXInstanaL $ Just "1"
   in
   TestCase $ do
-    assertEqual "level" level Trace
+    assertEqual "level" Trace level
     assertEqual "correlation type" Nothing correlationType
     assertEqual "correlation ID" Nothing correlationId
 
@@ -62,7 +191,7 @@ shouldParseXInstanaL1Untrimmed =
       TracingHeaders.parseXInstanaL $ Just "  1  "
   in
   TestCase $ do
-    assertEqual "level" level Trace
+    assertEqual "level" Trace level
     assertEqual "correlation type" Nothing correlationType
     assertEqual "correlation ID" Nothing correlationId
 
@@ -110,7 +239,7 @@ shouldParseXInstanaL1WithCorrelation =
       TracingHeaders.parseXInstanaL $ Just "1,correlationType=web;correlationId=1234567890abcdef"
   in
   TestCase $ do
-    assertEqual "level" level Trace
+    assertEqual "level" Trace level
     assertEqual "correlation type" (Just "web") correlationType
     assertEqual "correlation ID" (Just "1234567890abcdef") correlationId
 
@@ -122,7 +251,7 @@ shouldParseXInstanaL1WithOddlyFormattedCorrelation =
       TracingHeaders.parseXInstanaL $ Just "  1 ,  correlationType = web  ;  correlationId =  1234567890abcdef"
   in
   TestCase $ do
-    assertEqual "level" level Trace
+    assertEqual "level" Trace level
     assertEqual "correlation type" (Just "web") correlationType
     assertEqual "correlation ID" (Just "1234567890abcdef") correlationId
 

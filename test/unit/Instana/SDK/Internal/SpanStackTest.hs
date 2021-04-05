@@ -2,20 +2,24 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Instana.SDK.Internal.SpanStackTest (allTests) where
 
-import           Data.Aeson                     (Value)
-import qualified Data.Aeson                     as Aeson
+import           Data.Aeson                           (Value)
+import qualified Data.Aeson                           as Aeson
 import           Test.HUnit
 
-import qualified Instana.SDK.Internal.Id        as Id
-import           Instana.SDK.Internal.SpanStack (SpanStack)
-import qualified Instana.SDK.Internal.SpanStack as SpanStack
-import           Instana.SDK.Span.EntrySpan     (EntrySpan (RootEntrySpan))
-import           Instana.SDK.Span.ExitSpan      (ExitSpan (ExitSpan))
-import qualified Instana.SDK.Span.ExitSpan      as ExitSpan
-import           Instana.SDK.Span.RootEntry     (RootEntry (RootEntry))
-import qualified Instana.SDK.Span.RootEntry     as RootEntry
-import           Instana.SDK.Span.Span          (Span (..), SpanKind (..))
-import qualified Instana.SDK.Span.Span          as Span
+import qualified Instana.SDK.Internal.Id              as Id
+import           Instana.SDK.Internal.SpanStack       (SpanStack)
+import qualified Instana.SDK.Internal.SpanStack       as SpanStack
+import           Instana.SDK.Internal.W3CTraceContext (Flags (..),
+                                                       TraceParent (..),
+                                                       TraceState (..),
+                                                       W3CTraceContext (..))
+import           Instana.SDK.Span.EntrySpan           (EntrySpan (RootEntrySpan))
+import           Instana.SDK.Span.ExitSpan            (ExitSpan (ExitSpan))
+import qualified Instana.SDK.Span.ExitSpan            as ExitSpan
+import           Instana.SDK.Span.RootEntry           (RootEntry (RootEntry))
+import qualified Instana.SDK.Span.RootEntry           as RootEntry
+import           Instana.SDK.Span.Span                (Span (..), SpanKind (..))
+import qualified Instana.SDK.Span.Span                as Span
 
 
 allTests :: Test
@@ -369,7 +373,7 @@ empty =
 
 suppressed :: SpanStack
 suppressed =
-  SpanStack.suppress
+  SpanStack.suppress dummyW3cTraceContext
 
 
 entryOnly :: SpanStack
@@ -399,20 +403,41 @@ rootEntry =
       , RootEntry.correlationType = Nothing
       , RootEntry.correlationId   = Nothing
       , RootEntry.spanData        = emptyValue
+      , RootEntry.w3cTraceContext = Nothing
       }
 
 
 exitSpan :: ExitSpan
 exitSpan =
   ExitSpan
-    { ExitSpan.parentSpan   = entrySpan
-    , ExitSpan.spanId      = Id.fromString "spanId"
-    , ExitSpan.spanName    = "test.exit"
-    , ExitSpan.timestamp   = 1514761201000
-    , ExitSpan.errorCount  = 0
-    , ExitSpan.serviceName = Nothing
-    , ExitSpan.spanData    = emptyValue
+    { ExitSpan.parentSpan      = entrySpan
+    , ExitSpan.spanId          = Id.fromString "spanId"
+    , ExitSpan.spanName        = "test.exit"
+    , ExitSpan.timestamp       = 1514761201000
+    , ExitSpan.errorCount      = 0
+    , ExitSpan.serviceName     = Nothing
+    , ExitSpan.spanData        = emptyValue
+    , ExitSpan.w3cTraceContext = dummyW3cTraceContext
     }
+
+
+dummyW3cTraceContext :: W3CTraceContext
+dummyW3cTraceContext =
+  W3CTraceContext
+  { traceParent = TraceParent
+    { version  = 0
+    , traceId  = "trace-id"
+    , parentId = "span-id"
+    , flags    = Flags
+      { sampled = False
+      }
+    }
+  , traceState = TraceState
+    { traceStateHead      = Nothing
+    , instanaKeyValuePair = Nothing
+    , traceStateTail      = Nothing
+    }
+  }
 
 
 increaseEc :: Span -> Span

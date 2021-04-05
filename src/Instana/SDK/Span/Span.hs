@@ -21,27 +21,32 @@ module Instana.SDK.Span.Span
   , setCorrelationType
   , setServiceName
   , setSynthetic
+  , setW3cTraceContext
   , spanData
+  , setTpFlag
   , spanId
   , spanKind
   , spanName
   , synthetic
   , timestamp
+  , tpFlag
   , traceId
+  , w3cTraceContext
   ) where
 
 
-import           Data.Aeson                 (Value, (.=))
-import qualified Data.Aeson                 as Aeson
-import qualified Data.List                  as List
-import           Data.Text                  as T
+import           Data.Aeson                           (Value, (.=))
+import qualified Data.Aeson                           as Aeson
+import qualified Data.List                            as List
+import           Data.Text                            as T
 import           GHC.Generics
 
-import           Instana.SDK.Internal.Id    (Id)
-import           Instana.SDK.Span.EntrySpan (EntrySpan)
-import qualified Instana.SDK.Span.EntrySpan as EntrySpan
-import           Instana.SDK.Span.ExitSpan  (ExitSpan)
-import qualified Instana.SDK.Span.ExitSpan  as ExitSpan
+import           Instana.SDK.Internal.Id              (Id)
+import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
+import           Instana.SDK.Span.EntrySpan           (EntrySpan)
+import qualified Instana.SDK.Span.EntrySpan           as EntrySpan
+import           Instana.SDK.Span.ExitSpan            (ExitSpan)
+import qualified Instana.SDK.Span.ExitSpan            as ExitSpan
 
 
 -- |The span kind (entry, exit or intermediate).
@@ -181,6 +186,49 @@ setCorrelationId correlationId_ span_ =
   case span_ of
     Entry entry ->
       Entry $ EntrySpan.setCorrelationId correlationId_ entry
+    Exit _ ->
+      span_
+
+
+-- |The W3C Trace Context. An entry span only has an associated W3C trace
+-- context, if W3C trace context headers have been received. In contrast,
+-- exit spans always have an associated W3C trace context.
+w3cTraceContext :: Span -> Maybe W3CTraceContext
+w3cTraceContext span_ =
+  case span_ of
+    Entry entry -> EntrySpan.w3cTraceContext entry
+    Exit exit   -> Just $ ExitSpan.w3cTraceContext exit
+
+
+-- |Attaches a W3C trace context to the span.
+setW3cTraceContext :: W3CTraceContext -> Span -> Span
+setW3cTraceContext w3cTraceContext_ span_ =
+  case span_ of
+    Entry entry ->
+      Entry $ EntrySpan.setW3cTraceContext w3cTraceContext_ entry
+    Exit exit ->
+      Exit $ ExitSpan.setW3cTraceContext w3cTraceContext_ exit
+
+
+-- |The span.tp flag. A span with span.tp = True has inherited the trace ID/
+-- parent ID from W3C trace context instead of Instana headers. Only valid for
+-- non-root entry spans.
+tpFlag :: Span -> Bool
+tpFlag span_ =
+  case span_ of
+    Entry entry -> EntrySpan.tpFlag entry
+    Exit _      -> False
+
+
+-- |Set the span.tp flag. A span with span.tp = True has inherited the trace ID/
+-- parent ID from W3C trace context instead of Instana headers. Only valid for
+-- non-root entry spans, will be silently ignored for root entry spans and exit
+-- spans.
+setTpFlag :: Span -> Span
+setTpFlag span_ =
+  case span_ of
+    Entry entry ->
+      Entry $ EntrySpan.setTpFlag entry
     Exit _ ->
       span_
 

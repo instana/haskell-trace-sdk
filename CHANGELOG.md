@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## 0.7.00
+- Add support for W3C trace context.
+
 ## 0.6.2.0
 - Fix: Ignore incoming X-INSTANA-T/-S if website monitoring correlation data is present.
 - Add support for X-INSTANA-SYNTHETIC
