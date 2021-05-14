@@ -436,7 +436,7 @@ collectAndSendMetrics context agentConnection metricsStore = do
   -- move on.
   -- That means that if the agent is unavailable for some time, we will try to
   -- send data at least every second regardless.
-  -- We could do something more sophisticated here like trying to send metrics
+  -- We could do something more sophisticated here like trying to send spans
   -- less frequently after a number of failed attempts. Maybe we could use
   -- http://hackage.haskell.org/package/glue-0.2.0/docs/Glue-CircuitBreaker.html
   --
@@ -463,14 +463,9 @@ collectAndSendMetrics context agentConnection metricsStore = do
         then do
           warningM instanaLogger $
             "Received HTTP 404 when sending metrics to " ++
-            show metricsEndpointUrl
-            -- There is something fishy going on with sending metrics to the
-            -- agent when the Haskell app is running in a container. Until this
-            -- has been fixed, we do not reset the connection state to
-            -- unconnected on the POST for metrics, only on the POST for spans
-            --
-            -- ++ ", resetting connection state to unconnected."
-            -- resetToUnconnected context
+            show metricsEndpointUrl ++
+            ", resetting connection state to unconnected."
+          resetToUnconnected context
         else do
           debugM instanaLogger $ show e
           return ()
