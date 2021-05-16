@@ -11,14 +11,22 @@ import qualified Instana.SDK.Internal.Logging as Logging
 allTests :: Test
 allTests =
   TestList
-    [ TestLabel "shouldParseDebug" shouldParseDebug
-    , TestLabel "shouldParseInfo" shouldParseInfo
-    , TestLabel "shouldParseNotice" shouldParseNotice
-    , TestLabel "shouldParseWarning" shouldParseWarning
-    , TestLabel "shouldParseError" shouldParseError
-    , TestLabel "shouldParseCritical" shouldParseCritical
-    , TestLabel "shouldParseAlert" shouldParseAlert
-    , TestLabel "shouldParseEmergency" shouldParseEmergency
+    [ TestLabel "shouldParseDebugUpperCase" shouldParseDebugUpperCase
+    , TestLabel "shouldParseDebugLowerCase" shouldParseDebugLowerCase
+    , TestLabel "shouldParseInfoUpperCase" shouldParseInfoUpperCase
+    , TestLabel "shouldParseInfoLowerCase" shouldParseInfoLowerCase
+    , TestLabel "shouldParseNoticeUpperCase" shouldParseNoticeUpperCase
+    , TestLabel "shouldParseNoticeLowerCase" shouldParseNoticeLowerCase
+    , TestLabel "shouldParseWarningUpperCase" shouldParseWarningUpperCase
+    , TestLabel "shouldParseWarningLowerCase" shouldParseWarningLowerCase
+    , TestLabel "shouldParseErrorUpperCase" shouldParseErrorUpperCase
+    , TestLabel "shouldParseErrorLowerCase" shouldParseErrorLowerCase
+    , TestLabel "shouldParseCriticalUpperCase" shouldParseCriticalUpperCase
+    , TestLabel "shouldParseCriticalLowerCase" shouldParseCriticalLowerCase
+    , TestLabel "shouldParseAlertUpperCase" shouldParseAlertUpperCase
+    , TestLabel "shouldParseAlertLowerCase" shouldParseAlertLowerCase
+    , TestLabel "shouldParseEmergencyUpperCase" shouldParseEmergencyUpperCase
+    , TestLabel "shouldParseEmergencyLowerCase" shouldParseEmergencyLowerCase
     , TestLabel "shouldParseEmpty" shouldParseEmpty
     , TestLabel "shouldParseInvalid" shouldParseInvalid
     , TestLabel "minOfTwoNothings" minOfTwoNothings
@@ -29,66 +37,131 @@ allTests =
     ]
 
 
-shouldParseDebug :: Test
-shouldParseDebug =
+shouldParseDebugUpperCase :: Test
+shouldParseDebugUpperCase =
   let
     parsed = Logging.parseLogLevel "DEBUG"
   in
     TestCase $ assertEqual "parsed level" (Just DEBUG) parsed
 
 
-shouldParseInfo :: Test
-shouldParseInfo =
+shouldParseDebugLowerCase :: Test
+shouldParseDebugLowerCase =
+  let
+    parsed = Logging.parseLogLevel "debug"
+  in
+    TestCase $ assertEqual "parsed level" (Just DEBUG) parsed
+
+
+
+shouldParseInfoUpperCase :: Test
+shouldParseInfoUpperCase =
   let
     parsed = Logging.parseLogLevel "INFO"
   in
     TestCase $ assertEqual "parsed level" (Just INFO) parsed
 
 
-shouldParseNotice :: Test
-shouldParseNotice =
+shouldParseInfoLowerCase :: Test
+shouldParseInfoLowerCase =
+  let
+    parsed = Logging.parseLogLevel "info"
+  in
+    TestCase $ assertEqual "parsed level" (Just INFO) parsed
+
+
+shouldParseNoticeUpperCase :: Test
+shouldParseNoticeUpperCase =
   let
     parsed = Logging.parseLogLevel "NOTICE"
   in
     TestCase $ assertEqual "parsed level" (Just NOTICE) parsed
 
 
-shouldParseWarning :: Test
-shouldParseWarning =
+shouldParseNoticeLowerCase :: Test
+shouldParseNoticeLowerCase =
+  let
+    parsed = Logging.parseLogLevel "notice"
+  in
+    TestCase $ assertEqual "parsed level" (Just NOTICE) parsed
+
+
+shouldParseWarningUpperCase :: Test
+shouldParseWarningUpperCase =
   let
     parsed = Logging.parseLogLevel "WARNING"
   in
     TestCase $ assertEqual "parsed level" (Just WARNING) parsed
 
 
-shouldParseError :: Test
-shouldParseError =
+shouldParseWarningLowerCase :: Test
+shouldParseWarningLowerCase =
+  let
+    parsed = Logging.parseLogLevel "warning"
+  in
+    TestCase $ assertEqual "parsed level" (Just WARNING) parsed
+
+
+shouldParseErrorUpperCase :: Test
+shouldParseErrorUpperCase =
   let
     parsed = Logging.parseLogLevel "ERROR"
   in
     TestCase $ assertEqual "parsed level" (Just ERROR) parsed
 
 
-shouldParseCritical :: Test
-shouldParseCritical =
+shouldParseErrorLowerCase :: Test
+shouldParseErrorLowerCase =
+  let
+    parsed = Logging.parseLogLevel "error"
+  in
+    TestCase $ assertEqual "parsed level" (Just ERROR) parsed
+
+
+shouldParseCriticalUpperCase :: Test
+shouldParseCriticalUpperCase =
   let
     parsed = Logging.parseLogLevel "CRITICAL"
   in
     TestCase $ assertEqual "parsed level" (Just CRITICAL) parsed
 
 
-shouldParseAlert :: Test
-shouldParseAlert =
+shouldParseCriticalLowerCase :: Test
+shouldParseCriticalLowerCase =
+  let
+    parsed = Logging.parseLogLevel "critical"
+  in
+    TestCase $ assertEqual "parsed level" (Just CRITICAL) parsed
+
+
+shouldParseAlertUpperCase :: Test
+shouldParseAlertUpperCase =
   let
     parsed = Logging.parseLogLevel "ALERT"
   in
     TestCase $ assertEqual "parsed level" (Just ALERT) parsed
 
 
-shouldParseEmergency :: Test
-shouldParseEmergency =
+shouldParseAlertLowerCase :: Test
+shouldParseAlertLowerCase =
+  let
+    parsed = Logging.parseLogLevel "alert"
+  in
+    TestCase $ assertEqual "parsed level" (Just ALERT) parsed
+
+
+shouldParseEmergencyUpperCase :: Test
+shouldParseEmergencyUpperCase =
   let
     parsed = Logging.parseLogLevel "EMERGENCY"
+  in
+    TestCase $ assertEqual "parsed level" (Just EMERGENCY) parsed
+
+
+shouldParseEmergencyLowerCase :: Test
+shouldParseEmergencyLowerCase =
+  let
+    parsed = Logging.parseLogLevel "emergency"
   in
     TestCase $ assertEqual "parsed level" (Just EMERGENCY) parsed
 
