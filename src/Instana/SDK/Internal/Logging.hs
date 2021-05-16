@@ -16,6 +16,7 @@ module Instana.SDK.Internal.Logging
 
 import           Control.Monad             (when)
 import           Data.Maybe                (catMaybes, isJust)
+import qualified Data.Text                 as T
 import           System.Directory          (getTemporaryDirectory)
 import           System.Environment        (lookupEnv)
 import           System.IO                 (Handle, stdout)
@@ -191,7 +192,7 @@ withFormatter handler = setFormatter handler formatter
 -- |Parses a string into a hslogger log level.
 parseLogLevel :: String -> Maybe Priority
 parseLogLevel logLevelStr =
-  case logLevelStr of
+  case (T.unpack $ T.toUpper $ T.pack logLevelStr) of
     "DEBUG"     -> Just DEBUG
     "INFO"      -> Just INFO
     "NOTICE"    -> Just NOTICE

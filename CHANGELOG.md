@@ -2,6 +2,7 @@
 
 ## 0.7.00
 - Add support for W3C trace context.
+- Fix: Interprete log levels provided via `INSTANA_LOG_LEVEL` and `INSTANA_LOG_LEVEL_STDOUT` case insensitive.
 
 ## 0.6.2.0
 - Fix: Ignore incoming X-INSTANA-T/-S if website monitoring correlation data is present.
