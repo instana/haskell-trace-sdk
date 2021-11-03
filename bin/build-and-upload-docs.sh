@@ -1,12 +1,24 @@
 #!/bin/bash
-set -e
 
 # Taken from https://hackage.haskell.org/upload -> Notes
+
+set -eo pipefail
+
+cd `dirname $BASH_SOURCE`/..
 
 cabal_file=$(find . -maxdepth 1 -name "*.cabal" -print -quit)
 if [ ! -f "$cabal_file" ]; then
   echo "Run this script in the top-level package directory"
   exit 1
+fi
+
+# Don't even ask. For some reason, when building the Haddock docs, we need to
+# change unsafeFdSocket to fdSocket. We will revert this change when we
+# are done.
+if [ $(uname -s) = "Darwin" ]; then
+  sed -i '' 's/Socket.unsafeFdSocket socket/Socket.fdSocket socket/g' src/Instana/SDK/SDK.hs
+else
+  sed -i 's/Socket.unsafeFdSocket socket/Socket.fdSocket socket/g' src/Instana/SDK/SDK.hs
 fi
 
 dir=$(mktemp -d build-docs.XXXXXX)
@@ -23,4 +35,10 @@ cabal --version
 cabal v2-haddock --builddir="$dir" --haddock-for-hackage --enable-doc
 
 cabal upload -d --publish $dir/*-docs.tar.gz
+
+if [ $(uname -s) = "Darwin" ]; then
+  sed -i '' 's/Socket.fdSocket socket/Socket.unsafeFdSocket socket/g' src/Instana/SDK/SDK.hs
+else
+  sed -i 's/Socket.fdSocket socket/Socket.unsafeFdSocket socket/g' src/Instana/SDK/SDK.hs
+fi
 
