@@ -3,11 +3,6 @@
 
 Monitor your Haskell application with [Instana](https://www.instana.com/)! 🎉
 
-Disclaimer
-----------
-
-The Instana Haskell Trace SDK is a labor of love from some of our engineers and work on it is done in their spare time. Haskell is currently not a platform that we officialy support. The experience may differ from other programming languages and platforms that Instana actively supports (such as Java, .NET, Node.js, Python, Ruby, Go, PHP, ...). That said, the SDK is a fully functional piece of software, so don't let this disclaimer discourage you from using it. If you use Instana or consider using it and Haskell support is crucial for you, make sure to give us a ping and let's talk about it.
-
 What The Haskell Trace SDK Is And What It Is Not
 ------------------------------------------------
 

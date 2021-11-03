@@ -86,6 +86,21 @@ allTests =
         "shouldDecodeTraceStateWithWhitespace"
         shouldDecodeTraceStateWithWhitespace
     , TestLabel
+        "shouldDiscardExcessTraceStateListMembersWithoutInstanaKeyValuePair"
+        shouldDiscardExcessTraceStateListMembersWithoutInstanaKeyValuePair
+    , TestLabel
+        "shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePair"
+        shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePair
+    , TestLabel
+        "shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt32"
+        shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt32
+    , TestLabel
+        "shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt33"
+        shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt33
+    , TestLabel
+        "shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt66"
+        shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt66
+    , TestLabel
         "shouldDiscardMalformedInstanaKeyValuePair"
         shouldDiscardMalformedInstanaKeyValuePair
     , TestLabel
@@ -369,6 +384,122 @@ shouldDecodeTraceStateWithWhitespace =
   in
   TestCase $ do
     assertEqual "Trace State" expected actual
+
+
+shouldDiscardExcessTraceStateListMembersWithoutInstanaKeyValuePair :: Test
+shouldDiscardExcessTraceStateListMembersWithoutInstanaKeyValuePair =
+  let
+    actual =
+      parseAndExtractTraceState $ Just $ T.unpack $ longTraceStateList 1 34
+    expected = traceState $
+      withTraceState
+        defaultTraceParent
+        ( Just $ longTraceStateList 1 32 )
+        Nothing
+        Nothing
+  in
+  TestCase $ do
+    assertEqual "Trace State" expected actual
+
+
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePair :: Test
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePair =
+  let
+    actual =
+      parseAndExtractTraceState $ Just $
+        (T.unpack $ longTraceStateList 1 10) ++
+        ",in=fa2375d711a4ca0f;02468acefdb97531," ++
+        (T.unpack $ longTraceStateList 12 34)
+    expected = traceState $
+      withTraceState
+        defaultTraceParent
+        ( Just $ longTraceStateList 1 10 )
+        ( Just $ InstanaKeyValuePair
+             { instanaTraceId = "fa2375d711a4ca0f"
+             , instanaParentId = "02468acefdb97531"
+             }
+        )
+        ( Just $ longTraceStateList 12 32 )
+  in
+  TestCase $ do
+    assertEqual "Trace State" expected actual
+
+
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt32 :: Test
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt32 =
+  let
+    actual =
+      parseAndExtractTraceState $ Just $
+        (T.unpack $ longTraceStateList 1 31) ++
+        ",in=fa2375d711a4ca0f;02468acefdb97531," ++
+        (T.unpack $ longTraceStateList 33 34)
+    expected = traceState $
+      withTraceState
+        defaultTraceParent
+        ( Just $ longTraceStateList 1 31 )
+        ( Just $ InstanaKeyValuePair
+             { instanaTraceId = "fa2375d711a4ca0f"
+             , instanaParentId = "02468acefdb97531"
+             }
+        )
+        Nothing
+  in
+  TestCase $ do
+    assertEqual "Trace State" expected actual
+
+
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt33 :: Test
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt33 =
+  let
+    actual =
+      parseAndExtractTraceState $ Just $
+        (T.unpack $ longTraceStateList 1 32) ++
+        ",in=fa2375d711a4ca0f;02468acefdb97531," ++
+        (T.unpack $ longTraceStateList 34 35)
+    expected = traceState $
+      withTraceState
+        defaultTraceParent
+        ( Just $ longTraceStateList 1 31 )
+        ( Just $ InstanaKeyValuePair
+             { instanaTraceId = "fa2375d711a4ca0f"
+             , instanaParentId = "02468acefdb97531"
+             }
+        )
+        Nothing
+  in
+  TestCase $ do
+    assertEqual "Trace State" expected actual
+
+
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt66 :: Test
+shouldDiscardExcessTraceStateListMembersWithInstanaKeyValuePairAt66 =
+  let
+    actual =
+      parseAndExtractTraceState $ Just $
+        (T.unpack $ longTraceStateList 1 65) ++
+        ",in=fa2375d711a4ca0f;02468acefdb97531," ++
+        (T.unpack $ longTraceStateList 67 99)
+    expected = traceState $
+      withTraceState
+        defaultTraceParent
+        ( Just $ longTraceStateList 1 31 )
+        ( Just $ InstanaKeyValuePair
+             { instanaTraceId = "fa2375d711a4ca0f"
+             , instanaParentId = "02468acefdb97531"
+             }
+        )
+        Nothing
+  in
+  TestCase $ do
+    assertEqual "Trace State" expected actual
+
+
+longTraceStateList :: Int -> Int -> Text
+longTraceStateList from to =
+  T.intercalate
+    ","
+    [ T.pack $
+        "member" ++ show i ++ "=" ++ show i | i <- [from..to] ]
 
 
 shouldDiscardMalformedInstanaKeyValuePair :: Test

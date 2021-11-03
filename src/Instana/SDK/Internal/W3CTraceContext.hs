@@ -77,6 +77,10 @@ data InstanaKeyValuePair = InstanaKeyValuePair
   } deriving (Eq, Generic, Show)
 
 
+maxKeyValuePairsTraceState :: Int
+maxKeyValuePairsTraceState = 32
+
+
 -- |Decodes the raw values of traceparent and tracestate to the parsed
 -- representation of the W3C trace context. If the traceparent value is invalid,
 -- Nothing will be returned.
@@ -218,7 +222,7 @@ decodeNonEmptyTraceState :: Text -> TraceState
 decodeNonEmptyTraceState traceStateText =
   let
     keyValuePairs = map T.strip $ T.splitOn "," traceStateText
-    inKvPairIndex =
+    instanaKvPairIndex =
       List.findIndex (\kvPairString ->
         let
           key = T.strip $ fst $ T.breakOn "=" kvPairString
@@ -227,26 +231,39 @@ decodeNonEmptyTraceState traceStateText =
       ) keyValuePairs
 
     (tsHead, inKvPair, tsTail) =
-      case inKvPairIndex of
+      case instanaKvPairIndex of
         Just idx ->
           let
-            preIdx = take idx keyValuePairs
+            -- Use at most 31 non-Instana key-value pairs plus the Instana
+            -- key-value pair, since 32 key-value pairs is the limit imposed by
+            -- the W3C trace context spec.
+            numKvPairsBeforeInstanaKvPair =
+              min (maxKeyValuePairsTraceState - 1) idx
+            maxKvPairsAfterInstanaKvPair =
+              maxKeyValuePairsTraceState - numKvPairsBeforeInstanaKvPair - 1
+            kvPairsBeforeInstanaKvPair =
+              take numKvPairsBeforeInstanaKvPair keyValuePairs
+            allKvPairsAfterInstanaKvPair = drop (idx + 1) keyValuePairs
+            limitedKvPairsAfterInstanaKvPair =
+              take maxKvPairsAfterInstanaKvPair allKvPairsAfterInstanaKvPair
             tsHd =
-              if null preIdx
+              if null kvPairsBeforeInstanaKvPair
                 then Nothing
-                else Just $ T.intercalate "," preIdx
+                else Just $ T.intercalate "," kvPairsBeforeInstanaKvPair
             tsTl =
-              if null postIdx
+              if null limitedKvPairsAfterInstanaKvPair
                 then Nothing
-                else Just $ T.intercalate "," postIdx
-            postIdx = drop (idx + 1) keyValuePairs
+                else Just $ T.intercalate "," limitedKvPairsAfterInstanaKvPair
           in
           ( tsHd
           , decodeInKeyValuePair $ keyValuePairs !! idx
           , tsTl
           )
         Nothing ->
-          ( Just $ T.intercalate "," keyValuePairs
+          -- Limit the number of key-value pairs in tracestate to 32 as per
+          -- W3C trace context spec.
+          ( Just $
+              T.intercalate "," (take maxKeyValuePairsTraceState keyValuePairs)
           , Nothing
           , Nothing
           )
