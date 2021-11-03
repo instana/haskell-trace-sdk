@@ -1,6 +1,9 @@
 # Changelog for instana-haskell-trace-sdk
 
-## 0.7.00
+## 0.7.1.0
+- Fix: Limit the number of list-members (key-value pairs) to 32 in the W3C trace context `tracestate` header.
+
+## 0.7.0.0
 - Add support for W3C trace context.
 - Fix: Interprete log levels provided via `INSTANA_LOG_LEVEL` and `INSTANA_LOG_LEVEL_STDOUT` case insensitive.
 
