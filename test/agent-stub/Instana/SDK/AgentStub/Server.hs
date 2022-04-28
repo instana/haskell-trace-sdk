@@ -10,10 +10,10 @@ import           Data.Maybe                              (fromMaybe)
 import           Data.STRef                              (modifySTRef,
                                                           readSTRef)
 import           Data.Time.Clock.POSIX                   (getPOSIXTime)
-import           Servant                                 ((:<|>) (..), Header,
-                                                          Headers,
+import           Servant                                 (Header, Headers,
                                                           NoContent (NoContent),
-                                                          err404, err503)
+                                                          err404, err503,
+                                                          (:<|>) (..))
 import qualified Servant
 import           System.Log.Logger                       (debugM, warningM)
 import           Text.Read                               (readMaybe)
@@ -23,8 +23,7 @@ import           Instana.SDK.AgentStub.Config            (AgentStubConfig)
 import qualified Instana.SDK.AgentStub.Config            as Config
 import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
 import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
-import           Instana.SDK.AgentStub.DiscoveryResponse (DiscoveryResponse (DiscoveryResponse),
-                                                          SecretsConfig (SecretsConfig))
+import           Instana.SDK.AgentStub.DiscoveryResponse (DiscoveryResponse (DiscoveryResponse))
 import qualified Instana.SDK.AgentStub.DiscoveryResponse as DiscoveryResponse
 import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
 import           Instana.SDK.AgentStub.Logging           (agentStubLogger)
@@ -89,11 +88,7 @@ putDiscovery config startupTime recorders discoveryRequest = do
           { DiscoveryResponse.pid = translatedPid
           , DiscoveryResponse.agentUuid = "agent-stub-id"
           , DiscoveryResponse.extraHeaders = Nothing
-          , DiscoveryResponse.secrets =
-            SecretsConfig
-              { DiscoveryResponse.matcher = "contains-ignore-case"
-              , DiscoveryResponse.list = ["key", "pass", "secret"]
-              }
+          , DiscoveryResponse.secrets = Config.secretsConfig config
           }
 
 

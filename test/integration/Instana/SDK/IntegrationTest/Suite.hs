@@ -10,6 +10,7 @@ module Instana.SDK.IntegrationTest.Suite
   , testServerWithMiddleware
   , withConnectionLoss
   , withCustomServiceName
+  , withCustomSecretsConfig
   , withPidTranslation
   , withStartupDelay
   , withW3cTraceCorrelationDisabled
@@ -35,6 +36,7 @@ data SuiteOptions =
     , startupDelay               :: Bool
     , simulateConnectionLoss     :: Bool
     , customServiceName          :: Maybe String
+    , customSecretsConfig        :: Maybe String
     , disableW3cTraceCorrelation :: Bool
     , appsUnderTest              :: [AppUnderTest]
     }
@@ -56,6 +58,7 @@ defaultOptions =
     , startupDelay                = False
     , simulateConnectionLoss      = False
     , customServiceName           = Nothing
+    , customSecretsConfig         = Nothing
     , disableW3cTraceCorrelation  = False
     , appsUnderTest               = [testServer]
     }
@@ -106,6 +109,11 @@ withConnectionLoss =
 withCustomServiceName :: String -> SuiteOptions
 withCustomServiceName serviceName =
   defaultOptions { customServiceName = Just serviceName }
+
+
+withCustomSecretsConfig :: String -> SuiteOptions
+withCustomSecretsConfig secretsConfig =
+  defaultOptions { customSecretsConfig = Just secretsConfig }
 
 
 withW3cTraceCorrelationDisabled :: SuiteOptions

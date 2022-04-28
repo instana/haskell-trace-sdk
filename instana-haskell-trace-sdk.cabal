@@ -222,6 +222,7 @@ executable instana-haskell-agent-stub
   build-depends:
       base >=4.7 && <5
     , aeson
+    , aeson-casing
     , hslogger
     , servant
     , servant-server
@@ -263,6 +264,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
   build-depends:
       base >=4.7 && <5
     , aeson
+    , aeson-casing
     , array
     , bytestring
     , case-insensitive
@@ -287,6 +289,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , Instana.SDK.AgentStub.TraceRequest
     , Instana.SDK.IntegrationTest.BracketApi
     , Instana.SDK.IntegrationTest.Connection
+    , Instana.SDK.IntegrationTest.CustomSecrets
     , Instana.SDK.IntegrationTest.HUnitExtra
     , Instana.SDK.IntegrationTest.HttpHelper
     , Instana.SDK.IntegrationTest.HttpTracing

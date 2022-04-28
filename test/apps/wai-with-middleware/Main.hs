@@ -31,6 +31,14 @@ appLogger :: String
 appLogger = "WaiWithMiddleware"
 
 
+downstreamUrl :: String
+downstreamUrl = "http://127.0.0.1:1208/echo?" ++
+                  "some=query&" ++
+                  "parameters=2&" ++
+                  "pass=secret" ++
+                  "will-be-obscured-when-custom-secrets-regex-is-configured"
+
+
 application :: InstanaContext -> HTTP.Manager -> CPid -> Wai.Application
 application instana httpManager pid request respond = do
   let
@@ -77,8 +85,7 @@ apiUnderTest ::
   -> IO Wai.ResponseReceived
 apiUnderTest instana httpManager _ respond = do
   downstreamRequest <-
-    HTTP.parseUrlThrow $
-      "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+    HTTP.parseUrlThrow $ downstreamUrl
   downstreamResponse <- InstanaSDK.withHttpExit
     instana
     downstreamRequest
@@ -106,8 +113,7 @@ apiUnderTestWithWrongNesting ::
   -> IO Wai.ResponseReceived
 apiUnderTestWithWrongNesting instana httpManager _ respond = do
   downstreamRequest <-
-    HTTP.parseUrlThrow $
-      "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+    HTTP.parseUrlThrow $ downstreamUrl
   InstanaSDK.withHttpExit
     instana
     downstreamRequest

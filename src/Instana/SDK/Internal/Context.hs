@@ -10,6 +10,7 @@ module Instana.SDK.Internal.Context
   , isAgentConnectionEstablished
   , mkAgentReadyState
   , readAgentUuid
+  , readSecretsMatcher
   , readPid
   , whenConnected
   ) where
@@ -19,6 +20,7 @@ import           Control.Concurrent                                         (Thr
 import           Control.Concurrent.STM                                     (STM)
 import qualified Control.Concurrent.STM                                     as STM
 import           Data.Map.Strict                                            (Map)
+import           Data.Maybe                                                 as Maybe
 import           Data.Sequence                                              (Seq)
 import           Data.Text                                                  (Text)
 import qualified Foreign.C.Types                                            as CTypes
@@ -31,6 +33,8 @@ import qualified Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse as A
 import           Instana.SDK.Internal.Command                               (Command)
 import           Instana.SDK.Internal.Config                                (FinalConfig)
 import           Instana.SDK.Internal.Metrics.Sample                        (TimedSample)
+import           Instana.SDK.Internal.Secrets                               (SecretsMatcher)
+import qualified Instana.SDK.Internal.Secrets                               as SecretsMatcher
 import           Instana.SDK.Internal.SpanStack                             (SpanStack)
 import           Instana.SDK.Internal.WireSpan                              (QueuedSpan)
 
@@ -73,13 +77,15 @@ data AgentConnection =
   AgentConnection
     {
       -- |the host of the agent we are connected to
-      agentHost :: String
+      agentHost      :: String
       -- |the port of the agent we are connected to
-    , agentPort :: Int
+    , agentPort      :: Int
       -- |the PID of the monitored process
-    , pid       :: String
+    , pid            :: String
       -- |the agent's UUID
-    , agentUuid :: Text
+    , agentUuid      :: Text
+      -- |the configured secrets matcher
+    , secretsMatcher :: SecretsMatcher
     }
   deriving (Eq, Show, Generic)
 
@@ -93,10 +99,11 @@ mkAgentReadyState ::
 mkAgentReadyState (host_, port_) announceResponse metricsStore =
   let
     agentConnection = AgentConnection
-      { agentHost    = host_
-      , agentPort    = port_
-      , pid          = show $ AnnounceResponse.pid announceResponse
-      , agentUuid    = AnnounceResponse.agentUuid announceResponse
+      { agentHost      = host_
+      , agentPort      = port_
+      , pid            = show $ AnnounceResponse.pid announceResponse
+      , agentUuid      = AnnounceResponse.agentUuid announceResponse
+      , secretsMatcher = AnnounceResponse.secrets announceResponse
       }
   in
   AgentReady $
@@ -163,6 +170,21 @@ readPidSTM context = do
 readPid :: InternalContext -> IO (Maybe String)
 readPid context =
   STM.atomically $ readPidSTM context
+
+
+readSecretsMatcherSTM :: InternalContext -> STM SecretsMatcher
+readSecretsMatcherSTM context = do
+  state <- STM.readTVar $ connectionState context
+  let
+    secretsMacherMaybe = mapConnectionState secretsMatcher state
+  return $
+    Maybe.fromMaybe SecretsMatcher.defaultSecretsMatcher secretsMacherMaybe
+
+
+-- |accessor for the secrets matching config
+readSecretsMatcher :: InternalContext -> IO SecretsMatcher
+readSecretsMatcher context =
+  STM.atomically $ readSecretsMatcherSTM context
 
 
 mapConnectionState :: (AgentConnection -> a) -> ConnectionState -> Maybe a

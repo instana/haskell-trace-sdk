@@ -126,6 +126,7 @@ runSuite suite = do
             (if Suite.startupDelay options then Just "2500" else Nothing))
         , ("SIMULATE_CONNECTION_LOSS",
              booleanEnv $ Suite.simulateConnectionLoss options)
+        , ("SECRETS_CONFIG", Suite.customSecretsConfig options)
         , ("LOG_LEVEL", Just logLevel)
         ]
         "stack exec instana-haskell-agent-stub"

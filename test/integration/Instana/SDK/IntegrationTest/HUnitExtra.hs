@@ -35,6 +35,7 @@ assertAllIO assertions =
 
 applyLabel :: String -> IO Test -> IO Test
 applyLabel label testIO = do
+  infoM testLogger $ "Running: " ++ label
   t <- testIO
   return $ TestLabel label t
 

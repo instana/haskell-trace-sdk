@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## Unreleased
+- Fix: Apply secrets config from agent configuration.
+
 ## 0.7.1.0
 - Fix: Limit the number of list-members (key-value pairs) to 32 in the W3C trace context `tracestate` header.
 
