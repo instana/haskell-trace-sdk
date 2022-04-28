@@ -830,6 +830,7 @@ addHttpData context request synthetic = do
       Wai.requestHeaderHost request
       |> fmap BSC8.unpack
       |> Maybe.fromMaybe ""
+  secretsMatcher <- liftIO $ InternalContext.readSecretsMatcher context
   addRegisteredData
     context
     (Aeson.object [ "http" .=
@@ -837,7 +838,7 @@ addHttpData context request synthetic = do
         [ "method" .= Wai.requestMethod request |> BSC8.unpack
         , "url"    .= Wai.rawPathInfo request |> BSC8.unpack
         , "host"   .= host
-        , "params" .= (processQueryString $ Wai.rawQueryString request)
+        , "params" .= (processQueryString secretsMatcher (Wai.rawQueryString request))
         ]
       ]
     )
@@ -1093,24 +1094,22 @@ startHttpExit context request = do
 
   startExit context (RegisteredSpan SpanType.HaskellHttpClient)
   request'' <- addHttpTracingHeaders context request'
+  secretsMatcher <- liftIO $ InternalContext.readSecretsMatcher context
   addRegisteredData
     context
     (Aeson.object [ "http" .=
       Aeson.object
         [ "method" .= (BSC8.unpack $ HTTP.method request)
         , "url"    .= url
-        , "params" .= (processQueryString $ HTTP.queryString request)
+        , "params" .= (processQueryString secretsMatcher (HTTP.queryString request))
         ]
       ]
     )
   return request''
 
 
-processQueryString :: BSC8.ByteString -> Text
-processQueryString queryString =
-  let
-    matcher = Secrets.defaultSecretsMatcher
-  in
+processQueryString :: Secrets.SecretsMatcher -> BSC8.ByteString -> Text
+processQueryString secretsMatcher queryString =
   queryString
     |> BSC8.unpack
     |> T.pack
@@ -1120,7 +1119,7 @@ processQueryString queryString =
     |> List.filter
         (\pair ->
           List.length pair == 2 &&
-          (not . Secrets.isSecret matcher) (List.head pair)
+          (not . Secrets.isSecret secretsMatcher) (List.head pair)
         )
     |> List.map (T.intercalate "=")
     |> T.intercalate "&"

@@ -4,6 +4,7 @@ module Instana.SDK.IntegrationTest.TestSuites (allSuites) where
 import qualified Data.Aeson                                 as Aeson
 import qualified Instana.SDK.IntegrationTest.BracketApi     as BracketApi
 import qualified Instana.SDK.IntegrationTest.Connection     as Connection
+import qualified Instana.SDK.IntegrationTest.CustomSecrets  as CustomSecrets
 import qualified Instana.SDK.IntegrationTest.HttpTracing    as HttpTracing
 import qualified Instana.SDK.IntegrationTest.LowLevelApi    as LowLevelApi
 import qualified Instana.SDK.IntegrationTest.Metrics        as Metrics
@@ -25,6 +26,7 @@ allSuites specificationComplianceTestCases =
   , testPidTranslation
   , testServiceName
   , testHttpTracing
+  , testCustomSecrets
   , testWaiMiddleware
   , testSpecComplianceW3cOn
       specificationComplianceTestCases
@@ -133,6 +135,21 @@ testHttpTracing =
       { Suite.label = "HTTP Tracing"
       , Suite.tests = HttpTracing.allTests
       , Suite.options = Suite.defaultOptions {
+            Suite.appsUnderTest =
+              [ Suite.testServer
+              , Suite.downstreamTarget
+              ]
+          }
+      }
+
+
+testCustomSecrets :: ConditionalSuite
+testCustomSecrets =
+  Run $
+    Suite
+      { Suite.label = "Custom Secrets"
+      , Suite.tests = CustomSecrets.allTests
+      , Suite.options = (Suite.withCustomSecretsConfig "regex:.*obscured.*,hidden.*") {
             Suite.appsUnderTest =
               [ Suite.testServer
               , Suite.downstreamTarget

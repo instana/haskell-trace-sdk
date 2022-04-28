@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Instana.SDK.IntegrationTest.HttpTracing (allTests) where
+module Instana.SDK.IntegrationTest.HttpTracing (allTests, runHttpTest) where
 
 
 import           Control.Concurrent                     (threadDelay)
@@ -31,6 +31,7 @@ allTests pid =
   , shouldCreateNonRootEntryWithBracketApi pid
   , shouldSetSpanSyWithBracketApi pid
   , shouldSuppressWithBracketApi
+  , shouldNotCaptureDefaultSecrets pid
   , shouldCreateRootEntryWithLowLevelApi pid
   , shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid
   , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi pid
@@ -109,6 +110,19 @@ shouldSuppressWithBracketApi =
     runSuppressedTest "http/bracket/api"
 
 
+shouldNotCaptureDefaultSecrets :: String -> IO Test
+shouldNotCaptureDefaultSecrets pid =
+  applyLabel "shouldNotCaptureDefaultSecrets" $
+    runTest
+      pid
+      "http/bracket/api?query-param=value&api-key=1234&MYPASSWORD=abc&another-query-param=zzz1&secret=yes"
+      []
+      (applyConcat
+        [ rootEntryAsserts
+        , filterDefaultSecretsAsserts
+        ])
+
+
 shouldCreateRootEntryWithLowLevelApi :: String -> IO Test
 shouldCreateRootEntryWithLowLevelApi pid =
   applyLabel "shouldCreateRootEntryWithLowLevelApi" $
@@ -177,17 +191,47 @@ shouldSuppressWithLowLevelApi =
 
 
 runBracketTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
-runBracketTest pid headers extraAsserts =
-  runTest pid "http/bracket/api?some=query&parameters=1" headers extraAsserts
+runBracketTest pid headers extraAssertsForEntrySpan =
+  runTest pid "http/bracket/api?some=query&parameters=1" headers extraAssertsForEntrySpan
 
 
 runLowLevelTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
-runLowLevelTest pid headers extraAsserts =
-  runTest pid "http/low/level/api?some=query&parameters=2" headers extraAsserts
+runLowLevelTest pid headers extraAssertsForEntrySpan =
+  runTest pid "http/low/level/api?some=query&parameters=2" headers extraAssertsForEntrySpan
 
 
 runTest :: String -> String -> [Header] -> (Span -> [Assertion]) -> IO Test
-runTest pid urlPath headers extraAsserts = do
+runTest pid urlPath headers extraAssertsForEntrySpan =
+  runHttpTest
+    pid
+    urlPath
+    headers
+    extraAssertsForEntrySpan
+    (\exitSpan ->
+      [ assertEqual "exit data"
+        ( Aeson.object
+          [ "http" .= (Aeson.object
+              [ "method" .= ("GET" :: String)
+              , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
+              , "params" .= ("some=query&parameters=2" :: String)
+              , "status" .= (200 :: Int)
+              ]
+            )
+          ]
+        )
+        (TraceRequest.spanData exitSpan)
+      ]
+    )
+
+
+runHttpTest ::
+  String
+  -> String
+  -> [Header]
+  -> (Span -> [Assertion])
+  -> (Span -> [Assertion])
+  -> IO Test
+runHttpTest pid urlPath headers extraAssertsForEntrySpan extraAssertsForExitSpan = do
   response <-
     HttpHelper.doAppRequest Suite.testServer urlPath "GET" headers
   let
@@ -223,7 +267,8 @@ runTest pid urlPath headers extraAsserts = do
             Just exitSpan = maybeExitSpan
           assertAllIO $
             (commonAsserts entrySpan exitSpan responseBody from serverTimingValue) ++
-            (extraAsserts entrySpan)
+            (extraAssertsForEntrySpan entrySpan) ++
+            (extraAssertsForExitSpan exitSpan)
 
 
 runSuppressedTest :: String -> IO Test
@@ -327,18 +372,6 @@ commonAsserts entrySpan exitSpan responseBody from serverTimingValue =
   , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
   , assertEqual "exit error" 0 (TraceRequest.ec exitSpan)
   , assertEqual "exit from" from $ TraceRequest.f exitSpan
-  , assertEqual "exit data"
-    ( Aeson.object
-      [ "http" .= (Aeson.object
-          [ "method" .= ("GET" :: String)
-          , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
-          , "params" .= ("some=query&parameters=2" :: String)
-          , "status" .= (200 :: Int)
-          ]
-        )
-      ]
-    )
-    (TraceRequest.spanData exitSpan)
   ]
 
 
@@ -398,6 +431,24 @@ syntheticAssert span_ =
 notSyntheticAssert :: Span -> [Assertion]
 notSyntheticAssert span_ =
   [ assertEqual "span.sy" Nothing (TraceRequest.sy span_)
+  ]
+
+
+filterDefaultSecretsAsserts :: Span -> [Assertion]
+filterDefaultSecretsAsserts entrySpan =
+  [ assertEqual "entry data"
+    ( Aeson.object
+      [ "http"       .= (Aeson.object
+          [ "method" .= ("GET" :: String)
+          , "host"   .= ("127.0.0.1:1207" :: String)
+          , "url"    .= ("/http/bracket/api" :: String)
+          , "params" .= ("query-param=value&another-query-param=zzz1" :: String)
+          , "status" .= (200 :: Int)
+          ]
+        )
+      ]
+    )
+    (TraceRequest.spanData entrySpan)
   ]
 
 

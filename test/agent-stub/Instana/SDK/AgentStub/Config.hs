@@ -1,26 +1,39 @@
-{-# LANGUAGE DeriveGeneric #-}
-
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Instana.SDK.AgentStub.Config
   ( AgentStubConfig(..)
   , readConfig
   ) where
 
 
-import           Data.Maybe               (fromMaybe)
-import           Data.String              (fromString)
+import           Data.Maybe                              (fromMaybe)
+import           Data.String                             (fromString)
+import qualified Data.Text                               as T
 import           GHC.Generics
-import qualified Network.Wai.Handler.Warp as Warp
-import           System.Environment       (lookupEnv)
-import           Text.Read                (readMaybe)
+import           Instana.SDK.AgentStub.DiscoveryResponse (SecretsConfig (SecretsConfig))
+import qualified Instana.SDK.AgentStub.DiscoveryResponse as DiscoveryResponse
+import qualified Network.Wai.Handler.Warp                as Warp
+import           System.Environment                      (lookupEnv)
+import           Text.Read                               (readMaybe)
+
 
 
 data AgentStubConfig = AgentStubConfig
   { bindHost               :: Warp.HostPreference
   , bindPort               :: Int
+  , secretsConfig          :: SecretsConfig
   , startupDelay           :: Int
   , simulateConnectionLoss :: Bool
   , simulatPidTranslation  :: Bool
   } deriving (Eq, Show, Generic)
+
+
+defaultSecretsConfig :: SecretsConfig
+defaultSecretsConfig =
+  SecretsConfig
+    { DiscoveryResponse.matcher = "contains-ignore-case"
+    , DiscoveryResponse.list = ["key", "pass", "secret"]
+    }
 
 
 readConfig :: IO AgentStubConfig
@@ -32,6 +45,7 @@ readConfig = do
   -- incoming connections every time the app is recompiled and restarted.
   hostString     <- lookupEnvWithDefault    "HOST" "127.0.0.1"
   port           <- lookupEnvIntWithDefault "PORT" 1302
+  secrets        <- parseSecretsConfig
   delay          <- lookupEnvIntWithDefault "STARTUP_DELAY" 0
   connectionLoss <- lookupFlag              "SIMULATE_CONNECTION_LOSS"
   pidTranslation <- lookupFlag              "SIMULATE_PID_TRANSLATION"
@@ -42,6 +56,7 @@ readConfig = do
     AgentStubConfig
       { bindHost               = hostPreference
       , bindPort               = port
+      , secretsConfig          = secrets
       , startupDelay           = delay
       , simulateConnectionLoss = connectionLoss
       , simulatPidTranslation  = pidTranslation
@@ -82,4 +97,22 @@ lookupFlag key = do
   return $ case maybeValue of
              Just _ -> True
              _      -> False
+
+
+parseSecretsConfig :: IO SecretsConfig
+parseSecretsConfig = do
+  maybeSecretsConfigString <- lookupEnv "SECRETS_CONFIG"
+  case maybeSecretsConfigString of
+    Just secretsString -> do
+      let
+        matcherAndList = T.splitOn ":" (T.pack secretsString)
+        matcher = head matcherAndList
+        listAsString = head $ tail matcherAndList
+        list = T.splitOn "," listAsString
+      return SecretsConfig
+        { DiscoveryResponse.matcher = matcher
+        , DiscoveryResponse.list = list
+        }
+    Nothing -> do
+      return defaultSecretsConfig
 
