@@ -1113,16 +1113,36 @@ processQueryString secretsMatcher queryString =
   queryString
     |> BSC8.unpack
     |> T.pack
-    |> (\t -> if (not . T.null) t && T.head  t == '?' then T.tail t else t)
+    -- drop leading "?" character
+    |> (\t -> if (not . T.null) t && T.head t == '?' then T.tail t else t)
+    -- split on "&" delimiter
     |> T.splitOn "&"
-    |> List.map (T.splitOn "=")
-    |> List.filter
-        (\pair ->
-          List.length pair == 2 &&
-          (not . Secrets.isSecret secretsMatcher) (List.head pair)
-        )
-    |> List.map (T.intercalate "=")
+    -- splitOn can yield "" elements, drop them
+    |> List.filter (not . T.null)
+    -- convert to pairs of query string name and value
+    |> List.map (T.breakOn "=")
+    -- drop leading "=" from value (breakOn includes the delimiter if present)
+    |> List.map (\tuple ->
+         if T.isPrefixOf "=" (snd tuple)
+           then
+             (fst tuple, T.tail $ snd tuple)
+           else
+             tuple
+       )
+    -- redact secrets
+    |> List.map (\tuple ->
+         if (Secrets.isSecret secretsMatcher) (fst tuple)
+           then
+             (fst tuple, "<redacted>")
+           else
+             tuple
+       )
+    -- put pairs back together
+    |> List.map (\tuple -> T.concat [fst tuple, "=", snd tuple])
+    -- concat into one string again
     |> T.intercalate "&"
+    -- drop param if there were no query parameters
+    |> (\t -> if t == "" then Nothing else Just t)
 
 
 -- |Completes an entry span, to be called at the last possible moment before the
