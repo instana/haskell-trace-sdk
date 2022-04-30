@@ -14,23 +14,23 @@ import           Test.HUnit
 
 allTests :: String -> [IO Test]
 allTests pid =
-  [ shouldNotCaptureCustomSecrets pid
+  [ shouldRedactCustomSecrets pid
   ]
 
 
-shouldNotCaptureCustomSecrets :: String -> IO Test
-shouldNotCaptureCustomSecrets pid =
-  applyLabel "shouldNotCaptureCustomSecrets" $
+shouldRedactCustomSecrets :: String -> IO Test
+shouldRedactCustomSecrets pid =
+  applyLabel "shouldRedactCustomSecrets" $
     runHttpTest
       pid
       ("http/bracket/api?"
         -- this will be captured since the custom secret config overrides the default secret list
         ++ "api-key=1234&"
-        -- this should be filterd according to the custom config
+        -- this should be redacted according to the custom config
         ++ "hidden-param=value&"
         -- this will be captured since the custom secret config overrides the default secret list
         ++ "MYPASSWORD=abc&"
-        -- this should be filterd according to the custom config
+        -- this should be redacted according to the custom config
         ++ "this-will-be-obscured-by-the-regex-matcher=value&"
         -- this will be captured since the custom secret config overrides the default secret list
         ++ "secret=yes&"
@@ -53,8 +53,12 @@ entrySpanDataAsserts entrySpan =
           , "params" .= (
               -- this will be captured since the custom secret config overrides the default secret list
               "api-key=1234&"
+              -- this should be filterd according to the custom config
+              ++ "hidden-param=<redacted>&"
               -- this will be captured since the custom secret config overrides the default secret list
               ++ "MYPASSWORD=abc&"
+              -- this should be filterd according to the custom config
+              ++ "this-will-be-obscured-by-the-regex-matcher=<redacted>&"
               -- this will be captured since the custom secret config overrides the default secret list
               ++ "secret=yes&"
               -- this will be captured since the regex for hidden has no leading .*

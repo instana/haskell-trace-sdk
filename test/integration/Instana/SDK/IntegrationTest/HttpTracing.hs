@@ -31,7 +31,7 @@ allTests pid =
   , shouldCreateNonRootEntryWithBracketApi pid
   , shouldSetSpanSyWithBracketApi pid
   , shouldSuppressWithBracketApi
-  , shouldNotCaptureDefaultSecrets pid
+  , shouldRedactDefaultSecrets pid
   , shouldCreateRootEntryWithLowLevelApi pid
   , shouldAddWebsiteMonitoringCorrelationWithLowLevelApi pid
   , shouldIgnoreTraceIdParentIdIfWebsiteMonitoringCorrelationIsPresentWithLowLevelApi pid
@@ -110,9 +110,9 @@ shouldSuppressWithBracketApi =
     runSuppressedTest "http/bracket/api"
 
 
-shouldNotCaptureDefaultSecrets :: String -> IO Test
-shouldNotCaptureDefaultSecrets pid =
-  applyLabel "shouldNotCaptureDefaultSecrets" $
+shouldRedactDefaultSecrets :: String -> IO Test
+shouldRedactDefaultSecrets pid =
+  applyLabel "shouldRedactDefaultSecrets" $
     runTest
       pid
       "http/bracket/api?query-param=value&api-key=1234&MYPASSWORD=abc&another-query-param=zzz1&secret=yes"
@@ -213,7 +213,7 @@ runTest pid urlPath headers extraAssertsForEntrySpan =
           [ "http" .= (Aeson.object
               [ "method" .= ("GET" :: String)
               , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
-              , "params" .= ("some=query&parameters=2" :: String)
+              , "params" .= ("some=query&parameters=2&pass=<redacted>" :: String)
               , "status" .= (200 :: Int)
               ]
             )
@@ -442,7 +442,7 @@ filterDefaultSecretsAsserts entrySpan =
           [ "method" .= ("GET" :: String)
           , "host"   .= ("127.0.0.1:1207" :: String)
           , "url"    .= ("/http/bracket/api" :: String)
-          , "params" .= ("query-param=value&another-query-param=zzz1" :: String)
+          , "params" .= ("query-param=value&api-key=<redacted>&MYPASSWORD=<redacted>&another-query-param=zzz1&secret=<redacted>" :: String)
           , "status" .= (200 :: Int)
           ]
         )

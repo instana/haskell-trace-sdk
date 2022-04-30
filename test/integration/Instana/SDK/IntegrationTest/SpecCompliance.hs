@@ -680,7 +680,7 @@ fixedSpanAssertions route entrySpan exitSpan from =
       [ "http" .= (Aeson.object
           [ "method" .= ("GET" :: String)
           , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
-          , "params" .= ("some=query&parameters=2" :: String)
+          , "params" .= ("some=query&parameters=2&pass=<redacted>" :: String)
           , "status" .= (200 :: Int)
           ]
         )
