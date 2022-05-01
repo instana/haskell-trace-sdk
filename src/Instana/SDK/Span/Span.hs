@@ -9,8 +9,10 @@ module Instana.SDK.Span.Span
   , SpanKind (EntryKind, ExitKind, IntermediateKind)
   , addRegisteredData
   , addRegisteredDataAt
+  , addRegisteredValueAt
   , addTag
   , addTagAt
+  , addTagValueAt
   , addToErrorCount
   , correlationId
   , correlationType
@@ -35,9 +37,8 @@ module Instana.SDK.Span.Span
   ) where
 
 
-import           Data.Aeson                           (Value, (.=))
-import qualified Data.Aeson                           as Aeson
-import qualified Data.List                            as List
+import           Data.Aeson                           (ToJSON)
+import           Data.List                            as List
 import           Data.Text                            as T
 import           GHC.Generics
 
@@ -47,6 +48,10 @@ import           Instana.SDK.Span.EntrySpan           (EntrySpan)
 import qualified Instana.SDK.Span.EntrySpan           as EntrySpan
 import           Instana.SDK.Span.ExitSpan            (ExitSpan)
 import qualified Instana.SDK.Span.ExitSpan            as ExitSpan
+import           Instana.SDK.Span.SpanData            (Annotation,
+                                                       AnnotationValue,
+                                                       SpanData)
+import qualified Instana.SDK.Span.SpanData            as SpanData
 
 
 -- |The span kind (entry, exit or intermediate).
@@ -253,7 +258,7 @@ setSynthetic synthetic_ span_ =
 
 
 -- |Optional additional span data.
-spanData :: Span -> Value
+spanData :: Span -> SpanData
 spanData span_ =
   case span_ of
     Entry entry -> EntrySpan.spanData entry
@@ -262,43 +267,80 @@ spanData span_ =
 
 -- |Add a value to the span's custom tags section. This should be used for SDK
 -- spans instead of addRegisteredData.
-addTag :: Value -> Span -> Span
-addTag value span_ =
-  addRegisteredDataAt "sdk.custom.tags" value span_
+addTag :: Annotation -> Span -> Span
+addTag annotation span_ =
+  addRegisteredData
+    (SpanData.objectAnnotation "sdk" [
+      SpanData.objectAnnotation "custom" [
+        SpanData.objectAnnotation "tags" [
+          annotation
+        ]
+      ]
+    ])
+    span_
 
 
--- |Add a value to the given path to the span's custom tags section. This should
--- be used for SDK spans instead of addRegisteredDataAt.
-addTagAt :: Aeson.ToJSON a => Text -> a -> Span -> Span
+-- |Add a simple value (string, number, boolean, etc.) to the given path to the
+-- span's custom tags section. This should be used for SDK spans instead of
+-- addRegisteredDataAt. For complex annotations (lists), use addTagValueAt.
+addTagAt :: ToJSON a => Text -> a -> Span -> Span
 addTagAt path value span_ =
   addRegisteredDataAt (T.concat ["sdk.custom.tags.", path]) value span_
 
+
+-- |Add a value to the given path to the span's custom tags section. This should
+-- be used for SDK spans instead of addRegisteredValueAt. For annotations with
+-- simple values (string, number, boolean, etc.), you can also use the
+-- convenience function addTagAt.
+addTagValueAt :: Text -> AnnotationValue -> Span -> Span
+addTagValueAt path value span_ =
+  addRegisteredValueAt (T.concat ["sdk.custom.tags.", path]) value span_
 
 
 -- |Add a value to the span's data section. This should only be used for
 -- registered spans, not for SDK spans. For SDK spans, you should use addTag
 -- instead.
-addRegisteredData :: Value -> Span -> Span
+addRegisteredData :: Annotation -> Span -> Span
 addRegisteredData value span_ =
   case span_ of
     Entry entry -> Entry $ EntrySpan.addData value entry
     Exit exit   -> Exit $ ExitSpan.addData value exit
 
 
--- |Add a value at the given path to the span's data section. For SDK spans, you
--- should use addTagAt instead.
-addRegisteredDataAt :: Aeson.ToJSON a => Text -> a -> Span -> Span
+-- |Add a simple value (string, boolean, number) at the given path to the span's
+-- data section. For SDK spans, you should use addTagAt instead. For list
+-- annotations, use addRegisteredValueAt.
+addRegisteredDataAt :: ToJSON a => Text -> a -> Span -> Span
 addRegisteredDataAt path value span_ =
   let
     pathSegments = T.splitOn "." path
+    lastPathSegment = List.last pathSegments
+    pathPrefix = List.take (List.length pathSegments - 1) pathSegments
     newData = List.foldr
-      (\nextPathSegment accumulatedAesonValue ->
-        Aeson.object [
-          nextPathSegment .= accumulatedAesonValue
-        ]
+      (\nextPathSegment accumulated ->
+        SpanData.objectAnnotation nextPathSegment [accumulated]
       )
-      (Aeson.toJSON value)
-      pathSegments
+      (SpanData.simpleAnnotation lastPathSegment value)
+      pathPrefix
   in
   addRegisteredData newData span_
 
+
+-- |Add a list value at the given path to the span's data section. For SDK
+-- spans, you should use addTagValueAt instead. For annotations with simple
+-- values (string, number, boolean, etc.), you can also use the convenience
+-- function addRegisteredDataAt.
+addRegisteredValueAt :: Text -> AnnotationValue -> Span -> Span
+addRegisteredValueAt path value span_ =
+  let
+    pathSegments = T.splitOn "." path
+    lastPathSegment = List.last pathSegments
+    pathPrefix = List.take (List.length pathSegments - 1) pathSegments
+    newData = List.foldr
+      (\nextPathSegment accumulated ->
+        SpanData.objectAnnotation nextPathSegment [accumulated]
+      )
+      (SpanData.singleAnnotation lastPathSegment value)
+      pathPrefix
+  in
+  addRegisteredData newData span_

@@ -1,19 +1,20 @@
 module Instana.SDK.IntegrationTest.TestSuites (allSuites) where
 
 
-import qualified Data.Aeson                                 as Aeson
-import qualified Instana.SDK.IntegrationTest.BracketApi     as BracketApi
-import qualified Instana.SDK.IntegrationTest.Connection     as Connection
-import qualified Instana.SDK.IntegrationTest.CustomSecrets  as CustomSecrets
-import qualified Instana.SDK.IntegrationTest.HttpTracing    as HttpTracing
-import qualified Instana.SDK.IntegrationTest.LowLevelApi    as LowLevelApi
-import qualified Instana.SDK.IntegrationTest.Metrics        as Metrics
-import qualified Instana.SDK.IntegrationTest.ServiceName    as ServiceName
-import qualified Instana.SDK.IntegrationTest.SpecCompliance as SpecCompliance
-import           Instana.SDK.IntegrationTest.Suite          (ConditionalSuite (..),
-                                                             Suite (..))
-import qualified Instana.SDK.IntegrationTest.Suite          as Suite
-import qualified Instana.SDK.IntegrationTest.WaiMiddleware  as WaiMiddleware
+import qualified Data.Aeson                                   as Aeson
+import qualified Instana.SDK.IntegrationTest.BracketApi       as BracketApi
+import qualified Instana.SDK.IntegrationTest.Connection       as Connection
+import qualified Instana.SDK.IntegrationTest.CustomSecrets    as CustomSecrets
+import qualified Instana.SDK.IntegrationTest.ExtraHttpHeaders as ExtraHttpHeaders
+import qualified Instana.SDK.IntegrationTest.HttpTracing      as HttpTracing
+import qualified Instana.SDK.IntegrationTest.LowLevelApi      as LowLevelApi
+import qualified Instana.SDK.IntegrationTest.Metrics          as Metrics
+import qualified Instana.SDK.IntegrationTest.ServiceName      as ServiceName
+import qualified Instana.SDK.IntegrationTest.SpecCompliance   as SpecCompliance
+import           Instana.SDK.IntegrationTest.Suite            (ConditionalSuite (..),
+                                                               Suite (..))
+import qualified Instana.SDK.IntegrationTest.Suite            as Suite
+import qualified Instana.SDK.IntegrationTest.WaiMiddleware    as WaiMiddleware
 
 
 allSuites :: Aeson.Array -> [ConditionalSuite]
@@ -27,6 +28,8 @@ allSuites specificationComplianceTestCases =
   , testServiceName
   , testHttpTracing
   , testCustomSecrets
+  , testExtraHttpHeaders
+  , testExtraHttpHeadersLegacyConfig
   , testWaiMiddleware
   , testSpecComplianceW3cOn
       specificationComplianceTestCases
@@ -150,6 +153,40 @@ testCustomSecrets =
       { Suite.label = "Custom Secrets"
       , Suite.tests = CustomSecrets.allTests
       , Suite.options = (Suite.withCustomSecretsConfig "regex:.*obscured.*,hidden.*") {
+            Suite.appsUnderTest =
+              [ Suite.testServer
+              , Suite.downstreamTarget
+              ]
+          }
+      }
+
+
+testExtraHttpHeaders :: ConditionalSuite
+testExtraHttpHeaders =
+  Run $
+    Suite
+      { Suite.label = "Extra HTTP Headers"
+      , Suite.tests = (\pid -> [
+          ExtraHttpHeaders.shouldApplyExtraHeadersFromCommonTracerConfig pid
+        ])
+      , Suite.options = Suite.withTracingConfigForExtraHeaders {
+            Suite.appsUnderTest =
+              [ Suite.testServer
+              , Suite.downstreamTarget
+              ]
+          }
+      }
+
+
+testExtraHttpHeadersLegacyConfig :: ConditionalSuite
+testExtraHttpHeadersLegacyConfig =
+  Run $
+    Suite
+      { Suite.label = "Extra HTTP Headers (legacy config)"
+      , Suite.tests = (\pid -> [
+          ExtraHttpHeaders.shouldApplyExtraHeadersFromLegacyConfig pid
+        ])
+      , Suite.options = Suite.withLegacyConfigForExtraHeaders {
             Suite.appsUnderTest =
               [ Suite.testServer
               , Suite.downstreamTarget

@@ -9,10 +9,12 @@ module Instana.SDK.IntegrationTest.Suite
   , testServer
   , testServerWithMiddleware
   , withConnectionLoss
-  , withCustomServiceName
   , withCustomSecretsConfig
+  , withCustomServiceName
+  , withLegacyConfigForExtraHeaders
   , withPidTranslation
   , withStartupDelay
+  , withTracingConfigForExtraHeaders
   , withW3cTraceCorrelationDisabled
   ) where
 
@@ -32,13 +34,15 @@ data Suite =
 -- |Describes options for running a test suite.
 data SuiteOptions =
   SuiteOptions
-    { usePidTranslation          :: Bool
-    , startupDelay               :: Bool
-    , simulateConnectionLoss     :: Bool
-    , customServiceName          :: Maybe String
-    , customSecretsConfig        :: Maybe String
-    , disableW3cTraceCorrelation :: Bool
-    , appsUnderTest              :: [AppUnderTest]
+    { usePidTranslation            :: Bool
+    , startupDelay                 :: Bool
+    , simulateConnectionLoss       :: Bool
+    , customServiceName            :: Maybe String
+    , customSecretsConfig          :: Maybe String
+    , tracingConfigForExtraHeaders :: Bool
+    , legacyConfigForExtraHeaders  :: Bool
+    , disableW3cTraceCorrelation   :: Bool
+    , appsUnderTest                :: [AppUnderTest]
     }
 
 
@@ -54,13 +58,15 @@ data AppUnderTest =
 defaultOptions :: SuiteOptions
 defaultOptions =
   SuiteOptions
-    { usePidTranslation           = False
-    , startupDelay                = False
-    , simulateConnectionLoss      = False
-    , customServiceName           = Nothing
-    , customSecretsConfig         = Nothing
-    , disableW3cTraceCorrelation  = False
-    , appsUnderTest               = [testServer]
+    { usePidTranslation            = False
+    , startupDelay                 = False
+    , simulateConnectionLoss       = False
+    , customServiceName            = Nothing
+    , customSecretsConfig          = Nothing
+    , tracingConfigForExtraHeaders = False
+    , legacyConfigForExtraHeaders  = False
+    , disableW3cTraceCorrelation   = False
+    , appsUnderTest                = [testServer]
     }
 
 
@@ -114,6 +120,16 @@ withCustomServiceName serviceName =
 withCustomSecretsConfig :: String -> SuiteOptions
 withCustomSecretsConfig secretsConfig =
   defaultOptions { customSecretsConfig = Just secretsConfig }
+
+
+withTracingConfigForExtraHeaders :: SuiteOptions
+withTracingConfigForExtraHeaders =
+  defaultOptions { tracingConfigForExtraHeaders = True }
+
+
+withLegacyConfigForExtraHeaders :: SuiteOptions
+withLegacyConfigForExtraHeaders =
+  defaultOptions { legacyConfigForExtraHeaders = True }
 
 
 withW3cTraceCorrelationDisabled :: SuiteOptions

@@ -13,16 +13,17 @@ module Instana.SDK.Internal.WireSpan
   ) where
 
 
-import           Control.Applicative     ((<|>))
-import           Data.Aeson              (FromJSON, ToJSON, Value, (.:), (.=))
-import qualified Data.Aeson              as Aeson
-import qualified Data.Aeson.Extra.Merge  as AesonExtra
-import           Data.Aeson.Types        (Parser)
-import           Data.Text               (Text)
+import           Control.Applicative       ((<|>))
+import           Data.Aeson                (FromJSON, ToJSON, Value, (.:), (.=))
+import qualified Data.Aeson                as Aeson
+import           Data.Aeson.Types          (Parser)
+import           Data.Text                 (Text)
 import           GHC.Generics
 
-import           Instana.SDK.Internal.Id (Id)
-import qualified Instana.SDK.Internal.Id as Id
+import           Instana.SDK.Internal.Id   (Id)
+import qualified Instana.SDK.Internal.Id   as Id
+import           Instana.SDK.Span.SpanData (SpanData)
+import qualified Instana.SDK.Span.SpanData as SpanData
 
 
 -- |Direction of the call.
@@ -103,7 +104,7 @@ data QueuedSpan = QueuedSpan
   , tpFlag          :: Maybe Bool
   , instanaAncestor :: Maybe (String, String)
   , synthetic       :: Maybe Bool
-  , spanData        :: Value
+  , spanData        :: SpanData
   } deriving (Eq, Generic, Show)
 
 
@@ -143,9 +144,9 @@ instance ToJSON WireSpan where
       spanData_ =
         case (serviceName span_ <|> serviceNameConfig_) of
           Just service ->
-            AesonExtra.lodashMerge
+            SpanData.merge
+              (SpanData.simpleAnnotation "service" service)
               (spanData span_)
-              (Aeson.object [ "service" .= service ])
           _ ->
             spanData span_
     in

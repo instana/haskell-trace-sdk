@@ -10,14 +10,13 @@ module Instana.SDK.Span.SimpleSpan
   ) where
 
 
-import qualified Data.Aeson              as Aeson
-import qualified Data.Text               as T
+import qualified Data.Text                 as T
 import           GHC.Generics
 
-import qualified Instana.SDK.Internal.Id as Id
-import           Instana.SDK.Span.Span   (SpanKind (..))
-import           Instana.SDK.Span.Span   (Span)
-import qualified Instana.SDK.Span.Span   as Span
+import qualified Instana.SDK.Internal.Id   as Id
+import           Instana.SDK.Span.Span     (Span, SpanKind (..))
+import qualified Instana.SDK.Span.Span     as Span
+import           Instana.SDK.Span.SpanData (SpanData)
 
 
 -- |A representation of the span fit for external use by clients of the SDK.
@@ -29,7 +28,7 @@ data SimpleSpan = SimpleSpan
   , timestamp  :: Int
   , kind       :: SpanKind
   , errorCount :: Int
-  , spanData   :: Aeson.Value
+  , spanData   :: SpanData
   } deriving (Eq, Generic, Show)
 
 

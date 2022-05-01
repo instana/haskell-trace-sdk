@@ -23,7 +23,8 @@ import           Instana.SDK.AgentStub.Config            (AgentStubConfig)
 import qualified Instana.SDK.AgentStub.Config            as Config
 import           Instana.SDK.AgentStub.DiscoveryRequest  (DiscoveryRequest)
 import qualified Instana.SDK.AgentStub.DiscoveryRequest  as DiscoveryRequest
-import           Instana.SDK.AgentStub.DiscoveryResponse (DiscoveryResponse (DiscoveryResponse))
+import           Instana.SDK.AgentStub.DiscoveryResponse (DiscoveryResponse (DiscoveryResponse),
+                                                          TracingConfig (TracingConfig))
 import qualified Instana.SDK.AgentStub.DiscoveryResponse as DiscoveryResponse
 import           Instana.SDK.AgentStub.EntityDataRequest (EntityDataRequest)
 import           Instana.SDK.AgentStub.Logging           (agentStubLogger)
@@ -79,16 +80,48 @@ putDiscovery config startupTime recorders discoveryRequest = do
            else pid
         translatedDiscoveryRequest =
           discoveryRequest { DiscoveryRequest.pid = show translatedPid }
+        tracingConfig =
+          if Config.extraHeadersViaTracingConfig config
+            then
+              Just TracingConfig
+                { DiscoveryResponse.extraHttpHeaders =
+                    Just
+                      [ "X-Request-Header-On-Entry"
+                      , "X-Response-Header-On-Entry"
+                      , "X-Request-Header-On-Exit"
+                      , "X-Response-Header-On-Exit"
+                      ]
+                }
+            else
+              Nothing
+
+        extraHeadersLegacyConfig =
+          if Config.extraHeadersViaLegacyConfig config
+            then
+              Just
+                [ "X-Request-Header-On-Entry"
+                , "X-Response-Header-On-Entry"
+                , "X-Request-Header-On-Exit"
+                , "X-Response-Header-On-Exit"
+                ]
+            else
+              Nothing
+
       stToServant $
         modifySTRef
           (Recorders.discoveryRecorder recorders)
           ((++) [translatedDiscoveryRequest])
+
       return $
         DiscoveryResponse
           { DiscoveryResponse.pid = translatedPid
           , DiscoveryResponse.agentUuid = "agent-stub-id"
-          , DiscoveryResponse.extraHeaders = Nothing
+          , DiscoveryResponse.tracing = tracingConfig
+          , DiscoveryResponse.extraHeaders = extraHeadersLegacyConfig
           , DiscoveryResponse.secrets = Config.secretsConfig config
+          -- add a bogus attribute to make sure the trace SDK ignores unknown
+          -- attributes in the announce response
+          , DiscoveryResponse.unknownAttribute = "whatever"
           }
 
 

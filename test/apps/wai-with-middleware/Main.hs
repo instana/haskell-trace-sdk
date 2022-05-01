@@ -88,7 +88,7 @@ apiUnderTest instana httpManager _ respond = do
     HTTP.parseUrlThrow $ downstreamUrl
   downstreamResponse <- InstanaSDK.withHttpExit
     instana
-    downstreamRequest
+    (addDowntreamRequestHeaders downstreamRequest)
     (\req -> do
       -- make sure there is a duration > 0
       threadDelay $ 1000
@@ -98,7 +98,9 @@ apiUnderTest instana httpManager _ respond = do
   respond $
     Wai.responseLBS
       HTTPTypes.status200
-      [("Content-Type", "application/json; charset=UTF-8")]
+      [ ("Content-Type", "application/json; charset=UTF-8")
+      , ("X-Response-Header-On-Entry", "response header on entry value")
+      ]
       (HTTP.responseBody downstreamResponse)
 
 
@@ -116,7 +118,7 @@ apiUnderTestWithWrongNesting instana httpManager _ respond = do
     HTTP.parseUrlThrow $ downstreamUrl
   InstanaSDK.withHttpExit
     instana
-    downstreamRequest
+    (addDowntreamRequestHeaders downstreamRequest)
     (\req -> do
       -- make sure there is a duration > 0
       threadDelay $ 1000
@@ -129,7 +131,9 @@ apiUnderTestWithWrongNesting instana httpManager _ respond = do
       respond $
         Wai.responseLBS
           HTTPTypes.status200
-          [("Content-Type", "application/json; charset=UTF-8")]
+          [ ("Content-Type", "application/json; charset=UTF-8")
+          , ("X-Response-Header-On-Entry", "response header on entry value")
+          ]
           (HTTP.responseBody downstreamResponse)
     )
 
@@ -142,6 +146,14 @@ shutDown respond = do
   _ <-liftIO $ Posix.exitImmediately Exit.ExitSuccess
   respond $
     Wai.responseBuilder HTTPTypes.status204 [] Builder.empty
+
+
+addDowntreamRequestHeaders :: HTTP.Request -> HTTP.Request
+addDowntreamRequestHeaders request =
+  request {
+    HTTP.requestHeaders =
+      [ ("X-Request-Header-On-Exit", "request header on exit value") ]
+  }
 
 
 respondWithPlainText ::

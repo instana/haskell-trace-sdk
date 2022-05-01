@@ -10,6 +10,7 @@ module Instana.SDK.Internal.Context
   , isAgentConnectionEstablished
   , mkAgentReadyState
   , readAgentUuid
+  , readExtraHeaders
   , readSecretsMatcher
   , readPid
   , whenConnected
@@ -19,6 +20,9 @@ module Instana.SDK.Internal.Context
 import           Control.Concurrent                                         (ThreadId)
 import           Control.Concurrent.STM                                     (STM)
 import qualified Control.Concurrent.STM                                     as STM
+import qualified Data.ByteString.Char8                                      as BSC8
+import           Data.CaseInsensitive                                       (CI)
+import qualified Data.CaseInsensitive                                       as CI
 import           Data.Map.Strict                                            (Map)
 import           Data.Maybe                                                 as Maybe
 import           Data.Sequence                                              (Seq)
@@ -86,6 +90,8 @@ data AgentConnection =
     , agentUuid      :: Text
       -- |the configured secrets matcher
     , secretsMatcher :: SecretsMatcher
+      -- |the configured list of HTTP headers to capture (or an empty list)
+    , extraHeaders   :: [CI BSC8.ByteString]
     }
   deriving (Eq, Show, Generic)
 
@@ -98,12 +104,25 @@ mkAgentReadyState ::
   -> ConnectionState
 mkAgentReadyState (host_, port_) announceResponse metricsStore =
   let
+    maybeTracingConfig = AnnounceResponse.tracing announceResponse
+    maybeExtraHeaders = AnnounceResponse.extraHttpHeaders <$> maybeTracingConfig
+    maybeLegacyExtraHeaders = AnnounceResponse.extraHeaders announceResponse
+    extraHeadersList =
+      (Maybe.fromMaybe [] $
+        Maybe.fromMaybe
+          -- Fall back to legacy extraHeaders if tracing.extra-http-headers is
+          -- not present.
+          maybeLegacyExtraHeaders
+          -- Prefer the tracing.extra-http-headers over the legacy
+          -- extraHeaders attribute.
+          maybeExtraHeaders)
     agentConnection = AgentConnection
       { agentHost      = host_
       , agentPort      = port_
       , pid            = show $ AnnounceResponse.pid announceResponse
       , agentUuid      = AnnounceResponse.agentUuid announceResponse
       , secretsMatcher = AnnounceResponse.secrets announceResponse
+      , extraHeaders   = fmap (CI.mk . BSC8.pack) extraHeadersList
       }
   in
   AgentReady $
@@ -185,6 +204,21 @@ readSecretsMatcherSTM context = do
 readSecretsMatcher :: InternalContext -> IO SecretsMatcher
 readSecretsMatcher context =
   STM.atomically $ readSecretsMatcherSTM context
+
+
+readExtraHeadersSTM :: InternalContext -> STM [CI BSC8.ByteString]
+readExtraHeadersSTM context = do
+  state <- STM.readTVar $ connectionState context
+  let
+    extraHeadersMaybe = mapConnectionState extraHeaders state
+  return $
+    Maybe.fromMaybe [] extraHeadersMaybe
+
+
+-- |accessor for the extra http headers config
+readExtraHeaders :: InternalContext -> IO [CI BSC8.ByteString]
+readExtraHeaders context =
+  STM.atomically $ readExtraHeadersSTM context
 
 
 mapConnectionState :: (AgentConnection -> a) -> ConnectionState -> Maybe a

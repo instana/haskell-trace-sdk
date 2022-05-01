@@ -29,7 +29,6 @@ module Instana.SDK.Span.EntrySpan
   ) where
 
 
-import           Data.Aeson                           (Value)
 import           Data.Text                            (Text)
 import           GHC.Generics
 
@@ -39,6 +38,7 @@ import           Instana.SDK.Span.NonRootEntry        (NonRootEntry)
 import qualified Instana.SDK.Span.NonRootEntry        as NonRootEntry
 import           Instana.SDK.Span.RootEntry           (RootEntry)
 import qualified Instana.SDK.Span.RootEntry           as RootEntry
+import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
 
 
 -- |An entry span.
@@ -225,7 +225,7 @@ setSynthetic synthetic_ entrySpan =
 
 
 -- |Optional additional span data.
-spanData :: EntrySpan -> Value
+spanData :: EntrySpan -> SpanData
 spanData entrySpan =
   case entrySpan of
     RootEntrySpan    entry -> RootEntry.spanData entry
@@ -233,7 +233,7 @@ spanData entrySpan =
 
 
 -- |Add a value to the span's data section.
-addData :: Value -> EntrySpan -> EntrySpan
+addData :: Annotation-> EntrySpan -> EntrySpan
 addData value entrySpan =
   case entrySpan of
     RootEntrySpan    entry ->

@@ -14,13 +14,13 @@ module Instana.SDK.Span.NonRootEntry
   ) where
 
 
-import           Data.Aeson                           (Value)
-import qualified Data.Aeson.Extra.Merge               as AesonExtra
 import           Data.Text                            (Text)
 import           GHC.Generics
 
 import           Instana.SDK.Internal.Id              (Id)
 import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
+import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
+import qualified Instana.SDK.Span.SpanData            as SpanData
 
 
 -- |An entry span that is not the root span of a trace.
@@ -45,9 +45,8 @@ data NonRootEntry =
     , serviceName     :: Maybe Text
       -- |A flag indicating that this span represents a synthetic call
     , synthetic       :: Bool
-      -- |Additional data for the span. Must be provided as an
-      -- 'Data.Aeson.Value'.
-    , spanData        :: Value
+      -- |Additional data for the span.
+    , spanData        :: SpanData
       -- |The W3C Trace Context. An entry span only has an associated W3C trace
       -- context, if W3C trace context headers have been received.
     , w3cTraceContext :: Maybe W3CTraceContext
@@ -92,11 +91,7 @@ setSynthetic synthetic_ nonRootEntry =
 
 
 -- |Add a value to the span's data section.
-addData :: Value -> NonRootEntry -> NonRootEntry
-addData newData nonRootEntry =
-  let
-    currentData = spanData nonRootEntry
-    mergedData = AesonExtra.lodashMerge currentData newData
-  in
-  nonRootEntry { spanData = mergedData }
+addData :: Annotation -> NonRootEntry -> NonRootEntry
+addData annotation nonRootEntry =
+  nonRootEntry { spanData = SpanData.merge annotation $ spanData nonRootEntry }
 
