@@ -35,8 +35,10 @@ library
   build-depends:
       base >=4.7 && <5
     , aeson
+    , aeson-casing
     , aeson-extra
     , bytestring
+    , case-insensitive
     , containers
     , directory
     , ekg-core
@@ -60,6 +62,7 @@ library
     , time
     , unix
     , unordered-containers
+    , vector
     , wai
   if flag(dev)
     ghc-options:
@@ -76,6 +79,7 @@ library
       Instana.SDK.Span.RootEntry
       Instana.SDK.Span.SimpleSpan
       Instana.SDK.Span.Span
+      Instana.SDK.Span.SpanData
       Instana.SDK.Span.SpanType
       Instana.SDK.TracingHeaders
       Instana.Wai.Middleware.Entry
@@ -168,6 +172,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , scientific
     , text
     , unordered-containers
+    , vector
     , wai
   other-modules:
       -- the actual tests
@@ -180,8 +185,9 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.SecretsTest
       Instana.SDK.Internal.ServerTimingTest
       Instana.SDK.Internal.SpanStackTest
-      Instana.SDK.Internal.SpanTest
       Instana.SDK.Internal.W3CTraceContextTest
+      Instana.SDK.SpanTest
+      Instana.SDK.SpanDataTest
       Instana.SDK.TracingHeadersTest
       -- modules under test
       Instana.SDK.Internal.Config
@@ -195,6 +201,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Internal.ServerTiming
       Instana.SDK.Span.SimpleSpan
       Instana.SDK.Span.Span
+      Instana.SDK.Span.SpanData
       Instana.SDK.TracingHeaders
       Instana.SDK.Internal.W3CTraceContext
       -- dependencies of modules under test
@@ -290,6 +297,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , Instana.SDK.IntegrationTest.BracketApi
     , Instana.SDK.IntegrationTest.Connection
     , Instana.SDK.IntegrationTest.CustomSecrets
+    , Instana.SDK.IntegrationTest.ExtraHttpHeaders
     , Instana.SDK.IntegrationTest.HUnitExtra
     , Instana.SDK.IntegrationTest.HttpHelper
     , Instana.SDK.IntegrationTest.HttpTracing

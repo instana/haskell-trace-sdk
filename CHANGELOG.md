@@ -3,6 +3,7 @@
 ## Unreleased
 - Fix: Apply secrets config from agent configuration.
 - Fix: Redact secrets from query parameters instead of removing them.
+- Automatically capture HTTP request and response headers on HTTP entry and exit spans, based on the agent configuration.
 
 ## 0.7.1.0
 - Fix: Limit the number of list-members (key-value pairs) to 32 in the W3C trace context `tracestate` header.

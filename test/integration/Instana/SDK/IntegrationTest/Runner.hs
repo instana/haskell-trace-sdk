@@ -127,6 +127,10 @@ runSuite suite = do
         , ("SIMULATE_CONNECTION_LOSS",
              booleanEnv $ Suite.simulateConnectionLoss options)
         , ("SECRETS_CONFIG", Suite.customSecretsConfig options)
+        , ("EXTRA_HEADERS_VIA_TRACING_CONFIG",
+             booleanEnv $ Suite.tracingConfigForExtraHeaders options)
+        , ("EXTRA_HEADERS_VIA_LEGACY_CONFIG",
+             booleanEnv $ Suite.legacyConfigForExtraHeaders options)
         , ("LOG_LEVEL", Just logLevel)
         ]
         "stack exec instana-haskell-agent-stub"

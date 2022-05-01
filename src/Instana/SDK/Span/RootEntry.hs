@@ -17,13 +17,13 @@ module Instana.SDK.Span.RootEntry
   ) where
 
 
-import           Data.Aeson                           (Value)
-import qualified Data.Aeson.Extra.Merge               as AesonExtra
 import           Data.Text                            (Text)
 import           GHC.Generics
 
 import           Instana.SDK.Internal.Id              (Id)
 import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
+import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
+import qualified Instana.SDK.Span.SpanData            as SpanData
 
 
 -- |An entry span that is the root span of a trace.
@@ -48,9 +48,8 @@ data RootEntry =
     , correlationType :: Maybe Text
       -- |The website monitoring correlation ID
     , correlationId   :: Maybe Text
-      -- |Additional data for the span. Must be provided as an
-      -- 'Data.Aeson.Value'.
-    , spanData        :: Value
+      -- |Additional data for the span.
+    , spanData        :: SpanData
       -- |The W3C Trace Context. An entry span only has an associated W3C trace
       -- context, if W3C trace context headers have been received.
     , w3cTraceContext :: Maybe W3CTraceContext
@@ -108,11 +107,7 @@ setCorrelationId correlationId_ rootEntry =
 
 
 -- |Add a value to the span's data section.
-addData :: Value -> RootEntry -> RootEntry
-addData newData rootEntry =
-  let
-    currentData = spanData rootEntry
-    mergedData = AesonExtra.lodashMerge currentData newData
-  in
-  rootEntry { spanData = mergedData }
+addData :: Annotation -> RootEntry -> RootEntry
+addData annotation rootEntry =
+  rootEntry { spanData = SpanData.merge annotation $ spanData rootEntry }
 

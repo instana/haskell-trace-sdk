@@ -14,8 +14,6 @@ module Instana.SDK.Span.ExitSpan
   ) where
 
 
-import           Data.Aeson                           (Value)
-import qualified Data.Aeson.Extra.Merge               as AesonExtra
 import           Data.Text                            (Text)
 import           GHC.Generics
 
@@ -23,6 +21,8 @@ import           Instana.SDK.Internal.Id              (Id)
 import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
 import           Instana.SDK.Span.EntrySpan           (EntrySpan)
 import qualified Instana.SDK.Span.EntrySpan           as EntrySpan
+import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
+import qualified Instana.SDK.Span.SpanData            as SpanData
 
 
 -- |An exit span.
@@ -43,9 +43,8 @@ data ExitSpan  =
     , serviceName     :: Maybe Text
       -- |The number of errors that occured during processing
     , errorCount      :: Int
-      -- |Additional data for the span. Must be provided as an
-      -- 'Data.Aeson.Value'.
-    , spanData        :: Value
+      -- |Additional data for the span.
+    , spanData        :: SpanData
       -- |The W3C Trace Context. An entry span only has an associated W3C trace
       -- context, if W3C trace context headers have been received. In contrast,
       -- spans always have an associated W3C trace context.
@@ -87,11 +86,7 @@ setW3cTraceContext w3cTraceContext_ exitSpan =
 
 
 -- |Add a value to the span's data section.
-addData :: Value -> ExitSpan -> ExitSpan
-addData newData exitSpan =
-  let
-    currentData = spanData exitSpan
-    mergedData = AesonExtra.lodashMerge currentData newData
-  in
-  exitSpan { spanData = mergedData }
+addData :: Annotation -> ExitSpan -> ExitSpan
+addData annotation exitSpan =
+  exitSpan { spanData = SpanData.merge annotation $ spanData exitSpan }
 

@@ -14,14 +14,16 @@ module Instana.SDK.Span.SpanType
   ) where
 
 
-import           Data.Aeson            (Value, (.=))
-import qualified Data.Aeson            as Aeson
-import           Data.String           (IsString (fromString))
-import           Data.Text             (Text)
-import qualified Data.Text             as T
+import qualified Data.Aeson                as Aeson
+import           Data.String               (IsString (fromString))
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
 import           GHC.Generics
 
-import           Instana.SDK.Span.Span (SpanKind (EntryKind, ExitKind, IntermediateKind))
+import           Instana.SDK.Span.Span     (SpanKind (EntryKind, ExitKind, IntermediateKind))
+import           Instana.SDK.Span.SpanData (Annotation (Object),
+                                            SpanData (SpanData))
+import qualified Instana.SDK.Span.SpanData as SpanData
 
 
 -- |Differentiates between SDK spans and registered spans (which receive
@@ -52,9 +54,9 @@ registeredSpanName HaskellHttpClient = "haskell.http.client"
 
 
 -- |Returns the initial data (span.data) for a SpanType value.
-initialData :: SpanKind -> SpanType -> Value
+initialData :: SpanKind -> SpanType -> SpanData
 initialData kind (SdkSpan s)     = initialSdkData kind s
-initialData _ (RegisteredSpan _) = emptyValue
+initialData _ (RegisteredSpan _) = SpanData.empty
 
 
 -- |Enables passing any string as the span type argument to SDK.startEntrySpan
@@ -65,26 +67,20 @@ instance IsString SpanType where
 
 
 -- |Provides the initial data for an SDK span.
-initialSdkData :: SpanKind -> Text -> Value
+initialSdkData :: SpanKind -> Text -> SpanData
 initialSdkData kind spanName_ =
   let
-    sdkKind :: String
+    sdkKind :: Text
     sdkKind =
       case kind of
         EntryKind        -> "entry"
         ExitKind         -> "exit"
         IntermediateKind -> "intermediate"
   in
-  (Aeson.object [ "sdk" .=
-    Aeson.object
-      [ "name" .= spanName_
-      , "type" .= sdkKind
-      ]
+  SpanData
+    [ Object "sdk"
+        [ SpanData.simpleAnnotation "name" $ Aeson.String spanName_
+        , SpanData.simpleAnnotation "type" $ Aeson.String sdkKind
+        ]
     ]
-  )
-
-
--- |Provides an empty Aeson value.
-emptyValue :: Value
-emptyValue = Aeson.object []
 

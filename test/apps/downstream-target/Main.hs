@@ -20,10 +20,9 @@ import           System.Log.Formatter
 import           System.Log.Handler         (setFormatter)
 import           System.Log.Handler.Simple  (GenericHandler, fileHandler,
                                              streamHandler)
-import           System.Log.Logger          (Priority (..), rootLoggerName,
-                                             setHandlers, setLevel,
-                                             updateGlobalLogger)
-import           System.Log.Logger          (infoM)
+import           System.Log.Logger          (Priority (..), infoM,
+                                             rootLoggerName, setHandlers,
+                                             setLevel, updateGlobalLogger)
 import qualified System.Posix.Process       as Posix
 import           System.Posix.Types         (CPid)
 
@@ -89,7 +88,9 @@ echoHeaders request respond = do
   respond $
     Wai.responseLBS
       HTTPTypes.status200
-      [("Content-Type", "application/json; charset=UTF-8")]
+      [ ("Content-Type", "application/json; charset=UTF-8")
+      , ("X-Response-Header-On-Exit", "response header on exit value")
+      ]
       encodedHeaders
 
 

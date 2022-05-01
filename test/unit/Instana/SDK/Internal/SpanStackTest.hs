@@ -2,8 +2,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Instana.SDK.Internal.SpanStackTest (allTests) where
 
-import           Data.Aeson                           (Value)
-import qualified Data.Aeson                           as Aeson
 import           Test.HUnit
 
 import qualified Instana.SDK.Internal.Id              as Id
@@ -20,6 +18,7 @@ import           Instana.SDK.Span.RootEntry           (RootEntry (RootEntry))
 import qualified Instana.SDK.Span.RootEntry           as RootEntry
 import           Instana.SDK.Span.Span                (Span (..), SpanKind (..))
 import qualified Instana.SDK.Span.Span                as Span
+import qualified Instana.SDK.Span.SpanData            as SpanData
 
 
 allTests :: Test
@@ -402,7 +401,7 @@ rootEntry =
       , RootEntry.synthetic       = False
       , RootEntry.correlationType = Nothing
       , RootEntry.correlationId   = Nothing
-      , RootEntry.spanData        = emptyValue
+      , RootEntry.spanData        = SpanData.empty
       , RootEntry.w3cTraceContext = Nothing
       }
 
@@ -416,7 +415,7 @@ exitSpan =
     , ExitSpan.timestamp       = 1514761201000
     , ExitSpan.errorCount      = 0
     , ExitSpan.serviceName     = Nothing
-    , ExitSpan.spanData        = emptyValue
+    , ExitSpan.spanData        = SpanData.empty
     , ExitSpan.w3cTraceContext = dummyW3cTraceContext
     }
 
@@ -443,10 +442,6 @@ dummyW3cTraceContext =
 increaseEc :: Span -> Span
 increaseEc =
   Span.addToErrorCount 1
-
-
-emptyValue :: Value
-emptyValue = Aeson.object []
 
 
 fst3 :: (a, b, c) -> a

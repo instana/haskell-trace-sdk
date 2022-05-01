@@ -19,12 +19,14 @@ import           Text.Read                               (readMaybe)
 
 
 data AgentStubConfig = AgentStubConfig
-  { bindHost               :: Warp.HostPreference
-  , bindPort               :: Int
-  , secretsConfig          :: SecretsConfig
-  , startupDelay           :: Int
-  , simulateConnectionLoss :: Bool
-  , simulatPidTranslation  :: Bool
+  { bindHost                     :: Warp.HostPreference
+  , bindPort                     :: Int
+  , secretsConfig                :: SecretsConfig
+  , extraHeadersViaTracingConfig :: Bool
+  , extraHeadersViaLegacyConfig  :: Bool
+  , startupDelay                 :: Int
+  , simulateConnectionLoss       :: Bool
+  , simulatPidTranslation        :: Bool
   } deriving (Eq, Show, Generic)
 
 
@@ -43,23 +45,27 @@ readConfig = do
   -- (see https://hackage.haskell.org/package/warp-3.2.9/docs/Network-Wai-Handler-Warp.html#t:HostPreference),
   -- as it prevents the MacOS firewall from asking if it is okay to accept
   -- incoming connections every time the app is recompiled and restarted.
-  hostString     <- lookupEnvWithDefault    "HOST" "127.0.0.1"
-  port           <- lookupEnvIntWithDefault "PORT" 1302
-  secrets        <- parseSecretsConfig
-  delay          <- lookupEnvIntWithDefault "STARTUP_DELAY" 0
-  connectionLoss <- lookupFlag              "SIMULATE_CONNECTION_LOSS"
-  pidTranslation <- lookupFlag              "SIMULATE_PID_TRANSLATION"
+  hostString          <- lookupEnvWithDefault    "HOST" "127.0.0.1"
+  port                <- lookupEnvIntWithDefault "PORT" 1302
+  secrets             <- parseSecretsConfig
+  extraHeadersTracing <- lookupFlag              "EXTRA_HEADERS_VIA_TRACING_CONFIG"
+  extraHeadersLegacy  <- lookupFlag              "EXTRA_HEADERS_VIA_LEGACY_CONFIG"
+  delay               <- lookupEnvIntWithDefault "STARTUP_DELAY" 0
+  connectionLoss      <- lookupFlag              "SIMULATE_CONNECTION_LOSS"
+  pidTranslation      <- lookupFlag              "SIMULATE_PID_TRANSLATION"
   let
     hostPreference :: Warp.HostPreference
     hostPreference = fromString hostString
   return
     AgentStubConfig
-      { bindHost               = hostPreference
-      , bindPort               = port
-      , secretsConfig          = secrets
-      , startupDelay           = delay
-      , simulateConnectionLoss = connectionLoss
-      , simulatPidTranslation  = pidTranslation
+      { bindHost                     = hostPreference
+      , bindPort                     = port
+      , secretsConfig                = secrets
+      , extraHeadersViaTracingConfig = extraHeadersTracing
+      , extraHeadersViaLegacyConfig  = extraHeadersLegacy
+      , startupDelay                 = delay
+      , simulateConnectionLoss       = connectionLoss
+      , simulatPidTranslation        = pidTranslation
       }
 
 

@@ -14,6 +14,7 @@ module Instana.SDK.SDK
     , addHttpTracingHeaders
     , addRegisteredData
     , addRegisteredDataAt
+    , addRegisteredValueAt
     , addTag
     , addTagAt
     , addToErrorCount
@@ -65,9 +66,10 @@ import           Control.Concurrent.STM               (STM)
 import qualified Control.Concurrent.STM               as STM
 import           Control.Monad                        (join, when)
 import           Control.Monad.IO.Class               (MonadIO, liftIO)
-import           Data.Aeson                           (Value, (.=))
-import qualified Data.Aeson                           as Aeson
+import           Data.Aeson                           (ToJSON)
 import qualified Data.ByteString.Char8                as BSC8
+import           Data.CaseInsensitive                 (CI)
+import qualified Data.CaseInsensitive                 as CI
 import qualified Data.List                            as List
 import qualified Data.Map.Strict                      as Map
 import qualified Data.Maybe                           as Maybe
@@ -115,6 +117,9 @@ import           Instana.SDK.Span.SimpleSpan          (SimpleSpan)
 import qualified Instana.SDK.Span.SimpleSpan          as SimpleSpan
 import           Instana.SDK.Span.Span                (Span (..), SpanKind (..))
 import qualified Instana.SDK.Span.Span                as Span
+import           Instana.SDK.Span.SpanData            (Annotation (..),
+                                                       AnnotationValue)
+import qualified Instana.SDK.Span.SpanData            as SpanData
 import           Instana.SDK.Span.SpanType            (SpanType (RegisteredSpan))
 import qualified Instana.SDK.Span.SpanType            as SpanType
 import           Instana.SDK.TracingHeaders           (TracingHeaders,
@@ -824,25 +829,58 @@ addHttpData ::
   Bool ->
   m ()
 addHttpData context request synthetic = do
+  extraHeadersConfig <- liftIO $ InternalContext.readExtraHeaders context
+  secretsMatcher <- liftIO $ InternalContext.readSecretsMatcher context
   let
     host :: String
     host =
       Wai.requestHeaderHost request
       |> fmap BSC8.unpack
       |> Maybe.fromMaybe ""
-  secretsMatcher <- liftIO $ InternalContext.readSecretsMatcher context
-  addRegisteredData
-    context
-    (Aeson.object [ "http" .=
-      Aeson.object
-        [ "method" .= Wai.requestMethod request |> BSC8.unpack
-        , "url"    .= Wai.rawPathInfo request |> BSC8.unpack
-        , "host"   .= host
-        , "params" .= (processQueryString secretsMatcher (Wai.rawQueryString request))
-        ]
+    capturedHeaders = collectHeaders extraHeadersConfig $ Wai.requestHeaders request
+    httpAnnotations =
+      [ SpanData.simpleAnnotation "method" $
+          Wai.requestMethod request |> BSC8.unpack
+      , SpanData.simpleAnnotation "url"    $
+          Wai.rawPathInfo request |> BSC8.unpack
+      , SpanData.simpleAnnotation "host" $ host
+      , SpanData.optionalAnnotation "params" $
+           (processQueryString secretsMatcher (Wai.rawQueryString request))
       ]
-    )
+    httpAnnotations' =
+      case capturedHeaders of
+        Just headers ->
+          httpAnnotations ++ [SpanData.listAnnotation "header" headers]
+        Nothing ->
+          httpAnnotations
+
+  addRegisteredData context (Object "http" httpAnnotations')
   setSynthetic context synthetic
+
+
+collectHeaders ::
+  [CI BSC8.ByteString]
+  -> [HTTPTypes.Header]
+  -> Maybe [(String, String)]
+collectHeaders extraHeadersConfig allHeaders =
+  let
+    all2 = allHeaders
+    filtered = filterHeaders extraHeadersConfig all2
+    serialized =
+      fmap
+        (\(name, value) -> (BSC8.unpack $ CI.original name, BSC8.unpack value))
+        filtered
+  in
+  if null serialized then Nothing else Just serialized
+
+
+filterHeaders :: [CI BSC8.ByteString] -> [HTTPTypes.Header] -> [HTTPTypes.Header]
+filterHeaders configuredList allHeaders =
+  let
+    filterFn (name, _) =
+      elem name configuredList
+  in
+  filter filterFn allHeaders
 
 
 -- |Adds website correlation annotations to the HTTP entry span.
@@ -897,8 +935,9 @@ postProcessHttpResponse ::
   -> m Wai.Response
 postProcessHttpResponse context response = do
   liftIO $ do
-    response' <- captureHttpStatusUnlifted context response
-    addWebsiteMonitoringBackEndCorrelationUnlifted context response'
+    captureHttpStatusUnlifted context response
+    captureResponseHeaders context response
+    addWebsiteMonitoringBackEndCorrelationUnlifted context response
 
 
 -- |Captures the status code of the HTTP response and adds it to the currently
@@ -917,7 +956,7 @@ captureHttpStatus ::
   MonadIO m =>
   InstanaContext
   -> Wai.Response
-  -> m Wai.Response
+  -> m ()
 captureHttpStatus context response = do
   liftIO $ captureHttpStatusUnlifted context response
 
@@ -928,18 +967,59 @@ captureHttpStatus context response = do
 captureHttpStatusUnlifted ::
   InstanaContext
   -> Wai.Response
-  -> IO Wai.Response
+  -> IO ()
 captureHttpStatusUnlifted context response = do
   let
     (HTTPTypes.Status statusCode statusMessage) =
       Wai.responseStatus response
-  addRegisteredDataToEntryAt context "http.status" statusCode
+  addRegisteredDataToEntryAt context "http.status" $
+    SpanData.simpleValue statusCode
   when
     (statusCode >= 500 )
     (addRegisteredDataAt context "http.message" $
-      BSC8.unpack statusMessage
+      SpanData.simpleValue $ BSC8.unpack statusMessage
     )
-  return response
+
+
+-- |Captures the HTTP headers of the response, if extra headers for capture have
+-- been configured. The captured header (if any) will be added to the currently
+-- active span. This function needs be called while the HTTP entry span is still
+-- active. It can be used inside a 'withHttpEntry_' block or between
+-- 'startHttpEntry' and 'completeEntry'.
+--
+-- Client code should rarely have the need to call this directly. Instead,
+-- capture incoming HTTP requests with 'withHttpEntry', which captures the
+-- headers automatically. When not using 'withHttpEntry', the function
+-- 'postProcessHttpResponse' should be preferred over this function.
+captureResponseHeaders ::
+  MonadIO m =>
+  InstanaContext
+  -> Wai.Response
+  -> m ()
+captureResponseHeaders context response = do
+  liftIO $ captureResponseHeadersUnlifted context response
+
+
+-- |Captures the HTTP headers of the response, if extra headers for capture have
+-- been configured. The captured header (if any) will be added to the currently
+-- active span.
+captureResponseHeadersUnlifted ::
+  InstanaContext
+  -> Wai.Response
+  -> IO ()
+captureResponseHeadersUnlifted context response = do
+  extraHeadersConfig <- liftIO $ InternalContext.readExtraHeaders context
+  let
+    capturedHeaders =
+      collectHeaders extraHeadersConfig $ Wai.responseHeaders response
+  when
+    (Maybe.isJust capturedHeaders)
+    (do
+       let
+         Just headers = capturedHeaders
+       addRegisteredValueToEntryAt context "http.header" $
+         SpanData.listValue headers
+    )
 
 
 -- |Adds an additional HTTP response header (Server-Timing) to the given HTTP
@@ -1066,23 +1146,37 @@ startHttpExit ::
   -> HTTP.Request
   -> m HTTP.Request
 startHttpExit context request = do
+  extraHeadersConfig <- liftIO $ InternalContext.readExtraHeaders context
+  secretsMatcher <- liftIO $ InternalContext.readSecretsMatcher context
+
   let
     originalCheckResponse = HTTP.checkResponse request
     request' =
       request
+        -- Inject a checkResponse hook to capture the response status and
+        -- response headers.
         { HTTP.checkResponse = (\req res -> do
             let
               status =
                 res
                   |> HTTP.responseStatus
                   |> HTTPTypes.statusCode
-            addRegisteredData context
-              (Aeson.object [ "http" .=
-                Aeson.object
-                  [ "status" .= status
-                  ]
-                ]
+              capturedResponseHeaders =
+                collectHeaders extraHeadersConfig $
+                  HTTP.responseHeaders res
+
+            addRegisteredDataAt context "http.status" $
+              SpanData.simpleValue status
+
+            when
+              (Maybe.isJust capturedResponseHeaders)
+              (do
+                 let
+                   Just responseHeaders = capturedResponseHeaders
+                 addRegisteredValueAt context "http.header" $
+                   SpanData.listValue responseHeaders
               )
+
             originalCheckResponse req res
           )
         }
@@ -1091,24 +1185,27 @@ startHttpExit context request = do
     host = BSC8.unpack $ HTTP.host request
     path = BSC8.unpack $ HTTP.path request
     url = protocol ++ host ++ port ++ path
+    capturedRequestHeaders = collectHeaders extraHeadersConfig $ HTTP.requestHeaders request
+    httpAnnotations =
+      [ SpanData.simpleAnnotation "method" $ BSC8.unpack $ HTTP.method request
+      , SpanData.simpleAnnotation "url"    url
+      , SpanData.optionalAnnotation "params"
+          (processQueryString secretsMatcher (HTTP.queryString request))
+      ]
+    httpAnnotations' =
+      case capturedRequestHeaders of
+        Just requestHeaders ->
+          httpAnnotations ++ [SpanData.listAnnotation "header" requestHeaders]
+        Nothing ->
+          httpAnnotations
 
   startExit context (RegisteredSpan SpanType.HaskellHttpClient)
   request'' <- addHttpTracingHeaders context request'
-  secretsMatcher <- liftIO $ InternalContext.readSecretsMatcher context
-  addRegisteredData
-    context
-    (Aeson.object [ "http" .=
-      Aeson.object
-        [ "method" .= (BSC8.unpack $ HTTP.method request)
-        , "url"    .= url
-        , "params" .= (processQueryString secretsMatcher (HTTP.queryString request))
-        ]
-      ]
-    )
+  addRegisteredData context (Object "http" httpAnnotations')
   return request''
 
 
-processQueryString :: Secrets.SecretsMatcher -> BSC8.ByteString -> Text
+processQueryString :: Secrets.SecretsMatcher -> BSC8.ByteString -> Maybe Text
 processQueryString secretsMatcher queryString =
   queryString
     |> BSC8.unpack
@@ -1297,7 +1394,7 @@ setSynthetic context synthetic =
 -- }
 --
 -- This should be used for SDK spans instead of addRegisteredDataAt.
-addTagAt :: (MonadIO m, Aeson.ToJSON a) => InstanaContext -> Text -> a -> m ()
+addTagAt :: (MonadIO m, ToJSON a) => InstanaContext -> Text -> a -> m ()
 addTagAt context path value =
   liftIO $ modifyCurrentSpan context
     (\span_ -> Span.addTagAt path value span_)
@@ -1309,10 +1406,10 @@ addTagAt context path value =
 -- called multiple times, data from multiple calls will be merged.
 --
 -- This should be used for SDK spans instead of addRegisteredData.
-addTag :: MonadIO m => InstanaContext -> Value -> m ()
-addTag context value =
+addTag :: MonadIO m => InstanaContext -> Annotation -> m ()
+addTag context annotation =
   liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addTag value span_)
+    (\span_ -> Span.addTag annotation span_)
 
 
 -- |Adds additional meta data to the currently active registered span. Call this
@@ -1331,7 +1428,7 @@ addTag context value =
 -- Note that this should only be used for registered spans, not for SDK spans.
 -- Use addTagAt for SDK spans instead.
 addRegisteredDataAt ::
-  (MonadIO m, Aeson.ToJSON a) =>
+  (MonadIO m, ToJSON a) =>
   InstanaContext
   -> Text
   -> a
@@ -1341,12 +1438,38 @@ addRegisteredDataAt context path value =
     (\span_ -> Span.addRegisteredDataAt path value span_)
 
 
+-- |Adds an annotation to the currently active registered span. Call this
+-- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry.
+-- The given path can be a nested path, with path fragments separated by dots,
+-- like "http.url". This will result in
+-- "data": {
+--   ...
+--   "http": {
+--     "url": "..."
+--   },
+--   ...
+-- }
+--
+-- Note that this should only be used for registered spans, not for SDK spans.
+-- Use addTagAt for SDK spans instead.
+addRegisteredValueAt ::
+  (MonadIO m) =>
+  InstanaContext
+  -> Text
+  -> AnnotationValue
+  -> m ()
+addRegisteredValueAt context path value =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addRegisteredValueAt path value span_)
+
+
 -- |Adds additional meta data to the currently active entry span, even if the
 -- currently active span is an exit child of that entry span.
 --
 -- Note that this should only be used for registered spans, not for SDK spans.
 addRegisteredDataToEntryAt ::
-  (MonadIO m, Aeson.ToJSON a) =>
+  (MonadIO m, ToJSON a) =>
   InstanaContext
   -> Text
   -> a
@@ -1356,6 +1479,21 @@ addRegisteredDataToEntryAt context path value =
     (\span_ -> Span.addRegisteredDataAt path value span_)
 
 
+-- |Adds an additional annotation to the currently active entry span, even if
+-- the currently active span is an exit child of that entry span.
+--
+-- Note that this should only be used for registered spans, not for SDK spans.
+addRegisteredValueToEntryAt ::
+  (MonadIO m) =>
+  InstanaContext
+  -> Text
+  -> AnnotationValue
+  -> m ()
+addRegisteredValueToEntryAt context path value =
+  liftIO $ modifyCurrentEntrySpan context
+    (\span_ -> Span.addRegisteredValueAt path value span_)
+
+
 -- |Adds additional data to the currently active registered span. Call this
 -- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
 -- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
@@ -1363,10 +1501,10 @@ addRegisteredDataToEntryAt context path value =
 --
 -- Note that this should only be used for registered spans, not for SDK spans.
 -- Use addTag for SDK spans instead.
-addRegisteredData :: MonadIO m => InstanaContext -> Value -> m ()
-addRegisteredData context value =
+addRegisteredData :: MonadIO m => InstanaContext -> Annotation -> m ()
+addRegisteredData context annotation =
   liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addRegisteredData value span_)
+    (\span_ -> Span.addRegisteredData annotation span_)
 
 
 -- |Adds the Instana tracing headers

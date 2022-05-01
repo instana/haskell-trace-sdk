@@ -5,8 +5,6 @@ module Main where
 import           Control.Concurrent         (threadDelay)
 import           Control.Monad              (join)
 import           Control.Monad.IO.Class     (liftIO)
-import           Data.Aeson                 (Value, (.=))
-import qualified Data.Aeson                 as Aeson
 import qualified Data.Binary.Builder        as Builder
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Char8      as BS
@@ -15,6 +13,8 @@ import qualified Data.Maybe                 as Maybe
 import qualified Data.Text                  as T
 import           Instana.SDK.SDK            (InstanaContext)
 import qualified Instana.SDK.SDK            as InstanaSDK
+import           Instana.SDK.Span.SpanData  (Annotation)
+import qualified Instana.SDK.Span.SpanData  as SpanData
 import qualified Instana.SDK.Span.SpanType  as SpanType
 import qualified Network.HTTP.Client        as HTTP
 import qualified Network.HTTP.Types         as HTTPTypes
@@ -27,10 +27,9 @@ import           System.Log.Formatter
 import           System.Log.Handler         (setFormatter)
 import           System.Log.Handler.Simple  (GenericHandler, fileHandler,
                                              streamHandler)
-import           System.Log.Logger          (Priority (..), rootLoggerName,
-                                             setHandlers, setLevel,
-                                             updateGlobalLogger)
-import           System.Log.Logger          (infoM)
+import           System.Log.Logger          (Priority (..), infoM,
+                                             rootLoggerName, setHandlers,
+                                             setLevel, updateGlobalLogger)
 import qualified System.Posix.Process       as Posix
 import           System.Posix.Types         (CPid)
 
@@ -146,24 +145,24 @@ bracketApiWithTags instana respond = do
 
 withExitWithTags :: InstanaContext -> IO String
 withExitWithTags instana = do
-  InstanaSDK.addTag instana (someSpanData "entry")
+  addTags instana (someSpanData "entry")
   exitCallResult <-
     InstanaSDK.withExit
       instana
       "haskell.dummy.exit"
       (simulateExitCallWithTags instana)
   InstanaSDK.incrementErrorCount instana
-  InstanaSDK.addTag instana (moreSpanData "entry")
+  addTags instana (moreSpanData "entry")
   return $ exitCallResult ++ "::entry done"
 
 
 simulateExitCallWithTags :: InstanaContext -> IO String
 simulateExitCallWithTags instana = do
-  InstanaSDK.addTag instana (someSpanData "exit")
+  addTags instana (someSpanData "exit")
   -- some time needs to pass, otherwise the exit span's duration will be 0
   threadDelay $ 10 * 1000
   InstanaSDK.addToErrorCount instana 2
-  InstanaSDK.addTag instana (moreSpanData "exit")
+  addTags instana (moreSpanData "exit")
   InstanaSDK.addTagAt instana "nested.key1" ("nested.text.value1" :: String)
   InstanaSDK.addTagAt instana "nested.key2" ("nested.text.value2" :: String)
   InstanaSDK.addTagAt instana "nested.key3" (1604 :: Int)
@@ -271,10 +270,10 @@ lowLevelApiWithTags instana respond = do
   InstanaSDK.startRootEntry
     instana
     "haskell.dummy.root.entry"
-  InstanaSDK.addTag instana (someSpanData "entry")
+  addTags instana (someSpanData "entry")
   result <- doExitCallWithTags instana
   InstanaSDK.incrementErrorCount instana
-  InstanaSDK.addTag instana (moreSpanData "entry")
+  addTags instana (moreSpanData "entry")
   InstanaSDK.addTagAt
     instana "nested.entry.key" ("nested.entry.value" :: String)
   InstanaSDK.completeEntry instana
@@ -286,10 +285,10 @@ doExitCallWithTags instana = do
   InstanaSDK.startExit
     instana
     "haskell.dummy.exit"
-  InstanaSDK.addTag instana (someSpanData "exit")
+  addTags instana (someSpanData "exit")
   result <- simulateExitCall
   InstanaSDK.incrementErrorCount instana
-  InstanaSDK.addTag instana (moreSpanData "exit")
+  addTags instana (moreSpanData "exit")
   InstanaSDK.addTagAt instana "nested.exit.key" ("nested.exit.value" :: String)
   InstanaSDK.completeExit instana
   return result
@@ -302,22 +301,27 @@ simulateExitCall = do
   return "exit done"
 
 
-someSpanData :: String -> Value
+addTags :: InstanaContext -> [Annotation] -> IO ()
+addTags instana annotations =
+  mapM_
+    (\annotation -> InstanaSDK.addTag instana annotation)
+    annotations
+
+
+someSpanData :: String -> [Annotation]
 someSpanData kind =
-   Aeson.object
-     [ "data1"     .= ("value1" :: String)
-     , "data2"     .= (42 :: Int)
-     , "startKind" .= kind
-     ]
+  [ SpanData.simpleAnnotation "data1"     ("value1" :: String)
+  , SpanData.simpleAnnotation "data2"     (42 :: Int)
+  , SpanData.simpleAnnotation "startKind" kind
+  ]
 
 
-moreSpanData :: String -> Value
+moreSpanData :: String -> [Annotation]
 moreSpanData kind =
-   Aeson.object
-     [ "data2"   .= (1302 :: Int)
-     , "data3"   .= ("value3" :: String)
-     , "endKind" .= kind
-     ]
+  [ SpanData.simpleAnnotation "data2"   (1302 :: Int)
+  , SpanData.simpleAnnotation "data3"   ("value3" :: String)
+  , SpanData.simpleAnnotation "endKind" kind
+  ]
 
 
 httpBracketApi ::
@@ -334,7 +338,7 @@ httpBracketApi instana httpManager requestIn respond = do
           "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
       downstreamResponse <- InstanaSDK.withHttpExit
         instana
-        downstreamRequest
+        (addDowntreamRequestHeaders downstreamRequest)
         (\req -> do
           downstreamRespone' <- HTTP.httpLbs req httpManager
           threadDelay $ 1000 -- make sure there is a duration > 0
@@ -343,7 +347,9 @@ httpBracketApi instana httpManager requestIn respond = do
       return $
         Wai.responseLBS
           HTTPTypes.status200
-          [("Content-Type", "application/json; charset=UTF-8")]
+          [ ("Content-Type", "application/json; charset=UTF-8")
+          , ("X-Response-Header-On-Entry", "response header on entry value")
+          ]
           (HTTP.responseBody downstreamResponse)
   respond response
 
@@ -359,7 +365,9 @@ httpLowLevelApi instana httpManager requestIn respond = do
   downstreamRequest <-
     HTTP.parseUrlThrow $
       "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
-  downstreamRequest' <- InstanaSDK.startHttpExit instana downstreamRequest
+  downstreamRequest' <-
+    InstanaSDK.startHttpExit instana $
+      addDowntreamRequestHeaders downstreamRequest
   downstreamResponse <- HTTP.httpLbs downstreamRequest' httpManager
   threadDelay $ 1000 -- make sure there is a duration > 0
   InstanaSDK.completeExit instana
@@ -367,7 +375,9 @@ httpLowLevelApi instana httpManager requestIn respond = do
     response =
       Wai.responseLBS
         HTTPTypes.status200
-        [("Content-Type", "application/json; charset=UTF-8")]
+        [ ("Content-Type", "application/json; charset=UTF-8")
+        , ("X-Response-Header-On-Entry", "response header on entry value")
+        ]
         (HTTP.responseBody downstreamResponse)
   response' <-
     InstanaSDK.postProcessHttpResponse instana response
@@ -405,6 +415,14 @@ shutDown respond = do
   _ <-liftIO $ Posix.exitImmediately Exit.ExitSuccess
   respond $
     Wai.responseBuilder HTTPTypes.status204 [] Builder.empty
+
+
+addDowntreamRequestHeaders :: HTTP.Request -> HTTP.Request
+addDowntreamRequestHeaders request =
+  request {
+    HTTP.requestHeaders =
+      [ ("X-Request-Header-On-Exit", "request header on exit value") ]
+  }
 
 
 respondWithPlainText ::
