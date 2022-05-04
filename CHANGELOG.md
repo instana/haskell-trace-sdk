@@ -1,6 +1,6 @@
 # Changelog for instana-haskell-trace-sdk
 
-## Unreleased
+## 0.8.0.0
 - Fix: Apply secrets config from agent configuration.
 - Fix: Redact secrets from query parameters instead of removing them.
 - Feature: Automatically capture HTTP request and response headers on HTTP entry and exit spans, based on the agent configuration.
