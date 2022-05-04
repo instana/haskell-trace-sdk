@@ -11,12 +11,10 @@ of the 'withRootEntry', 'withEntry', 'withExit' functions for tracing.
 module Instana.SDK.SDK
     ( Config
     , InstanaContext
+    , addAnnotation
+    , addAnnotationAt
+    , addAnnotationValueAt
     , addHttpTracingHeaders
-    , addRegisteredData
-    , addRegisteredDataAt
-    , addRegisteredValueAt
-    , addTag
-    , addTagAt
     , addToErrorCount
     , addWebsiteMonitoringBackEndCorrelation
     , agentHost
@@ -24,8 +22,8 @@ module Instana.SDK.SDK
     , captureHttpStatus
     , completeEntry
     , completeExit
-    , currentSpan
     , currentParentId
+    , currentSpan
     , currentSpanId
     , currentTraceId
     , currentTraceIdInternal
@@ -459,14 +457,14 @@ startRootEntry context spanType = do
         RootEntrySpan $
           RootEntry
             { RootEntry.spanAndTraceId  = traceId
-            , RootEntry.spanName        = SpanType.spanName spanType
+            , RootEntry.spanType        = spanType
             , RootEntry.timestamp       = timestamp
             , RootEntry.errorCount      = 0
             , RootEntry.serviceName     = Nothing
             , RootEntry.synthetic       = False
             , RootEntry.correlationType = Nothing
             , RootEntry.correlationId   = Nothing
-            , RootEntry.spanData        = SpanType.initialData EntryKind spanType
+            , RootEntry.spanData        = Span.initialData EntryKind spanType
             , RootEntry.w3cTraceContext = Nothing
             }
     pushSpan
@@ -520,12 +518,12 @@ startEntry' context traceId parentId spanType = do
             { NonRootEntry.traceId         = traceId
             , NonRootEntry.spanId          = spanId
             , NonRootEntry.parentId        = parentId
-            , NonRootEntry.spanName        = SpanType.spanName spanType
+            , NonRootEntry.spanType        = spanType
             , NonRootEntry.timestamp       = timestamp
             , NonRootEntry.errorCount      = 0
             , NonRootEntry.serviceName     = Nothing
             , NonRootEntry.synthetic       = False
-            , NonRootEntry.spanData        = SpanType.initialData EntryKind spanType
+            , NonRootEntry.spanData        = Span.initialData EntryKind spanType
             , NonRootEntry.w3cTraceContext = Nothing
             , NonRootEntry.tpFlag          = False
             }
@@ -854,7 +852,7 @@ addHttpData context request synthetic = do
         Nothing ->
           httpAnnotations
 
-  addRegisteredData context (Object "http" httpAnnotations')
+  addAnnotation context (Object "http" httpAnnotations')
   setSynthetic context synthetic
 
 
@@ -972,11 +970,11 @@ captureHttpStatusUnlifted context response = do
   let
     (HTTPTypes.Status statusCode statusMessage) =
       Wai.responseStatus response
-  addRegisteredDataToEntryAt context "http.status" $
+  addAnnotationToEntrySpanAt context "http.status" $
     SpanData.simpleValue statusCode
   when
     (statusCode >= 500 )
-    (addRegisteredDataAt context "http.message" $
+    (addAnnotationAt context "http.message" $
       SpanData.simpleValue $ BSC8.unpack statusMessage
     )
 
@@ -1017,7 +1015,7 @@ captureResponseHeadersUnlifted context response = do
     (do
        let
          Just headers = capturedHeaders
-       addRegisteredValueToEntryAt context "http.header" $
+       addAnnotationValueToEntrySpanAt context "http.header" $
          SpanData.listValue headers
     )
 
@@ -1100,11 +1098,11 @@ startExit context spanType = do
               ExitSpan
                 { ExitSpan.parentSpan      = parent
                 , ExitSpan.spanId          = spanId
-                , ExitSpan.spanName        = SpanType.spanName spanType
+                , ExitSpan.spanType        = spanType
                 , ExitSpan.timestamp       = timestamp
                 , ExitSpan.errorCount      = 0
                 , ExitSpan.serviceName     = Nothing
-                , ExitSpan.spanData        = SpanType.initialData
+                , ExitSpan.spanData        = Span.initialData
                                                ExitKind
                                                spanType
                 , ExitSpan.w3cTraceContext = w3cTraceContext
@@ -1165,7 +1163,7 @@ startHttpExit context request = do
                 collectHeaders extraHeadersConfig $
                   HTTP.responseHeaders res
 
-            addRegisteredDataAt context "http.status" $
+            addAnnotationAt context "http.status" $
               SpanData.simpleValue status
 
             when
@@ -1173,7 +1171,7 @@ startHttpExit context request = do
               (do
                  let
                    Just responseHeaders = capturedResponseHeaders
-                 addRegisteredValueAt context "http.header" $
+                 addAnnotationValueAt context "http.header" $
                    SpanData.listValue responseHeaders
               )
 
@@ -1201,7 +1199,7 @@ startHttpExit context request = do
 
   startExit context (RegisteredSpan SpanType.HaskellHttpClient)
   request'' <- addHttpTracingHeaders context request'
-  addRegisteredData context (Object "http" httpAnnotations')
+  addAnnotation context (Object "http" httpAnnotations')
   return request''
 
 
@@ -1374,47 +1372,9 @@ setSynthetic context synthetic =
     (\span_ -> Span.setSynthetic synthetic span_)
 
 
--- |Adds additional custom tags to the currently active span. Call this
--- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
--- inside the IO action given to with withEntry/withExit/withRootEntry.
--- The given path can be a nested path, with path fragments separated by dots,
--- like "http.url". This will result in
--- "data": {
---   ...
---   "sdk": {
---     "custom": {
---       "tags": {
---         "http": {
---           "url": "..."
---         },
---       },
---     },
---   },
---   ...
--- }
---
--- This should be used for SDK spans instead of addRegisteredDataAt.
-addTagAt :: (MonadIO m, ToJSON a) => InstanaContext -> Text -> a -> m ()
-addTagAt context path value =
-  liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addTagAt path value span_)
-
-
--- |Adds additional custom tags to the currently active span. Call this
--- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
--- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
--- called multiple times, data from multiple calls will be merged.
---
--- This should be used for SDK spans instead of addRegisteredData.
-addTag :: MonadIO m => InstanaContext -> Annotation -> m ()
-addTag context annotation =
-  liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addTag annotation span_)
-
-
--- |Adds additional meta data to the currently active registered span. Call this
--- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
--- inside the IO action given to with withEntry/withExit/withRootEntry.
+-- |Adds an annotation to the currently active span. Call this between
+-- startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to withEntry/withExit/withRootEntry.
 -- The given path can be a nested path, with path fragments separated by dots,
 -- like "http.url". This will result in
 -- "data": {
@@ -1424,25 +1384,32 @@ addTag context annotation =
 --   },
 --   ...
 -- }
---
--- Note that this should only be used for registered spans, not for SDK spans.
--- Use addTagAt for SDK spans instead.
-addRegisteredDataAt ::
+addAnnotationAt ::
   (MonadIO m, ToJSON a) =>
   InstanaContext
   -> Text
   -> a
   -> m ()
-addRegisteredDataAt context path value =
+addAnnotationAt context path value =
   liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addRegisteredDataAt path value span_)
+    (\span_ -> Span.addAnnotationAt path value span_)
 
 
--- |Adds an annotation to the currently active registered span. Call this
--- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
--- inside the IO action given to with withEntry/withExit/withRootEntry.
--- The given path can be a nested path, with path fragments separated by dots,
--- like "http.url". This will result in
+-- |Adds an annotation to the currently active span. Call this between
+-- startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
+-- called multiple times, data from multiple calls will be merged.
+addAnnotation :: MonadIO m => InstanaContext -> Annotation -> m ()
+addAnnotation context annotation =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addAnnotation annotation span_)
+
+
+-- |Adds an annotation with the given value to the currently active span. Call
+-- this between startEntry/startRootEntry/startExit and
+-- completeEntry/completeExit or inside the IO action given to with
+-- withEntry/withExit/withRootEntry. The given path can be a nested path, with
+-- path fragments separated by dots, like "http.url". This will result in
 -- "data": {
 --   ...
 --   "http": {
@@ -1450,61 +1417,41 @@ addRegisteredDataAt context path value =
 --   },
 --   ...
 -- }
---
--- Note that this should only be used for registered spans, not for SDK spans.
--- Use addTagAt for SDK spans instead.
-addRegisteredValueAt ::
+addAnnotationValueAt ::
   (MonadIO m) =>
   InstanaContext
   -> Text
   -> AnnotationValue
   -> m ()
-addRegisteredValueAt context path value =
+addAnnotationValueAt context path value =
   liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addRegisteredValueAt path value span_)
-
-
--- |Adds additional meta data to the currently active entry span, even if the
--- currently active span is an exit child of that entry span.
---
--- Note that this should only be used for registered spans, not for SDK spans.
-addRegisteredDataToEntryAt ::
-  (MonadIO m, ToJSON a) =>
-  InstanaContext
-  -> Text
-  -> a
-  -> m ()
-addRegisteredDataToEntryAt context path value =
-  liftIO $ modifyCurrentEntrySpan context
-    (\span_ -> Span.addRegisteredDataAt path value span_)
+    (\span_ -> Span.addAnnotationValueAt path value span_)
 
 
 -- |Adds an additional annotation to the currently active entry span, even if
 -- the currently active span is an exit child of that entry span.
---
--- Note that this should only be used for registered spans, not for SDK spans.
-addRegisteredValueToEntryAt ::
+addAnnotationToEntrySpanAt ::
+  (MonadIO m, ToJSON a) =>
+  InstanaContext
+  -> Text
+  -> a
+  -> m ()
+addAnnotationToEntrySpanAt context path value =
+  liftIO $ modifyCurrentEntrySpan context
+    (\span_ -> Span.addAnnotationAt path value span_)
+
+
+-- |Adds an additional annotation to the currently active entry span, even if
+-- the currently active span is an exit child of that entry span.
+addAnnotationValueToEntrySpanAt ::
   (MonadIO m) =>
   InstanaContext
   -> Text
   -> AnnotationValue
   -> m ()
-addRegisteredValueToEntryAt context path value =
+addAnnotationValueToEntrySpanAt context path value =
   liftIO $ modifyCurrentEntrySpan context
-    (\span_ -> Span.addRegisteredValueAt path value span_)
-
-
--- |Adds additional data to the currently active registered span. Call this
--- between startEntry/startRootEntry/startExit and completeEntry/completeExit or
--- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
--- called multiple times, data from multiple calls will be merged.
---
--- Note that this should only be used for registered spans, not for SDK spans.
--- Use addTag for SDK spans instead.
-addRegisteredData :: MonadIO m => InstanaContext -> Annotation -> m ()
-addRegisteredData context annotation =
-  liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addRegisteredData annotation span_)
+    (\span_ -> Span.addAnnotationValueAt path value span_)
 
 
 -- |Adds the Instana tracing headers

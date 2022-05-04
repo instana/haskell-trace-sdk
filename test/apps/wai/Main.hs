@@ -145,27 +145,27 @@ bracketApiWithTags instana respond = do
 
 withExitWithTags :: InstanaContext -> IO String
 withExitWithTags instana = do
-  addTags instana (someSpanData "entry")
+  addAnnotations instana (someSpanData "entry")
   exitCallResult <-
     InstanaSDK.withExit
       instana
       "haskell.dummy.exit"
       (simulateExitCallWithTags instana)
   InstanaSDK.incrementErrorCount instana
-  addTags instana (moreSpanData "entry")
+  addAnnotations instana (moreSpanData "entry")
   return $ exitCallResult ++ "::entry done"
 
 
 simulateExitCallWithTags :: InstanaContext -> IO String
 simulateExitCallWithTags instana = do
-  addTags instana (someSpanData "exit")
+  addAnnotations instana (someSpanData "exit")
   -- some time needs to pass, otherwise the exit span's duration will be 0
   threadDelay $ 10 * 1000
   InstanaSDK.addToErrorCount instana 2
-  addTags instana (moreSpanData "exit")
-  InstanaSDK.addTagAt instana "nested.key1" ("nested.text.value1" :: String)
-  InstanaSDK.addTagAt instana "nested.key2" ("nested.text.value2" :: String)
-  InstanaSDK.addTagAt instana "nested.key3" (1604 :: Int)
+  addAnnotations instana (moreSpanData "exit")
+  InstanaSDK.addAnnotationAt instana "nested.key1" ("nested.text.value1" :: String)
+  InstanaSDK.addAnnotationAt instana "nested.key2" ("nested.text.value2" :: String)
+  InstanaSDK.addAnnotationAt instana "nested.key3" (1604 :: Int)
   return "exit done"
 
 
@@ -270,11 +270,11 @@ lowLevelApiWithTags instana respond = do
   InstanaSDK.startRootEntry
     instana
     "haskell.dummy.root.entry"
-  addTags instana (someSpanData "entry")
+  addAnnotations instana (someSpanData "entry")
   result <- doExitCallWithTags instana
   InstanaSDK.incrementErrorCount instana
-  addTags instana (moreSpanData "entry")
-  InstanaSDK.addTagAt
+  addAnnotations instana (moreSpanData "entry")
+  InstanaSDK.addAnnotationAt
     instana "nested.entry.key" ("nested.entry.value" :: String)
   InstanaSDK.completeEntry instana
   respondWithPlainText respond result
@@ -285,11 +285,11 @@ doExitCallWithTags instana = do
   InstanaSDK.startExit
     instana
     "haskell.dummy.exit"
-  addTags instana (someSpanData "exit")
+  addAnnotations instana (someSpanData "exit")
   result <- simulateExitCall
   InstanaSDK.incrementErrorCount instana
-  addTags instana (moreSpanData "exit")
-  InstanaSDK.addTagAt instana "nested.exit.key" ("nested.exit.value" :: String)
+  addAnnotations instana (moreSpanData "exit")
+  InstanaSDK.addAnnotationAt instana "nested.exit.key" ("nested.exit.value" :: String)
   InstanaSDK.completeExit instana
   return result
 
@@ -301,10 +301,10 @@ simulateExitCall = do
   return "exit done"
 
 
-addTags :: InstanaContext -> [Annotation] -> IO ()
-addTags instana annotations =
+addAnnotations :: InstanaContext -> [Annotation] -> IO ()
+addAnnotations instana annotations =
   mapM_
-    (\annotation -> InstanaSDK.addTag instana annotation)
+    (\annotation -> InstanaSDK.addAnnotation instana annotation)
     annotations
 
 

@@ -3,7 +3,10 @@
 ## Unreleased
 - Fix: Apply secrets config from agent configuration.
 - Fix: Redact secrets from query parameters instead of removing them.
-- Automatically capture HTTP request and response headers on HTTP entry and exit spans, based on the agent configuration.
+- Feature: Automatically capture HTTP request and response headers on HTTP entry and exit spans, based on the agent configuration.
+- BREAKING: Refactor and simplify the API to add nnotations via `Instana.SDK.SDK`:
+    - Use `addAnnotation` instead of `addRegisteredData` and `addTag`. This variant requires an `Annotation`, use the functions in `Instana.SDK.Span.SpanData` to create an annotation.
+    - Use `addAnnotationValueAt` or `addAnnotationAt` instead of `addRegisteredDataAt` and `addTagAt`. Both variants require the path to the annotation/value as a dot-separated string (same as before). The function `addAnnotationAt` accepts anything that implements `ToJSON`, and `addAnnotationValueAt` requires an `Instana.SDK.Span.SpanData.AnnotationValue` (previously you needed to pass in an `Aeson.Value`).
 
 ## 0.7.1.0
 - Fix: Limit the number of list-members (key-value pairs) to 32 in the W3C trace context `tracestate` header.

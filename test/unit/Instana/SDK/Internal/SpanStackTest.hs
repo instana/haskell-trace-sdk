@@ -19,7 +19,7 @@ import qualified Instana.SDK.Span.RootEntry           as RootEntry
 import           Instana.SDK.Span.Span                (Span (..), SpanKind (..))
 import qualified Instana.SDK.Span.Span                as Span
 import qualified Instana.SDK.Span.SpanData            as SpanData
-
+import           Instana.SDK.Span.SpanType            (SpanType (SdkSpan))
 
 allTests :: Test
 allTests =
@@ -394,7 +394,7 @@ rootEntry :: RootEntry
 rootEntry =
     RootEntry
       { RootEntry.spanAndTraceId  = Id.fromString "traceId"
-      , RootEntry.spanName        = "test.entry"
+      , RootEntry.spanType        = SdkSpan "test.entry"
       , RootEntry.timestamp       = 1514761200000
       , RootEntry.errorCount      = 0
       , RootEntry.serviceName     = Nothing
@@ -411,7 +411,7 @@ exitSpan =
   ExitSpan
     { ExitSpan.parentSpan      = entrySpan
     , ExitSpan.spanId          = Id.fromString "spanId"
-    , ExitSpan.spanName        = "test.exit"
+    , ExitSpan.spanType        = SdkSpan "test.exit"
     , ExitSpan.timestamp       = 1514761201000
     , ExitSpan.errorCount      = 0
     , ExitSpan.serviceName     = Nothing

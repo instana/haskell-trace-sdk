@@ -14,6 +14,8 @@ import           Instana.SDK.Span.Span       (Span (..), SpanKind (..))
 import qualified Instana.SDK.Span.Span       as Span
 import           Instana.SDK.Span.SpanData   (SpanData (SpanData))
 import qualified Instana.SDK.Span.SpanData   as SpanData
+import           Instana.SDK.Span.SpanType   (RegisteredSpanType (HaskellWaiServer),
+                                              SpanType (RegisteredSpan, SdkSpan))
 
 
 allTests :: Test
@@ -30,7 +32,7 @@ allTests =
     , TestLabel "shouldAddTwoAtSameNestedPath" shouldAddTwoAtSameNestedPath
     , TestLabel "shouldAddMultipleRegistered" shouldAddMultipleRegistered
     , TestLabel "shouldMergeListValues" shouldMergeListValues
-    , TestLabel "shouldAddMultipleTags" shouldAddMultipleTags
+    , TestLabel "shouldWrapAnnotationsInSdkCustomTagsForSdkSpans" shouldWrapAnnotationsInSdkCustomTagsForSdkSpans
     , TestLabel "shouldConvertToSimpleSpanFormat" shouldConvertToSimpleSpanFormat
     ]
 
@@ -38,7 +40,7 @@ allTests =
 shouldAddStringNotNested :: Test
 shouldAddStringNotNested =
   let
-    span_ = Span.addRegisteredDataAt "path" ("value" :: String) $ entrySpan
+    span_ = Span.addAnnotationAt "path" ("value" :: String) $ registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -53,10 +55,10 @@ shouldAddStringNested :: Test
 shouldAddStringNested =
   let
     span_ =
-      Span.addRegisteredDataAt
+      Span.addAnnotationAt
         "nested.path"
         ("value" :: String) $
-          entrySpan
+          registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -73,10 +75,10 @@ shouldAddStringDeeplyNested :: Test
 shouldAddStringDeeplyNested =
   let
     span_ =
-      Span.addRegisteredDataAt
+      Span.addAnnotationAt
         "really.deeply.nested.path"
         ("deeplyNestedValue" :: String)
-        entrySpan
+        registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -97,10 +99,10 @@ shouldAddIntDeeplyNested :: Test
 shouldAddIntDeeplyNested =
   let
     span_ =
-      Span.addRegisteredDataAt
+      Span.addAnnotationAt
         "really.deeply.nested.path"
         (42 :: Int) $
-          entrySpan
+          registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -121,10 +123,10 @@ shouldAddDoubleDeeplyNested :: Test
 shouldAddDoubleDeeplyNested =
   let
     span_ =
-      Span.addRegisteredDataAt
+      Span.addAnnotationAt
         "really.deeply.nested.path"
         (28.08 :: Double) $
-          entrySpan
+          registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -144,7 +146,7 @@ shouldAddDoubleDeeplyNested =
 shouldAddBooleanDeeplyNested :: Test
 shouldAddBooleanDeeplyNested =
   let
-    span_ = Span.addRegisteredDataAt "really.deeply.nested.path" True $ entrySpan
+    span_ = Span.addAnnotationAt "really.deeply.nested.path" True $ registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -165,9 +167,9 @@ shouldAddTwoAtDifferentPaths :: Test
 shouldAddTwoAtDifferentPaths =
   let
     span_ =
-      Span.addRegisteredDataAt "nested2.key" (2 :: Int) $
-      Span.addRegisteredDataAt "nested1.key" (1 :: Int) $
-      entrySpan
+      Span.addAnnotationAt "nested2.key" (2 :: Int) $
+      Span.addAnnotationAt "nested1.key" (1 :: Int) $
+      registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -186,9 +188,9 @@ shouldAddTwoAtSamePath :: Test
 shouldAddTwoAtSamePath =
   let
     span_ =
-      Span.addRegisteredDataAt "nested.key2" (2 :: Int) $
-      Span.addRegisteredDataAt "nested.key1" (1 :: Int) $
-      entrySpan
+      Span.addAnnotationAt "nested.key2" (2 :: Int) $
+      Span.addAnnotationAt "nested.key1" (1 :: Int) $
+      registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -207,9 +209,9 @@ shouldAddTwoAtSameNestedPath :: Test
 shouldAddTwoAtSameNestedPath =
   let
     span_ =
-      Span.addRegisteredDataAt "nested.deeper.key2" (2 :: Int) $
-      Span.addRegisteredDataAt "nested.deeper.key1" (1 :: Int) $
-      entrySpan
+      Span.addAnnotationAt "nested.deeper.key2" (2 :: Int) $
+      Span.addAnnotationAt "nested.deeper.key1" (1 :: Int) $
+      registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -230,14 +232,14 @@ shouldAddMultipleRegistered :: Test
 shouldAddMultipleRegistered =
   let
     span_ =
-      Span.addRegisteredDataAt "nested.key3" (12.07 :: Double) $
-      Span.addRegisteredDataAt "nested.key2" (2 :: Int) $
-      Span.addRegisteredDataAt "nested.key1" ("value.n.1" :: String) $
-      Span.addRegisteredDataAt "list" (["one", "two", "three"] :: [String]) $
-      Span.addRegisteredDataAt "key3" (16.04 :: Double) $
-      Span.addRegisteredDataAt "key2" (13 :: Int) $
-      Span.addRegisteredDataAt "key1" ("value1" :: String) $
-      entrySpan
+      Span.addAnnotationAt "nested.key3" (12.07 :: Double) $
+      Span.addAnnotationAt "nested.key2" (2 :: Int) $
+      Span.addAnnotationAt "nested.key1" ("value.n.1" :: String) $
+      Span.addAnnotationAt "list" (["one", "two", "three"] :: [String]) $
+      Span.addAnnotationAt "key3" (16.04 :: Double) $
+      Span.addAnnotationAt "key2" (13 :: Int) $
+      Span.addAnnotationAt "key1" ("value1" :: String) $
+      registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -261,11 +263,11 @@ shouldMergeListValues :: Test
 shouldMergeListValues =
   let
     span_ =
-      Span.addRegisteredValueAt "list"
+      Span.addAnnotationValueAt "list"
         (SpanData.listValue (["three", "four"] :: [String])) $
-          Span.addRegisteredValueAt "list"
+          Span.addAnnotationValueAt "list"
             (SpanData.listValue (["one", "two"] :: [String])) $
-              entrySpan
+              registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -279,21 +281,21 @@ shouldMergeListValues =
       spanData
 
 
-shouldAddMultipleTags :: Test
-shouldAddMultipleTags =
+shouldWrapAnnotationsInSdkCustomTagsForSdkSpans :: Test
+shouldWrapAnnotationsInSdkCustomTagsForSdkSpans =
   let
     span_ =
-      Span.addTagAt "nested.key3" (12.07 :: Double) $
-      Span.addTagAt "nested.key2" (2 :: Int) $
-      Span.addTagAt "nested.key1" ("value.n.1" :: String) $
-      Span.addTagAt "key3" (16.04 :: Double) $
-      Span.addTagAt "key2" (13 :: Int) $
-      Span.addTagAt "key1" ("value1" :: String) $
-      entrySpan
+      Span.addAnnotationAt "nested.key3" (12.07 :: Double) $
+      Span.addAnnotationAt "nested.key2" (2 :: Int) $
+      Span.addAnnotationAt "nested.key1" ("value.n.1" :: String) $
+      Span.addAnnotationAt "key3" (16.04 :: Double) $
+      Span.addAnnotationAt "key2" (13 :: Int) $
+      Span.addAnnotationAt "key1" ("value1" :: String) $
+      sdkEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
-    assertEqual "shouldAddMultipleTags"
+    assertEqual "shouldWrapAnnotationsInSdkCustomTagsForSdkSpans"
       (SpanData
         [ SpanData.objectAnnotation "sdk"
           [ SpanData.objectAnnotation "custom"
@@ -318,7 +320,7 @@ shouldConvertToSimpleSpanFormat :: Test
 shouldConvertToSimpleSpanFormat =
   let
     span_ =
-      Span.addRegisteredDataAt "really.deeply.nested.path" True entrySpan
+      Span.addAnnotationAt "really.deeply.nested.path" True registeredEntrySpan
     simple = SimpleSpan.convert span_
     traceId = SimpleSpan.traceId simple
     spanId = SimpleSpan.spanId simple
@@ -333,31 +335,50 @@ shouldConvertToSimpleSpanFormat =
     assertEqual "traceId" "traceId" traceId
     assertEqual "spanId" "traceId" spanId
     assertEqual "parentId" Nothing parentId
-    assertEqual "spanName" "test.entry" spanName
+    assertEqual "spanName" "haskell.wai.server" spanName
     assertEqual "timestamp" 1514761200000 timestamp
     assertEqual "kind" EntryKind kind
     assertEqual "errorCount" 0 errorCount
     assertEqual
       "spanData"
-      (SpanData [
-        SpanData.objectAnnotation "really" [
-          SpanData.objectAnnotation"deeply" [
-            SpanData.objectAnnotation "nested" [
-              SpanData.simpleAnnotation "path" True
+      (SpanData
+        [ SpanData.objectAnnotation "really" [
+            SpanData.objectAnnotation"deeply" [
+              SpanData.objectAnnotation "nested" [
+                SpanData.simpleAnnotation "path" True
+              ]
             ]
           ]
         ]
-      ])
+      )
       spanData
 
 
-entrySpan :: Span
-entrySpan =
+registeredEntrySpan :: Span
+registeredEntrySpan =
   Entry $
     RootEntrySpan $
       RootEntry
         { RootEntry.spanAndTraceId  = Id.fromString "traceId"
-        , RootEntry.spanName        = "test.entry"
+        , RootEntry.spanType        = RegisteredSpan HaskellWaiServer
+        , RootEntry.timestamp       = 1514761200000
+        , RootEntry.errorCount      = 0
+        , RootEntry.serviceName     = Nothing
+        , RootEntry.synthetic       = False
+        , RootEntry.correlationType = Nothing
+        , RootEntry.correlationId   = Nothing
+        , RootEntry.spanData        = SpanData.empty
+        , RootEntry.w3cTraceContext = Nothing
+        }
+
+
+sdkEntrySpan :: Span
+sdkEntrySpan =
+  Entry $
+    RootEntrySpan $
+      RootEntry
+        { RootEntry.spanAndTraceId  = Id.fromString "traceId"
+        , RootEntry.spanType        = SdkSpan "test.entry"
         , RootEntry.timestamp       = 1514761200000
         , RootEntry.errorCount      = 0
         , RootEntry.serviceName     = Nothing

@@ -5,12 +5,13 @@ Description : An entry span that is not the root of a trace
 -}
 module Instana.SDK.Span.NonRootEntry
   ( NonRootEntry(..)
-  , addData
+  , addAnnotation
   , addToErrorCount
   , setServiceName
   , setSynthetic
   , setTpFlag
   , setW3cTraceContext
+  , spanName
   ) where
 
 
@@ -21,6 +22,8 @@ import           Instana.SDK.Internal.Id              (Id)
 import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
 import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
 import qualified Instana.SDK.Span.SpanData            as SpanData
+import           Instana.SDK.Span.SpanType            (SpanType)
+import qualified Instana.SDK.Span.SpanType            as SpanType
 
 
 -- |An entry span that is not the root span of a trace.
@@ -33,10 +36,8 @@ data NonRootEntry =
     , spanId          :: Id
       -- |The ID of the parent span
     , parentId        :: Id
-      -- |The span name/type, e.g. a short string like "haskell.wai.server",
-      -- "haskell.http.client". For SDK spans this is always "sdk", the actual
-      -- name is then in span.data.sdk.name.
-    , spanName        :: Text
+      -- |The type of the span (SDK span or registerd span)
+    , spanType        :: SpanType
       -- |The time the span started
     , timestamp       :: Int
       -- |The number of errors that occured during processing
@@ -54,6 +55,13 @@ data NonRootEntry =
       -- trace ID/parent ID from W3C trace context instead of Instana headers.
     , tpFlag          :: Bool
     } deriving (Eq, Generic, Show)
+
+
+-- |The span name/type, e.g. a short string like "haskell.wai.server",
+-- "haskell.http.client". For SDK spans this is always "sdk", the actual
+-- name is then in span.data.sdk.name.
+spanName :: NonRootEntry -> Text
+spanName = SpanType.spanName . spanType
 
 
 -- |Add to the error count.
@@ -90,8 +98,10 @@ setSynthetic synthetic_ nonRootEntry =
   nonRootEntry { synthetic = synthetic_ }
 
 
--- |Add a value to the span's data section.
-addData :: Annotation -> NonRootEntry -> NonRootEntry
-addData annotation nonRootEntry =
+-- |Add an annotation to the span's data section. For SDK spans, the annotation
+-- is added to span.data.sdk.custom.tags, for registered spans it is added
+-- directly to span.data.
+addAnnotation :: Annotation -> NonRootEntry -> NonRootEntry
+addAnnotation annotation nonRootEntry =
   nonRootEntry { spanData = SpanData.merge annotation $ spanData nonRootEntry }
 
