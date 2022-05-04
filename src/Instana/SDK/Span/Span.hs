@@ -7,28 +7,27 @@ Description : A type for spans (entries, exits or intermediates).
 module Instana.SDK.Span.Span
   ( Span (Entry, Exit)
   , SpanKind (EntryKind, ExitKind, IntermediateKind)
-  , addRegisteredData
-  , addRegisteredDataAt
-  , addRegisteredValueAt
-  , addTag
-  , addTagAt
-  , addTagValueAt
+  , addAnnotation
+  , addAnnotationAt
+  , addAnnotationValueAt
   , addToErrorCount
   , correlationId
   , correlationType
   , errorCount
+  , initialData
   , parentId
   , serviceName
   , setCorrelationId
   , setCorrelationType
   , setServiceName
   , setSynthetic
+  , setTpFlag
   , setW3cTraceContext
   , spanData
-  , setTpFlag
   , spanId
   , spanKind
   , spanName
+  , spanType
   , synthetic
   , timestamp
   , tpFlag
@@ -50,8 +49,9 @@ import           Instana.SDK.Span.ExitSpan            (ExitSpan)
 import qualified Instana.SDK.Span.ExitSpan            as ExitSpan
 import           Instana.SDK.Span.SpanData            (Annotation,
                                                        AnnotationValue,
-                                                       SpanData)
+                                                       SpanData (SpanData))
 import qualified Instana.SDK.Span.SpanData            as SpanData
+import           Instana.SDK.Span.SpanType            (SpanType (RegisteredSpan, SdkSpan))
 
 
 -- |The span kind (entry, exit or intermediate).
@@ -95,6 +95,14 @@ parentId span_ =
   case span_ of
     Entry entry -> EntrySpan.parentId entry
     Exit exit   -> Just $ ExitSpan.parentId exit
+
+
+-- |Type of span (registerd span vs. SDK span)
+spanType :: Span -> SpanType
+spanType span_ =
+  case span_ of
+    Entry entry -> EntrySpan.spanType entry
+    Exit exit   -> ExitSpan.spanType exit
 
 
 -- |Name of span.
@@ -265,53 +273,23 @@ spanData span_ =
     Exit exit   -> ExitSpan.spanData exit
 
 
--- |Add a value to the span's custom tags section. This should be used for SDK
--- spans instead of addRegisteredData.
-addTag :: Annotation -> Span -> Span
-addTag annotation span_ =
-  addRegisteredData
-    (SpanData.objectAnnotation "sdk" [
-      SpanData.objectAnnotation "custom" [
-        SpanData.objectAnnotation "tags" [
-          annotation
-        ]
-      ]
-    ])
-    span_
-
-
--- |Add a simple value (string, number, boolean, etc.) to the given path to the
--- span's custom tags section. This should be used for SDK spans instead of
--- addRegisteredDataAt. For complex annotations (lists), use addTagValueAt.
-addTagAt :: ToJSON a => Text -> a -> Span -> Span
-addTagAt path value span_ =
-  addRegisteredDataAt (T.concat ["sdk.custom.tags.", path]) value span_
-
-
--- |Add a value to the given path to the span's custom tags section. This should
--- be used for SDK spans instead of addRegisteredValueAt. For annotations with
--- simple values (string, number, boolean, etc.), you can also use the
--- convenience function addTagAt.
-addTagValueAt :: Text -> AnnotationValue -> Span -> Span
-addTagValueAt path value span_ =
-  addRegisteredValueAt (T.concat ["sdk.custom.tags.", path]) value span_
-
-
--- |Add a value to the span's data section. This should only be used for
--- registered spans, not for SDK spans. For SDK spans, you should use addTag
--- instead.
-addRegisteredData :: Annotation -> Span -> Span
-addRegisteredData value span_ =
+-- |Add an annotation to the span's data section. For SDK spans, the annotation
+-- is added to span.data.sdk.custom.tags, for registered spans it is added
+-- directly to span.data.
+addAnnotation :: Annotation -> Span -> Span
+addAnnotation annotation span_ =
+  let
+    wrappedAnnotation = wrapAnnotationIfNecessary span_ annotation
+  in
   case span_ of
-    Entry entry -> Entry $ EntrySpan.addData value entry
-    Exit exit   -> Exit $ ExitSpan.addData value exit
+    Entry entry -> Entry $ EntrySpan.addAnnotation wrappedAnnotation entry
+    Exit exit   -> Exit $ ExitSpan.addAnnotation wrappedAnnotation exit
 
 
 -- |Add a simple value (string, boolean, number) at the given path to the span's
--- data section. For SDK spans, you should use addTagAt instead. For list
--- annotations, use addRegisteredValueAt.
-addRegisteredDataAt :: ToJSON a => Text -> a -> Span -> Span
-addRegisteredDataAt path value span_ =
+-- data section.
+addAnnotationAt :: ToJSON a => Text -> a -> Span -> Span
+addAnnotationAt path value span_ =
   let
     pathSegments = T.splitOn "." path
     lastPathSegment = List.last pathSegments
@@ -323,15 +301,15 @@ addRegisteredDataAt path value span_ =
       (SpanData.simpleAnnotation lastPathSegment value)
       pathPrefix
   in
-  addRegisteredData newData span_
+  addAnnotation newData span_
 
 
 -- |Add a list value at the given path to the span's data section. For SDK
--- spans, you should use addTagValueAt instead. For annotations with simple
+-- spans, you should use addAnnotationValueToSdkSpan instead. For annotations with simple
 -- values (string, number, boolean, etc.), you can also use the convenience
--- function addRegisteredDataAt.
-addRegisteredValueAt :: Text -> AnnotationValue -> Span -> Span
-addRegisteredValueAt path value span_ =
+-- function addAnnotationAt.
+addAnnotationValueAt :: Text -> AnnotationValue -> Span -> Span
+addAnnotationValueAt path value span_ =
   let
     pathSegments = T.splitOn "." path
     lastPathSegment = List.last pathSegments
@@ -343,4 +321,46 @@ addRegisteredValueAt path value span_ =
       (SpanData.singleAnnotation lastPathSegment value)
       pathPrefix
   in
-  addRegisteredData newData span_
+  addAnnotation newData span_
+
+
+wrapAnnotationIfNecessary :: Span -> Annotation -> Annotation
+wrapAnnotationIfNecessary span_ annotation =
+  case spanType span_ of
+    RegisteredSpan _ ->
+      annotation
+    SdkSpan _ ->
+      ( SpanData.objectAnnotation "sdk" [
+          SpanData.objectAnnotation "custom" [
+            SpanData.objectAnnotation "tags" [
+              annotation
+            ]
+          ]
+        ]
+      )
+
+
+-- |Returns the initial data (span.data) for a SpanType value.
+initialData :: SpanKind -> SpanType -> SpanData
+initialData kind (SdkSpan s)     = initialSdkData kind s
+initialData _ (RegisteredSpan _) = SpanData.empty
+
+
+-- |Provides the initial data for an SDK span.
+initialSdkData :: SpanKind -> Text -> SpanData
+initialSdkData kind spanName_ =
+  let
+    sdkKind :: Text
+    sdkKind =
+      case kind of
+        EntryKind        -> "entry"
+        ExitKind         -> "exit"
+        IntermediateKind -> "intermediate"
+  in
+  SpanData
+    [ SpanData.objectAnnotation "sdk"
+        [ SpanData.simpleAnnotation "name" spanName_
+        , SpanData.simpleAnnotation "type" sdkKind
+        ]
+    ]
+

@@ -7,35 +7,28 @@ Description : Describes the type of a span, either an SDK span or a
               registered span.
 -}
 module Instana.SDK.Span.SpanType
-  ( Registered (..)
+  ( RegisteredSpanType (..)
   , SpanType (SdkSpan, RegisteredSpan)
   , spanName
-  , initialData
   ) where
 
 
-import qualified Data.Aeson                as Aeson
-import           Data.String               (IsString (fromString))
-import           Data.Text                 (Text)
-import qualified Data.Text                 as T
+import           Data.String  (IsString (fromString))
+import           Data.Text    (Text)
+import qualified Data.Text    as T
 import           GHC.Generics
-
-import           Instana.SDK.Span.Span     (SpanKind (EntryKind, ExitKind, IntermediateKind))
-import           Instana.SDK.Span.SpanData (Annotation (Object),
-                                            SpanData (SpanData))
-import qualified Instana.SDK.Span.SpanData as SpanData
 
 
 -- |Differentiates between SDK spans and registered spans (which receive
 -- special treatment by Instana's processing pipeline.
 data SpanType =
     SdkSpan Text
-  | RegisteredSpan Registered
+  | RegisteredSpan RegisteredSpanType
   deriving (Eq, Generic, Show)
 
 
 -- |All registered spans that the Haskell trace SDK will produce.
-data Registered =
+data RegisteredSpanType =
     HaskellWaiServer
   | HaskellHttpClient
   deriving (Eq, Generic, Show)
@@ -48,15 +41,9 @@ spanName    (RegisteredSpan registered) = registeredSpanName registered
 
 
 -- |Returns the wire value of span.n for a registered span.
-registeredSpanName :: Registered -> Text
+registeredSpanName :: RegisteredSpanType -> Text
 registeredSpanName HaskellWaiServer  = "haskell.wai.server"
 registeredSpanName HaskellHttpClient = "haskell.http.client"
-
-
--- |Returns the initial data (span.data) for a SpanType value.
-initialData :: SpanKind -> SpanType -> SpanData
-initialData kind (SdkSpan s)     = initialSdkData kind s
-initialData _ (RegisteredSpan _) = SpanData.empty
 
 
 -- |Enables passing any string as the span type argument to SDK.startEntrySpan
@@ -64,23 +51,4 @@ initialData _ (RegisteredSpan _) = SpanData.empty
 instance IsString SpanType where
   fromString :: String -> SpanType
   fromString s = SdkSpan $ T.pack s
-
-
--- |Provides the initial data for an SDK span.
-initialSdkData :: SpanKind -> Text -> SpanData
-initialSdkData kind spanName_ =
-  let
-    sdkKind :: Text
-    sdkKind =
-      case kind of
-        EntryKind        -> "entry"
-        ExitKind         -> "exit"
-        IntermediateKind -> "intermediate"
-  in
-  SpanData
-    [ Object "sdk"
-        [ SpanData.simpleAnnotation "name" $ Aeson.String spanName_
-        , SpanData.simpleAnnotation "type" $ Aeson.String sdkKind
-        ]
-    ]
 

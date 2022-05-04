@@ -5,7 +5,7 @@ Description : An entry span
 -}
 module Instana.SDK.Span.EntrySpan
   ( EntrySpan(..)
-  , addData
+  , addAnnotation
   , addToErrorCount
   , correlationId
   , correlationType
@@ -21,6 +21,7 @@ module Instana.SDK.Span.EntrySpan
   , spanData
   , spanId
   , spanName
+  , spanType
   , synthetic
   , tpFlag
   , timestamp
@@ -39,6 +40,7 @@ import qualified Instana.SDK.Span.NonRootEntry        as NonRootEntry
 import           Instana.SDK.Span.RootEntry           (RootEntry)
 import qualified Instana.SDK.Span.RootEntry           as RootEntry
 import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
+import           Instana.SDK.Span.SpanType            (SpanType)
 
 
 -- |An entry span.
@@ -70,6 +72,14 @@ parentId entrySpan =
   case entrySpan of
     RootEntrySpan    _     -> Nothing
     NonRootEntrySpan entry -> Just $ NonRootEntry.parentId entry
+
+
+-- |Type of span (registerd span vs. SDK span)
+spanType :: EntrySpan -> SpanType
+spanType entrySpan =
+  case entrySpan of
+    RootEntrySpan entry   -> RootEntry.spanType entry
+    NonRootEntrySpan exit -> NonRootEntry.spanType exit
 
 
 -- |Name of span.
@@ -232,12 +242,14 @@ spanData entrySpan =
     NonRootEntrySpan entry -> NonRootEntry.spanData entry
 
 
--- |Add a value to the span's data section.
-addData :: Annotation-> EntrySpan -> EntrySpan
-addData value entrySpan =
+-- |Add an annotation to the span's data section. For SDK spans, the annotation
+-- is added to span.data.sdk.custom.tags, for registered spans it is added
+-- directly to span.data.
+addAnnotation :: Annotation-> EntrySpan -> EntrySpan
+addAnnotation value entrySpan =
   case entrySpan of
     RootEntrySpan    entry ->
-      RootEntrySpan $ RootEntry.addData value entry
+      RootEntrySpan $ RootEntry.addAnnotation value entry
     NonRootEntrySpan entry ->
-      NonRootEntrySpan $ NonRootEntry.addData value entry
+      NonRootEntrySpan $ NonRootEntry.addAnnotation value entry
 

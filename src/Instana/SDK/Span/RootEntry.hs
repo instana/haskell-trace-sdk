@@ -7,13 +7,14 @@ module Instana.SDK.Span.RootEntry
   ( RootEntry(..)
   , spanId
   , traceId
-  , addData
+  , addAnnotation
   , addToErrorCount
   , setServiceName
   , setCorrelationType
   , setCorrelationId
   , setSynthetic
   , setW3cTraceContext
+  , spanName
   ) where
 
 
@@ -24,6 +25,8 @@ import           Instana.SDK.Internal.Id              (Id)
 import           Instana.SDK.Internal.W3CTraceContext (W3CTraceContext)
 import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
 import qualified Instana.SDK.Span.SpanData            as SpanData
+import           Instana.SDK.Span.SpanType            (SpanType)
+import qualified Instana.SDK.Span.SpanType            as SpanType
 
 
 -- |An entry span that is the root span of a trace.
@@ -31,12 +34,10 @@ data RootEntry =
   RootEntry
     {
       -- |The trace ID and span ID (those are identical for root spans)
-      spanAndTraceId  :: Id
-      -- |The span name/type, e.g. a short string like "haskell.wai.server",
-      -- "haskell.http.client". For SDK spans this is always "sdk", the actual
-      -- name is then in span.data.sdk.name.
-    , spanName        :: Text
-      -- |The time the span (and trace) started
+       spanAndTraceId :: Id
+      -- |The type of the span (SDK span or registerd span)
+     , spanType       :: SpanType
+     -- |The time the span (and trace) started
     , timestamp       :: Int
       -- |The number of errors that occured during processing
     , errorCount      :: Int
@@ -55,6 +56,13 @@ data RootEntry =
     , w3cTraceContext :: Maybe W3CTraceContext
 
     } deriving (Eq, Generic, Show)
+
+
+-- |The span name/type, e.g. a short string like "haskell.wai.server",
+-- "haskell.http.client". For SDK spans this is always "sdk", the actual
+-- name is then in span.data.sdk.name.
+spanName :: RootEntry -> Text
+spanName = SpanType.spanName . spanType
 
 
 -- |Accessor for the trace ID.
@@ -106,8 +114,10 @@ setCorrelationId correlationId_ rootEntry =
   rootEntry { correlationId = Just correlationId_ }
 
 
--- |Add a value to the span's data section.
-addData :: Annotation -> RootEntry -> RootEntry
-addData annotation rootEntry =
+-- |Add an annotation to the span's data section. For SDK spans, the annotation
+-- is added to span.data.sdk.custom.tags, for registered spans it is added
+-- directly to span.data.
+addAnnotation :: Annotation -> RootEntry -> RootEntry
+addAnnotation annotation rootEntry =
   rootEntry { spanData = SpanData.merge annotation $ spanData rootEntry }
 

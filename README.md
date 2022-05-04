@@ -155,7 +155,7 @@ All functions starting with `with` accept (among other parameters) an IO action.
 
 #### Best Practices
 
-Make sure you have read Instana's [docs on custom tracing](https://docs.instana.io/quick_start/custom_tracing/#tips--best-practices) and in particular the [best practices section](https://docs.instana.io/quick_start/custom_tracing/#tips--best-practices). This documentation contains a lot of useful info for integrating Instana tracing into your code; among other things, it explains which [metadata](https://docs.instana.io/quick_start/custom_tracing/#list-of-processed-tags) can be added to spans (via `InstanaSDK.addTag` and `InstanaSDK.addTagAt`).
+Make sure you have read Instana's [docs on custom tracing](https://docs.instana.io/quick_start/custom_tracing/#tips--best-practices) and in particular the [best practices section](https://docs.instana.io/quick_start/custom_tracing/#tips--best-practices). This documentation contains a lot of useful info for integrating Instana tracing into your code; among other things, it explains which [annotations](https://docs.instana.io/quick_start/custom_tracing/#list-of-processed-tags) can be added to spans (via `InstanaSDK.addAnnotation`, `InstanaSDK.addAnnotationAt`, and `InstanaSDK.addAnnotationValueAt`).
 
 Instana differentiates between so-called registered spans and SDK spans. Registered spans are usually created by automatic tracing and there is specialized handling for each registered in Instana's processing pipeline. SDK spans, in contrast, are the type of spans created by using a trace SDK (like the Haskell trace SDK or other, similar SDKs for other runtime platforms). SDK span are processed in a more generic fashion by Instana's processing pipeline.
 

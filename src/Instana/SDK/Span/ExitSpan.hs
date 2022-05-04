@@ -7,10 +7,11 @@ module Instana.SDK.Span.ExitSpan
   ( ExitSpan(..)
   , parentId
   , traceId
-  , addData
+  , addAnnotation
   , addToErrorCount
   , setServiceName
   , setW3cTraceContext
+  , spanName
   ) where
 
 
@@ -23,6 +24,8 @@ import           Instana.SDK.Span.EntrySpan           (EntrySpan)
 import qualified Instana.SDK.Span.EntrySpan           as EntrySpan
 import           Instana.SDK.Span.SpanData            (Annotation, SpanData)
 import qualified Instana.SDK.Span.SpanData            as SpanData
+import           Instana.SDK.Span.SpanType            (SpanType)
+import qualified Instana.SDK.Span.SpanType            as SpanType
 
 
 -- |An exit span.
@@ -33,10 +36,8 @@ data ExitSpan  =
       parentSpan      :: EntrySpan
       -- |The span ID
     , spanId          :: Id
-      -- |The span name/type, e.g. a short string like "haskell.wai.server",
-      -- "haskell.http.client". For SDK spans this is always "sdk", the actual
-      -- name is then in span.data.sdk.name.
-    , spanName        :: Text
+      -- |The type of the span (SDK span or registerd span)
+    , spanType        :: SpanType
       -- |The time the span started
     , timestamp       :: Int
       -- |An attribute for overriding the name of the service in Instana
@@ -50,6 +51,13 @@ data ExitSpan  =
       -- spans always have an associated W3C trace context.
     , w3cTraceContext :: W3CTraceContext
     } deriving (Eq, Generic, Show)
+
+
+-- |The span name/type, e.g. a short string like "haskell.wai.server",
+-- "haskell.http.client". For SDK spans this is always "sdk", the actual
+-- name is then in span.data.sdk.name.
+spanName :: ExitSpan -> Text
+spanName = SpanType.spanName . spanType
 
 
 -- |Accessor for the trace ID.
@@ -85,8 +93,10 @@ setW3cTraceContext w3cTraceContext_ exitSpan =
   exitSpan { w3cTraceContext = w3cTraceContext_ }
 
 
--- |Add a value to the span's data section.
-addData :: Annotation -> ExitSpan -> ExitSpan
-addData annotation exitSpan =
+-- |Add an annotation to the span's data section. For SDK spans, the annotation
+-- is added to span.data.sdk.custom.tags, for registered spans it is added
+-- directly to span.data.
+addAnnotation :: Annotation -> ExitSpan -> ExitSpan
+addAnnotation annotation exitSpan =
   exitSpan { spanData = SpanData.merge annotation $ spanData exitSpan }
 

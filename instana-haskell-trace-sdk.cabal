@@ -212,6 +212,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.Span.ExitSpan
       Instana.SDK.Span.NonRootEntry
       Instana.SDK.Span.RootEntry
+      Instana.SDK.Span.SpanType
   default-language: Haskell2010
 
 
