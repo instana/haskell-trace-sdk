@@ -12,6 +12,8 @@ if [ ! -f "$cabal_file" ]; then
   exit 1
 fi
 
+dir=$(mktemp -d build-docs.XXXXXX)
+
 # Don't even ask. For some reason, when building the Haddock docs, we need to
 # change unsafeFdSocket to fdSocket. We will revert this change when we
 # are done.
@@ -21,8 +23,16 @@ else
   sed -i 's/Socket.unsafeFdSocket socket/Socket.fdSocket socket/g' src/Instana/SDK/SDK.hs
 fi
 
-dir=$(mktemp -d build-docs.XXXXXX)
-trap 'rm -r "$dir"' EXIT
+cleanup () {
+  rm -r "$dir"
+  if [[ $(uname -s) = "Darwin" ]]; then
+    sed -i '' 's/Socket.fdSocket socket/Socket.unsafeFdSocket socket/g' src/Instana/SDK/SDK.hs
+  else
+    sed -i 's/Socket.fdSocket socket/Socket.unsafeFdSocket socket/g' src/Instana/SDK/SDK.hs
+  fi
+}
+
+trap cleanup EXIT
 
 export PATH=$(stack path --bin-path)
 
@@ -34,6 +44,7 @@ cabal --version
 
 cabal v2-haddock --builddir="$dir" --haddock-for-hackage --enable-doc
 
+# check credentials in ~/.cabal/config if this fails with "Error: Username or password incorrect"
 cabal upload -d --publish $dir/*-docs.tar.gz
 
 if [ $(uname -s) = "Darwin" ]; then
