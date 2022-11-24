@@ -32,15 +32,26 @@ allTests =
     , TestLabel "shouldAddTwoAtSameNestedPath" shouldAddTwoAtSameNestedPath
     , TestLabel "shouldAddMultipleRegistered" shouldAddMultipleRegistered
     , TestLabel "shouldMergeListValues" shouldMergeListValues
-    , TestLabel "shouldWrapAnnotationsInSdkCustomTagsForSdkSpans" shouldWrapAnnotationsInSdkCustomTagsForSdkSpans
-    , TestLabel "shouldConvertToSimpleSpanFormat" shouldConvertToSimpleSpanFormat
+    , TestLabel
+        "shouldWrapAnnotationsInSdkCustomTagsForSdkSpans"
+        shouldWrapAnnotationsInSdkCustomTagsForSdkSpans
+    , TestLabel
+        "shouldConvertToSimpleSpanFormat"
+        shouldConvertToSimpleSpanFormat
+    , TestLabel "shouldAddAnnotationAt" shouldAddAnnotationAt
+    , TestLabel
+        "shouldAddAnnotationAtToExistingKey"
+        shouldAddAnnotationAtToExistingKey
+    , TestLabel
+        "shouldAddAnnotationAtToDeeplyNestedExistingKey"
+        shouldAddAnnotationAtToDeeplyNestedExistingKey
     ]
 
 
 shouldAddStringNotNested :: Test
 shouldAddStringNotNested =
   let
-    span_ = Span.addAnnotationAt "path" ("value" :: String) $ registeredEntrySpan
+    span_ = Span.addJsonValueAt "path" ("value" :: String) $ registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -55,7 +66,7 @@ shouldAddStringNested :: Test
 shouldAddStringNested =
   let
     span_ =
-      Span.addAnnotationAt
+      Span.addJsonValueAt
         "nested.path"
         ("value" :: String) $
           registeredEntrySpan
@@ -75,7 +86,7 @@ shouldAddStringDeeplyNested :: Test
 shouldAddStringDeeplyNested =
   let
     span_ =
-      Span.addAnnotationAt
+      Span.addJsonValueAt
         "really.deeply.nested.path"
         ("deeplyNestedValue" :: String)
         registeredEntrySpan
@@ -99,7 +110,7 @@ shouldAddIntDeeplyNested :: Test
 shouldAddIntDeeplyNested =
   let
     span_ =
-      Span.addAnnotationAt
+      Span.addJsonValueAt
         "really.deeply.nested.path"
         (42 :: Int) $
           registeredEntrySpan
@@ -123,7 +134,7 @@ shouldAddDoubleDeeplyNested :: Test
 shouldAddDoubleDeeplyNested =
   let
     span_ =
-      Span.addAnnotationAt
+      Span.addJsonValueAt
         "really.deeply.nested.path"
         (28.08 :: Double) $
           registeredEntrySpan
@@ -146,7 +157,7 @@ shouldAddDoubleDeeplyNested =
 shouldAddBooleanDeeplyNested :: Test
 shouldAddBooleanDeeplyNested =
   let
-    span_ = Span.addAnnotationAt "really.deeply.nested.path" True $ registeredEntrySpan
+    span_ = Span.addJsonValueAt "really.deeply.nested.path" True $ registeredEntrySpan
     spanData = Span.spanData span_
   in
   TestCase $
@@ -167,8 +178,8 @@ shouldAddTwoAtDifferentPaths :: Test
 shouldAddTwoAtDifferentPaths =
   let
     span_ =
-      Span.addAnnotationAt "nested2.key" (2 :: Int) $
-      Span.addAnnotationAt "nested1.key" (1 :: Int) $
+      Span.addJsonValueAt "nested2.key" (2 :: Int) $
+      Span.addJsonValueAt "nested1.key" (1 :: Int) $
       registeredEntrySpan
     spanData = Span.spanData span_
   in
@@ -188,8 +199,8 @@ shouldAddTwoAtSamePath :: Test
 shouldAddTwoAtSamePath =
   let
     span_ =
-      Span.addAnnotationAt "nested.key2" (2 :: Int) $
-      Span.addAnnotationAt "nested.key1" (1 :: Int) $
+      Span.addJsonValueAt "nested.key2" (2 :: Int) $
+      Span.addJsonValueAt "nested.key1" (1 :: Int) $
       registeredEntrySpan
     spanData = Span.spanData span_
   in
@@ -209,8 +220,8 @@ shouldAddTwoAtSameNestedPath :: Test
 shouldAddTwoAtSameNestedPath =
   let
     span_ =
-      Span.addAnnotationAt "nested.deeper.key2" (2 :: Int) $
-      Span.addAnnotationAt "nested.deeper.key1" (1 :: Int) $
+      Span.addJsonValueAt "nested.deeper.key2" (2 :: Int) $
+      Span.addJsonValueAt "nested.deeper.key1" (1 :: Int) $
       registeredEntrySpan
     spanData = Span.spanData span_
   in
@@ -232,13 +243,13 @@ shouldAddMultipleRegistered :: Test
 shouldAddMultipleRegistered =
   let
     span_ =
-      Span.addAnnotationAt "nested.key3" (12.07 :: Double) $
-      Span.addAnnotationAt "nested.key2" (2 :: Int) $
-      Span.addAnnotationAt "nested.key1" ("value.n.1" :: String) $
-      Span.addAnnotationAt "list" (["one", "two", "three"] :: [String]) $
-      Span.addAnnotationAt "key3" (16.04 :: Double) $
-      Span.addAnnotationAt "key2" (13 :: Int) $
-      Span.addAnnotationAt "key1" ("value1" :: String) $
+      Span.addJsonValueAt "nested.key3" (12.07 :: Double) $
+      Span.addJsonValueAt "nested.key2" (2 :: Int) $
+      Span.addJsonValueAt "nested.key1" ("value.n.1" :: String) $
+      Span.addJsonValueAt "list" (["one", "two", "three"] :: [String]) $
+      Span.addJsonValueAt "key3" (16.04 :: Double) $
+      Span.addJsonValueAt "key2" (13 :: Int) $
+      Span.addJsonValueAt "key1" ("value1" :: String) $
       registeredEntrySpan
     spanData = Span.spanData span_
   in
@@ -285,12 +296,12 @@ shouldWrapAnnotationsInSdkCustomTagsForSdkSpans :: Test
 shouldWrapAnnotationsInSdkCustomTagsForSdkSpans =
   let
     span_ =
-      Span.addAnnotationAt "nested.key3" (12.07 :: Double) $
-      Span.addAnnotationAt "nested.key2" (2 :: Int) $
-      Span.addAnnotationAt "nested.key1" ("value.n.1" :: String) $
-      Span.addAnnotationAt "key3" (16.04 :: Double) $
-      Span.addAnnotationAt "key2" (13 :: Int) $
-      Span.addAnnotationAt "key1" ("value1" :: String) $
+      Span.addJsonValueAt "nested.key3" (12.07 :: Double) $
+      Span.addJsonValueAt "nested.key2" (2 :: Int) $
+      Span.addJsonValueAt "nested.key1" ("value.n.1" :: String) $
+      Span.addJsonValueAt "key3" (16.04 :: Double) $
+      Span.addJsonValueAt "key2" (13 :: Int) $
+      Span.addJsonValueAt "key1" ("value1" :: String) $
       sdkEntrySpan
     spanData = Span.spanData span_
   in
@@ -320,7 +331,7 @@ shouldConvertToSimpleSpanFormat :: Test
 shouldConvertToSimpleSpanFormat =
   let
     span_ =
-      Span.addAnnotationAt "really.deeply.nested.path" True registeredEntrySpan
+      Span.addJsonValueAt "really.deeply.nested.path" True registeredEntrySpan
     simple = SimpleSpan.convert span_
     traceId = SimpleSpan.traceId simple
     spanId = SimpleSpan.spanId simple
@@ -351,6 +362,75 @@ shouldConvertToSimpleSpanFormat =
           ]
         ]
       )
+      spanData
+
+
+shouldAddAnnotationAt :: Test
+shouldAddAnnotationAt =
+  let
+    span_ =
+      Span.addAnnotationAt
+        "parent"
+        (SpanData.simpleAnnotation "key" ("value" :: String)) $
+      registeredEntrySpan
+    spanData = Span.spanData span_
+  in
+  TestCase $
+    assertEqual "shouldAddAnnotationAt"
+      (SpanData [
+        SpanData.objectAnnotation "parent" [
+          SpanData.simpleAnnotation "key" ("value" :: String)
+        ]
+      ])
+      spanData
+
+
+shouldAddAnnotationAtToExistingKey :: Test
+shouldAddAnnotationAtToExistingKey =
+  let
+    span_ =
+      Span.addAnnotationAt
+        "nested"
+        (SpanData.simpleAnnotation "key3" ("value" :: String)) $
+      Span.addJsonValueAt "nested.key2" (2 :: Int) $
+      Span.addJsonValueAt "nested.key1" (1 :: Int) $
+      registeredEntrySpan
+    spanData = Span.spanData span_
+  in
+  TestCase $
+    assertEqual "shouldAddAnnotationAtToExistingKey"
+      (SpanData [
+        SpanData.objectAnnotation "nested"
+          [ SpanData.simpleAnnotation "key1" (1 :: Int)
+          , SpanData.simpleAnnotation "key2" (2 :: Int)
+          , SpanData.simpleAnnotation "key3" ("value" :: String)
+          ]
+      ])
+      spanData
+
+
+shouldAddAnnotationAtToDeeplyNestedExistingKey :: Test
+shouldAddAnnotationAtToDeeplyNestedExistingKey =
+  let
+    span_ =
+      Span.addAnnotationAt
+        "nested.deeper"
+        (SpanData.simpleAnnotation "key3" ("value" :: String)) $
+      Span.addJsonValueAt "nested.deeper.key2" (2 :: Int) $
+      Span.addJsonValueAt "nested.deeper.key1" (1 :: Int) $
+      registeredEntrySpan
+    spanData = Span.spanData span_
+  in
+  TestCase $
+    assertEqual "shouldAddAnnotationAtToExistingKey"
+      (SpanData [
+        SpanData.objectAnnotation "nested" [
+          SpanData.objectAnnotation "deeper"
+            [ SpanData.simpleAnnotation "key1" (1 :: Int)
+            , SpanData.simpleAnnotation "key2" (2 :: Int)
+            , SpanData.simpleAnnotation "key3" ("value" :: String) ]
+        ]
+      ])
       spanData
 
 

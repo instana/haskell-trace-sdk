@@ -1,5 +1,15 @@
 # Changelog for instana-haskell-trace-sdk
 
+## Unreleased
+- Fix format of annotation span.data.http.header - it is now a JSON object instead of an array of arrays.
+- BREAKING: Rename confusingly named `Instana.SDK.addAnnotationAt` to `Instana.SDK.addJsonValueAt`, because it actually takes a JSON value. `Instana.SDK.addAnnotationAt` still exists, but takes an actual `Instana.SDK.Span.SpanData.Annotation` value as its argument now, see below.
+- Provide additional functions to add annotations:
+  - `Instana.SDK.addAnnotationAt` which takes a path and an `Instana.SDK.Span.SpanData.Annotation` value
+  - `Instana.SDK.addAnnotationToEntrySpan`, which has the same signature as `addAnnotation` but always unconditionally adds the annotation to the entry span, even if an intermediate or exit span is currently active
+  - `Instana.SDK.addAnnotationToEntrySpanAt`, which has the same signature as `addAnnotationAt` but always unconditionally adds the annotation to the entry span, even if an intermediate or exit span is currently active
+  - `Instana.SDK.addAnnotationValueToEntrySpanAt`, which has the same signature as `addAnnotationValueAt` but always unconditionally adds the annotation to the entry span, even if an intermediate or exit span is currently active
+  - `Instana.SDK.addJsonValueToEntrySpanAt`, which has the same signature as `addAnnotationJsonValueAt` but always unconditionally adds the annotation to the entry span, even if an intermediate or exit span is currently active.
+
 ## 0.8.0.0
 - Fix: Apply secrets config from agent configuration.
 - Fix: Redact secrets from query parameters instead of removing them.

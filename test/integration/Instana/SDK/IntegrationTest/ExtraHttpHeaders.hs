@@ -45,10 +45,10 @@ entrySpanDataAsserts entrySpan =
           , "host"   .= ("127.0.0.1:1207" :: String)
           , "url"    .= ("/http/bracket/api" :: String)
           , "status" .= (200 :: Int)
-          , "header" .= (
-            [ ("X-Response-Header-On-Entry", "response header on entry value")
-            , ("X-Request-Header-On-Entry", "request header on entry value")
-            ] :: [(String, String)])
+          , "header" .= (Aeson.object
+            [ "X-Response-Header-On-Entry" .= ("response header on entry value" :: String)
+            , "X-Request-Header-On-Entry"  .= ("request header on entry value" :: String)
+            ])
           ]
         )
       ]
@@ -66,10 +66,10 @@ exitSpanDataAsserts exitSpan =
           , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
           , "status" .= (200 :: Int)
           , "params" .= ("some=query&parameters=2&pass=<redacted>" :: String)
-          , "header" .= (
-            [ ("X-Request-Header-On-Exit", "request header on exit value")
-            , ("X-Response-Header-On-Exit", "response header on exit value")
-            ] :: [(String, String)])
+          , "header" .= (Aeson.object
+            [ "X-Request-Header-On-Exit"  .= ("request header on exit value" :: String)
+            , "X-Response-Header-On-Exit" .= ("response header on exit value" :: String)
+            ])
           ]
         )
       ]
