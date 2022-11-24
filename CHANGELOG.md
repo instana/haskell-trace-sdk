@@ -9,6 +9,7 @@
   - `Instana.SDK.addAnnotationToEntrySpanAt`, which has the same signature as `addAnnotationAt` but always unconditionally adds the annotation to the entry span, even if an intermediate or exit span is currently active
   - `Instana.SDK.addAnnotationValueToEntrySpanAt`, which has the same signature as `addAnnotationValueAt` but always unconditionally adds the annotation to the entry span, even if an intermediate or exit span is currently active
   - `Instana.SDK.addJsonValueToEntrySpanAt`, which has the same signature as `addAnnotationJsonValueAt` but always unconditionally adds the annotation to the entry span, even if an intermediate or exit span is currently active.
+- Remove stability=experimental from cabal file.
 
 ## 0.8.0.0
 - Fix: Apply secrets config from agent configuration.
