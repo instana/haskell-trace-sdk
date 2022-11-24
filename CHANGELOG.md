@@ -1,6 +1,6 @@
 # Changelog for instana-haskell-trace-sdk
 
-## Unreleased
+## 0.9.0.0
 - Fix format of annotation span.data.http.header - it is now a JSON object instead of an array of arrays.
 - BREAKING: Rename confusingly named `Instana.SDK.addAnnotationAt` to `Instana.SDK.addJsonValueAt`, because it actually takes a JSON value. `Instana.SDK.addAnnotationAt` still exists, but takes an actual `Instana.SDK.Span.SpanData.Annotation` value as its argument now, see below.
 - Provide additional functions to add annotations:
