@@ -163,9 +163,9 @@ simulateExitCallWithTags instana = do
   threadDelay $ 10 * 1000
   InstanaSDK.addToErrorCount instana 2
   addAnnotations instana (moreSpanData "exit")
-  InstanaSDK.addAnnotationAt instana "nested.key1" ("nested.text.value1" :: String)
-  InstanaSDK.addAnnotationAt instana "nested.key2" ("nested.text.value2" :: String)
-  InstanaSDK.addAnnotationAt instana "nested.key3" (1604 :: Int)
+  InstanaSDK.addJsonValueAt instana "nested.key1" ("nested.text.value1" :: String)
+  InstanaSDK.addJsonValueAt instana "nested.key2" ("nested.text.value2" :: String)
+  InstanaSDK.addJsonValueAt instana "nested.key3" (1604 :: Int)
   return "exit done"
 
 
@@ -274,7 +274,7 @@ lowLevelApiWithTags instana respond = do
   result <- doExitCallWithTags instana
   InstanaSDK.incrementErrorCount instana
   addAnnotations instana (moreSpanData "entry")
-  InstanaSDK.addAnnotationAt
+  InstanaSDK.addJsonValueAt
     instana "nested.entry.key" ("nested.entry.value" :: String)
   InstanaSDK.completeEntry instana
   respondWithPlainText respond result
@@ -289,7 +289,7 @@ doExitCallWithTags instana = do
   result <- simulateExitCall
   InstanaSDK.incrementErrorCount instana
   addAnnotations instana (moreSpanData "exit")
-  InstanaSDK.addAnnotationAt instana "nested.exit.key" ("nested.exit.value" :: String)
+  InstanaSDK.addJsonValueAt instana "nested.exit.key" ("nested.exit.value" :: String)
   InstanaSDK.completeExit instana
   return result
 

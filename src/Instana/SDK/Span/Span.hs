@@ -10,6 +10,7 @@ module Instana.SDK.Span.Span
   , addAnnotation
   , addAnnotationAt
   , addAnnotationValueAt
+  , addJsonValueAt
   , addToErrorCount
   , correlationId
   , correlationType
@@ -286,19 +287,16 @@ addAnnotation annotation span_ =
     Exit exit   -> Exit $ ExitSpan.addAnnotation wrappedAnnotation exit
 
 
--- |Add a simple value (string, boolean, number) at the given path to the span's
--- data section.
-addAnnotationAt :: ToJSON a => Text -> a -> Span -> Span
-addAnnotationAt path value span_ =
+-- |Add an annotation at the given path to the span's data section.
+addAnnotationAt :: Text -> Annotation -> Span -> Span
+addAnnotationAt path annotation span_ =
   let
-    pathSegments = T.splitOn "." path
-    lastPathSegment = List.last pathSegments
-    pathPrefix = List.take (List.length pathSegments - 1) pathSegments
+    pathPrefix = T.splitOn "." path
     newData = List.foldr
       (\nextPathSegment accumulated ->
         SpanData.objectAnnotation nextPathSegment [accumulated]
       )
-      (SpanData.simpleAnnotation lastPathSegment value)
+      annotation
       pathPrefix
   in
   addAnnotation newData span_
@@ -322,6 +320,14 @@ addAnnotationValueAt path value span_ =
       pathPrefix
   in
   addAnnotation newData span_
+
+
+-- |Add a simple value (string, boolean, number) at the given path to the span's
+-- data section. Should not be used for objects or lists in case you intend to
+-- merge them with additional values at the same path later.
+addJsonValueAt :: ToJSON a => Text -> a -> Span -> Span
+addJsonValueAt path value span_ =
+  addAnnotationValueAt path (SpanData.simpleValue value) span_
 
 
 wrapAnnotationIfNecessary :: Span -> Annotation -> Annotation

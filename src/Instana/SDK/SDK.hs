@@ -13,8 +13,13 @@ module Instana.SDK.SDK
     , InstanaContext
     , addAnnotation
     , addAnnotationAt
+    , addAnnotationToEntrySpan
+    , addAnnotationToEntrySpanAt
     , addAnnotationValueAt
+    , addAnnotationValueToEntrySpanAt
     , addHttpTracingHeaders
+    , addJsonValueAt
+    , addJsonValueToEntrySpanAt
     , addToErrorCount
     , addWebsiteMonitoringBackEndCorrelation
     , agentHost
@@ -848,7 +853,7 @@ addHttpData context request synthetic = do
     httpAnnotations' =
       case capturedHeaders of
         Just headers ->
-          httpAnnotations ++ [SpanData.listAnnotation "header" headers]
+          (SpanData.objectAnnotation "header" headers) : httpAnnotations
         Nothing ->
           httpAnnotations
 
@@ -859,17 +864,22 @@ addHttpData context request synthetic = do
 collectHeaders ::
   [CI BSC8.ByteString]
   -> [HTTPTypes.Header]
-  -> Maybe [(String, String)]
+  -> Maybe [Annotation]
 collectHeaders extraHeadersConfig allHeaders =
   let
-    all2 = allHeaders
-    filtered = filterHeaders extraHeadersConfig all2
-    serialized =
+    filtered = filterHeaders extraHeadersConfig allHeaders
+    listOfStringTuples =
       fmap
         (\(name, value) -> (BSC8.unpack $ CI.original name, BSC8.unpack value))
         filtered
+    headersAsAnnotations =
+      fmap
+        (\(name, value) -> SpanData.simpleAnnotation (T.pack name) value)
+        listOfStringTuples
   in
-  if null serialized then Nothing else Just serialized
+  if null headersAsAnnotations
+    then Nothing
+    else Just $ headersAsAnnotations
 
 
 filterHeaders :: [CI BSC8.ByteString] -> [HTTPTypes.Header] -> [HTTPTypes.Header]
@@ -970,11 +980,11 @@ captureHttpStatusUnlifted context response = do
   let
     (HTTPTypes.Status statusCode statusMessage) =
       Wai.responseStatus response
-  addAnnotationToEntrySpanAt context "http.status" $
+  addAnnotationValueToEntrySpanAt context "http.status" $
     SpanData.simpleValue statusCode
   when
     (statusCode >= 500 )
-    (addAnnotationAt context "http.message" $
+    (addAnnotationValueToEntrySpanAt context "http.message" $
       SpanData.simpleValue $ BSC8.unpack statusMessage
     )
 
@@ -1015,8 +1025,8 @@ captureResponseHeadersUnlifted context response = do
     (do
        let
          Just headers = capturedHeaders
-       addAnnotationValueToEntrySpanAt context "http.header" $
-         SpanData.listValue headers
+       addAnnotationToEntrySpanAt context "http" $
+         SpanData.objectAnnotation "header" headers
     )
 
 
@@ -1163,16 +1173,16 @@ startHttpExit context request = do
                 collectHeaders extraHeadersConfig $
                   HTTP.responseHeaders res
 
-            addAnnotationAt context "http.status" $
+            addAnnotationValueAt context "http.status" $
               SpanData.simpleValue status
 
             when
               (Maybe.isJust capturedResponseHeaders)
               (do
                  let
-                   Just responseHeaders = capturedResponseHeaders
-                 addAnnotationValueAt context "http.header" $
-                   SpanData.listValue responseHeaders
+                   Just headers = capturedResponseHeaders
+                 addAnnotationAt context "http" $
+                     SpanData.objectAnnotation "header" headers
               )
 
             originalCheckResponse req res
@@ -1192,8 +1202,8 @@ startHttpExit context request = do
       ]
     httpAnnotations' =
       case capturedRequestHeaders of
-        Just requestHeaders ->
-          httpAnnotations ++ [SpanData.listAnnotation "header" requestHeaders]
+        Just headers ->
+          (SpanData.objectAnnotation "header" headers) : httpAnnotations
         Nothing ->
           httpAnnotations
 
@@ -1374,35 +1384,37 @@ setSynthetic context synthetic =
 
 -- |Adds an annotation to the currently active span. Call this between
 -- startEntry/startRootEntry/startExit and completeEntry/completeExit or
--- inside the IO action given to withEntry/withExit/withRootEntry.
--- The given path can be a nested path, with path fragments separated by dots,
--- like "http.url". This will result in
--- "data": {
---   ...
---   "http": {
---     "url": "..."
---   },
---   ...
--- }
-addAnnotationAt ::
-  (MonadIO m, ToJSON a) =>
-  InstanaContext
-  -> Text
-  -> a
-  -> m ()
-addAnnotationAt context path value =
-  liftIO $ modifyCurrentSpan context
-    (\span_ -> Span.addAnnotationAt path value span_)
-
-
--- |Adds an annotation to the currently active span. Call this between
--- startEntry/startRootEntry/startExit and completeEntry/completeExit or
 -- inside the IO action given to with withEntry/withExit/withRootEntry. Can be
 -- called multiple times, data from multiple calls will be merged.
 addAnnotation :: MonadIO m => InstanaContext -> Annotation -> m ()
 addAnnotation context annotation =
   liftIO $ modifyCurrentSpan context
     (\span_ -> Span.addAnnotation annotation span_)
+
+
+-- |Adds an annotation to the currently active span. Call this between
+-- startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to withEntry/withExit/withRootEntry.
+-- The given path can be a nested path, with path fragments separated by dots,
+-- like "http.url". This will result in
+-- "data": {
+--   ...
+--   "http": {
+--     "url": {
+--       "key_from_the_provided_annotation_value": ...
+--     }
+--   },
+--   ...
+-- }
+addAnnotationAt ::
+  MonadIO m =>
+  InstanaContext
+  -> Text
+  -> Annotation
+  -> m ()
+addAnnotationAt context path value =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addAnnotationAt path value span_)
 
 
 -- |Adds an annotation with the given value to the currently active span. Call
@@ -1428,23 +1440,90 @@ addAnnotationValueAt context path value =
     (\span_ -> Span.addAnnotationValueAt path value span_)
 
 
--- |Adds an additional annotation to the currently active entry span, even if
--- the currently active span is an exit child of that entry span.
-addAnnotationToEntrySpanAt ::
+-- |Adds a simple value (string, boolean, number) to the currently active span's
+-- data section. Should not be used for objects or lists in case you intend to
+-- merge them with additional values at the same path later. Call this between
+-- startEntry/startRootEntry/startExit and completeEntry/completeExit or
+-- inside the IO action given to withEntry/withExit/withRootEntry.
+-- The given path can be a nested path, with path fragments separated by dots,
+-- like "http.url". This will result in
+-- "data": {
+--   ...
+--   "http": {
+--     "url": "..."
+--   },
+--   ...
+-- }
+addJsonValueAt ::
   (MonadIO m, ToJSON a) =>
   InstanaContext
   -> Text
   -> a
   -> m ()
-addAnnotationToEntrySpanAt context path value =
-  liftIO $ modifyCurrentEntrySpan context
-    (\span_ -> Span.addAnnotationAt path value span_)
+addJsonValueAt context path value =
+  liftIO $ modifyCurrentSpan context
+    (\span_ -> Span.addJsonValueAt path value span_)
 
 
 -- |Adds an additional annotation to the currently active entry span, even if
--- the currently active span is an exit child of that entry span.
+-- the currently active span is an intermediate or exit child of that entry
+-- span. Call this between startEntry/startRootEntry/startExit and
+-- completeEntry/completeExit or inside the IO action given to with
+-- withEntry/withExit/withRootEntry. Can be called multiple times, data from
+-- multiple calls will be merged.
+addAnnotationToEntrySpan ::
+  MonadIO m =>
+  InstanaContext
+  -> Annotation
+  -> m ()
+addAnnotationToEntrySpan context annotation =
+  liftIO $ modifyCurrentEntrySpan context
+    (\span_ -> Span.addAnnotation annotation span_)
+
+
+-- |Adds an additional annotation to the currently active entry span, even if
+-- the currently active span is an intermediate or exit child of that entry
+-- span. Call this between startEntry/startRootEntry/startExit and
+-- completeEntry/completeExit or inside the IO action given to with
+-- withEntry/withExit/withRootEntry. Can be called multiple times, data from
+-- multiple calls will be merged. The given path can be a nested path, with path
+-- fragments separated by dots, like "http.url". This will result in
+-- "data": {
+--   ...
+--   "http": {
+--     "url": {
+--       "key_from_the_provided_annotation_value": ...
+--     }
+--   },
+--   ...
+-- }
+addAnnotationToEntrySpanAt ::
+  MonadIO m =>
+  InstanaContext
+  -> Text
+  -> Annotation
+  -> m ()
+addAnnotationToEntrySpanAt context path annotation =
+  liftIO $ modifyCurrentEntrySpan context
+    (\span_ -> Span.addAnnotationAt path annotation span_)
+
+
+-- |Adds an additional annotation value to the currently active entry span, even
+-- if the currently active span is an intermediate or exit child of that entry
+-- span. Call this between startEntry/startRootEntry/startExit and
+-- completeEntry/completeExit or inside the IO action given to with
+-- withEntry/withExit/withRootEntry. Can be called multiple times, data from
+-- multiple calls will be merged. The given path can be a nested path, with path
+-- fragments separated by dots, like "http.url". This will result in
+-- "data": {
+--   ...
+--   "http": {
+--     "url": "..."
+--   },
+--   ...
+-- }
 addAnnotationValueToEntrySpanAt ::
-  (MonadIO m) =>
+  MonadIO m =>
   InstanaContext
   -> Text
   -> AnnotationValue
@@ -1452,6 +1531,34 @@ addAnnotationValueToEntrySpanAt ::
 addAnnotationValueToEntrySpanAt context path value =
   liftIO $ modifyCurrentEntrySpan context
     (\span_ -> Span.addAnnotationValueAt path value span_)
+
+
+-- |Adds an additional annotation from a simple JSON value (string, number,
+-- boolean) to the currently active entry span, even if
+-- the currently active span is an intermediate or exit child of that entry
+-- span. Should not be used for objects or lists in case you intend to merge
+-- them with additional values at the same path later. Call this between
+-- startEntry/startRootEntry/startExit and completeEntry/completeExit or inside
+-- the IO action given to with withEntry/withExit/withRootEntry. Can be called
+-- multiple times, data from  multiple calls will be merged.
+-- The given path can be a nested path, with path fragments separated by dots,
+-- like "http.url". This will result in
+-- "data": {
+--   ...
+--   "http": {
+--     "url": "..."
+--   },
+--   ...
+-- }
+addJsonValueToEntrySpanAt ::
+  (MonadIO m, ToJSON a) =>
+  InstanaContext
+  -> Text
+  -> a
+  -> m ()
+addJsonValueToEntrySpanAt context path value =
+  liftIO $ modifyCurrentEntrySpan context
+    (\span_ -> Span.addJsonValueAt path value span_)
 
 
 -- |Adds the Instana tracing headers
@@ -1729,8 +1836,8 @@ mapCurrentSpan fn stack =
 
 
 -- |Applies the given function to the currently active entry span, even if the
--- currently active span is an exit child of that entry span. The entry span
--- will be replaced with the result of the given function.
+-- currently active span is an intermediate or exit child of that entry span.
+-- The entry span will be replaced with the result of the given function.
 modifyCurrentEntrySpan ::
   InstanaContext
   -> (Span -> Span)
@@ -1749,7 +1856,7 @@ modifyCurrentEntrySpan context fn = do
 
 
 -- |Applies the given function to the entry span (if present) on the given span
--- stack, even if there is already an exit span on top of it.
+-- stack, even if there is already an intermediate or exit span on top of it.
 mapCurrentEntrySpan :: (Span -> Span) -> Maybe SpanStack -> SpanStack
 mapCurrentEntrySpan fn stack =
   Maybe.fromMaybe
