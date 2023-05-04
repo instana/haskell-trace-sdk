@@ -5,6 +5,7 @@ module Main where
 import           Control.Concurrent           (threadDelay)
 import           Control.Monad.IO.Class       (liftIO)
 import qualified Data.Binary.Builder          as Builder
+import qualified Data.ByteString.Char8        as BS
 import qualified Data.ByteString.Lazy.Char8   as LBSC8
 import           Instana.SDK.SDK              (InstanaContext)
 import qualified Instana.SDK.SDK              as InstanaSDK
@@ -31,12 +32,8 @@ appLogger :: String
 appLogger = "WaiWithMiddleware"
 
 
-downstreamUrl :: String
-downstreamUrl = "http://127.0.0.1:1208/echo?" ++
-                  "some=query&" ++
-                  "parameters=2&" ++
-                  "pass=secret" ++
-                  "will-be-obscured-when-custom-secrets-regex-is-configured"
+downstreamBaseUrl :: String
+downstreamBaseUrl = "http://127.0.0.1:1208/echo"
 
 
 application :: InstanaContext -> HTTP.Manager -> CPid -> Wai.Application
@@ -83,7 +80,10 @@ apiUnderTest ::
   -> Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-apiUnderTest instana httpManager _ respond = do
+apiUnderTest instana httpManager requestIn respond = do
+  let
+    query = BS.unpack $ Wai.rawQueryString requestIn
+    downstreamUrl = downstreamBaseUrl ++ query
   downstreamRequest <-
     HTTP.parseUrlThrow $ downstreamUrl
   downstreamResponse <- InstanaSDK.withHttpExit
@@ -113,7 +113,10 @@ apiUnderTestWithWrongNesting ::
   -> Wai.Request
   -> (Wai.Response -> IO Wai.ResponseReceived)
   -> IO Wai.ResponseReceived
-apiUnderTestWithWrongNesting instana httpManager _ respond = do
+apiUnderTestWithWrongNesting instana httpManager requestIn respond = do
+  let
+    query = BS.unpack $ Wai.rawQueryString requestIn
+    downstreamUrl = downstreamBaseUrl ++ query
   downstreamRequest <-
     HTTP.parseUrlThrow $ downstreamUrl
   InstanaSDK.withHttpExit
