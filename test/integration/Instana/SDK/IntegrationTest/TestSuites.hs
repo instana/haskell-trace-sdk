@@ -207,7 +207,7 @@ testSpecComplianceW3cOn specificationComplianceTestCases apiLabel route =
             specificationComplianceTestCases
             Suite.testServer
             route
-      , Suite.options = Suite.defaultOptions {
+      , Suite.options = (Suite.withCustomSecretsConfig "contains-ignore-case:password,secret,token") {
             Suite.appsUnderTest =
               [ Suite.testServer
               , Suite.downstreamTarget
@@ -228,8 +228,10 @@ testSpecComplianceW3cOff specificationComplianceTestCases apiLabel route =
             specificationComplianceTestCases
             Suite.testServer
             route
-      , Suite.options = Suite.withW3cTraceCorrelationDisabled {
-            Suite.appsUnderTest =
+      , Suite.options = Suite.defaultOptions {
+            Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+          , Suite.disableW3cTraceCorrelation = True
+          , Suite.appsUnderTest =
               [ Suite.testServer
               , Suite.downstreamTarget
               ]
@@ -266,7 +268,7 @@ testSpecComplianceW3cOnWaiMiddleware specificationComplianceTestCases route =
             specificationComplianceTestCases
             Suite.testServerWithMiddleware
             route
-      , Suite.options = Suite.defaultOptions {
+      , Suite.options = (Suite.withCustomSecretsConfig "contains-ignore-case:password,secret,token") {
             Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware
               , Suite.downstreamTarget
@@ -289,8 +291,10 @@ testSpecComplianceW3cOffWaiMiddleware specificationComplianceTestCases route =
             specificationComplianceTestCases
             Suite.testServerWithMiddleware
             route
-      , Suite.options = Suite.withW3cTraceCorrelationDisabled {
-            Suite.appsUnderTest =
+      , Suite.options = Suite.defaultOptions {
+            Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+          , Suite.disableW3cTraceCorrelation = True
+          , Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware
               , Suite.downstreamTarget
               ]

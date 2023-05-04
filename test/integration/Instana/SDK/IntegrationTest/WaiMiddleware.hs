@@ -239,7 +239,7 @@ commonAsserts entrySpan exitSpan responseBody from serverTimingValue =
       [ "http" .= (Aeson.object
           [ "method" .= ("GET" :: String)
           , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
-          , "params" .= ("some=query&parameters=2&pass=<redacted>" :: String)
+          , "params" .= ("some=query&parameters=1" :: String)
           , "status" .= (200 :: Int)
           ]
         )

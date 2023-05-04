@@ -80,7 +80,14 @@ exitSpanDataAsserts exitSpan =
       [ "http" .= (Aeson.object
           [ "method" .= ("GET" :: String)
           , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
-          , "params" .= ("some=query&parameters=2&pass=secret" :: String)
+          , "params" .= (
+              "api-key=1234&"
+              ++ "hidden-param=<redacted>&"
+              ++ "MYPASSWORD=abc&"
+              ++ "this-will-be-obscured-by-the-regex-matcher=<redacted>&"
+              ++ "secret=yes&"
+              ++ "not-hidden=value" :: String
+            )
           , "status" .= (200 :: Int)
           ]
         )

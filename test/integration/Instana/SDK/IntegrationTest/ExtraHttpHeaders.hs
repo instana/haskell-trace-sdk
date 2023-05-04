@@ -65,7 +65,6 @@ exitSpanDataAsserts exitSpan =
           [ "method" .= ("GET" :: String)
           , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
           , "status" .= (200 :: Int)
-          , "params" .= ("some=query&parameters=2&pass=<redacted>" :: String)
           , "header" .= (Aeson.object
             [ "X-Request-Header-On-Exit"  .= ("request header on exit value" :: String)
             , "X-Response-Header-On-Exit" .= ("response header on exit value" :: String)

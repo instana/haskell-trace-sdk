@@ -7,7 +7,7 @@ module Instana.SDK.IntegrationTest.SpecCompliance
 
 
 import           Control.Concurrent                     (threadDelay)
-import           Data.Aeson                             ((.:), (.:?), (.=))
+import           Data.Aeson                             ((.:), (.:?))
 import qualified Data.Aeson                             as Aeson
 import           Data.Aeson.Types                       (FromJSON)
 import qualified Data.Aeson.Types                       as AesonTypes
@@ -16,6 +16,7 @@ import qualified Data.Array                             as Array
 import qualified Data.ByteString.Char8                  as BSC8
 import qualified Data.ByteString.Lazy.Char8             as LBSC8
 import qualified Data.CaseInsensitive                   as CI
+import           Data.Either                            (isLeft)
 import           Data.HashMap.Strict                    (HashMap)
 import qualified Data.HashMap.Strict                    as HashMap
 import           Data.Maybe                             (catMaybes, isNothing,
@@ -44,6 +45,7 @@ data RunSubsetOfCases =
   | RunSubset [Int]
 
 
+-- replace RunAll with RunSubset[...] to run test cases selectively
 testCasesToRun :: RunSubsetOfCases
 testCasesToRun = RunAll
 
@@ -97,6 +99,8 @@ data SpecTestCase = SpecTestCase
   , xInstanaSyntheticIn   :: Maybe String
   , traceparentIn         :: Maybe String
   , tracestateIn          :: Maybe String
+  , queryIn               :: Maybe String
+  , requestHeadersIn      :: Maybe String
   , serverTiming          :: Maybe String
   , entrySpanT            :: Maybe String
   , entrySpanP            :: Maybe String
@@ -107,6 +111,9 @@ data SpecTestCase = SpecTestCase
   , entrySpanCrid         :: Maybe String
   , entrySpanCrtp         :: Maybe String
   , entrySpanSy           :: Maybe Bool
+  , entrySpanParams       :: Maybe String
+  , entrySpanHeaders      :: Maybe String
+  , entrySpanService      :: Maybe String
   , exitSpanT             :: Maybe String
   , exitSpanP             :: Maybe String
   , exitSpanS             :: Maybe String
@@ -116,6 +123,9 @@ data SpecTestCase = SpecTestCase
   , exitSpanCrid          :: Maybe String
   , exitSpanCrtp          :: Maybe String
   , exitSpanSy            :: Maybe Bool
+  , exitSpanParams        :: Maybe String
+  , exitSpanHeaders       :: Maybe String
+  , exitSpanService       :: Maybe String
   , xInstanaTOut          :: Maybe String
   , xInstanaSOut          :: Maybe String
   , xInstanaLOut          :: Maybe String
@@ -130,7 +140,7 @@ instance FromJSON SpecTestCase where
     \obj ->
       SpecTestCase
         <$> obj .: "index"
-        <*> obj .: "Scenario/incoming headers"
+        <*> obj .: "Scenario"
         <*> obj .: "What to do?"
         <*> obj .:? "INSTANA_DISABLE_W3C_TRACE_CORRELATION"
         <*> obj .:? "X-INSTANA-T in"
@@ -139,6 +149,8 @@ instance FromJSON SpecTestCase where
         <*> obj .:? "X-INSTANA-SYNTHETIC in"
         <*> obj .:? "traceparent in"
         <*> obj .:? "tracestate in"
+        <*> obj .:? "query in"
+        <*> obj .:? "request headers in"
         <*> obj .:? "Server-Timing"
         <*> obj .:? "entrySpan.t"
         <*> obj .:? "entrySpan.p"
@@ -149,6 +161,9 @@ instance FromJSON SpecTestCase where
         <*> obj .:? "entrySpan.crid"
         <*> obj .:? "entrySpan.crtp"
         <*> obj .:? "entrySpan.sy"
+        <*> obj .:? "entrySpan.params"
+        <*> obj .:? "entrySpan.headers"
+        <*> obj .:? "entrySpan.data.service"
         <*> obj .:? "exitSpan.t"
         <*> obj .:? "exitSpan.p"
         <*> obj .:? "exitSpan.s"
@@ -158,11 +173,48 @@ instance FromJSON SpecTestCase where
         <*> obj .:? "exitSpan.crid"
         <*> obj .:? "exitSpan.crtp"
         <*> obj .:? "exitSpan.sy"
+        <*> obj .:? "exitSpan.params"
+        <*> obj .:? "exitSpan.headers"
+        <*> obj .:? "exitSpan.data.service"
         <*> obj .:? "X-INSTANA-T out"
         <*> obj .:? "X-INSTANA-S out"
         <*> obj .:? "X-INSTANA-L out"
         <*> obj .:? "traceparent out"
         <*> obj .:? "tracestate out"
+
+
+data SpanData = SpanData
+  { httpAnnotations :: HttpAnnotations
+  }
+  deriving (Show)
+
+
+instance FromJSON SpanData where
+  parseJSON = Aeson.withObject "Span Annotations" $
+    \obj ->
+      SpanData
+        <$> obj .: "http"
+
+
+data HttpAnnotations = HttpAnnotations
+  { method :: Maybe String
+  , host   :: Maybe String
+  , url    :: Maybe String
+  , params :: Maybe String
+  , status :: Maybe Int
+  }
+  deriving (Show)
+
+
+instance FromJSON HttpAnnotations where
+  parseJSON = Aeson.withObject "HTTP Annotations" $
+    \obj ->
+      HttpAnnotations
+        <$> obj .:? "method"
+        <*> obj .:? "host"
+        <*> obj .:? "url"
+        <*> obj .:? "params"
+        <*> obj .:? "status"
 
 
 type ValueForPlaceholder = (Text, Text)
@@ -332,12 +384,17 @@ testCaseDefinitionToTest appUnderTest route pid testCaseDefinition = do
       scenario testCaseDefinition ++ " -> " ++
       whatToDo testCaseDefinition
     headers = testCaseDefinitionToHeaders testCaseDefinition
+    routeWithQuery =
+       case queryIn testCaseDefinition of
+         Just query -> route ++ "?" ++ query
+         Nothing    -> route
   putStrLn $ "Creating test: " ++ label ++ "\nwith headers:\n" ++ show headers
   putStrLn $ "TEST CASE: " ++ show testCaseDefinition
   applyLabel label $
     runSpecTestCase
       appUnderTest
       route
+      routeWithQuery
       pid
       headers
       testCaseDefinition
@@ -363,10 +420,17 @@ runSpecTestCase ::
   AppUnderTest
   -> String
   -> String
+  -> String
   -> [Header]
   -> SpecTestCase
   -> IO Test
-runSpecTestCase appUnderTest route pid headers testCaseDefinition = do
+runSpecTestCase
+  appUnderTest
+  expectedEntryUrl
+  routeWithQuery
+  pid
+  headers
+  testCaseDefinition = do
   let
     suppressionHeader =
       filter
@@ -380,7 +444,8 @@ runSpecTestCase appUnderTest route pid headers testCaseDefinition = do
   executeRequestAndVerify
     appUnderTest
     testCaseDefinition
-    route
+    expectedEntryUrl
+    routeWithQuery
     pid
     suppressed
     headers
@@ -391,20 +456,22 @@ executeRequestAndVerify ::
   -> SpecTestCase
   -> String
   -> String
+  -> String
   -> Bool
   -> [Header]
   -> IO Test
 executeRequestAndVerify
   appUnderTest
   testCaseDefinition
-  route
+  expectedEntryUrl
+  routeWithQuery
   pid
   suppressed
   headers = do
   response <-
     HttpHelper.doAppRequest
       appUnderTest
-      (route ++ "?some=query&parameters=1")
+      routeWithQuery
       "GET"
       headers
   let
@@ -436,7 +503,7 @@ executeRequestAndVerify
           verifySpans
             testCaseDefinition
             testContextAfterDownstreamHeaderCheck
-            route
+            expectedEntryUrl
             responseBody
             from
 
@@ -583,7 +650,7 @@ verifySpans ::
 verifySpans
   testCaseDefinition
   testContext
-  route
+  expectedEntryUrl
   responseBody
   from = do
   spansResults <-
@@ -604,20 +671,48 @@ verifySpans
         else do
           let
             Just entrySpan = maybeEntrySpan
+            entrySpanDataAeson = (TraceRequest.spanData entrySpan)
+            entryHttpAnnotationsEither :: Either String HttpAnnotations
+            entryHttpAnnotationsEither =
+              fmap httpAnnotations $
+                (AesonTypes.parseEither
+                 Aeson.parseJSON
+                 entrySpanDataAeson :: Either String SpanData)
             Just exitSpan = maybeExitSpan
-            (assertions, _) =
-              (spanAssertions
-                testCaseDefinition
-                testContext
-                route
-                entrySpan
-                exitSpan
-                from
-              )
+            exitSpanDataAeson = (TraceRequest.spanData exitSpan)
+            exitHttpAnnotationsEither :: Either String HttpAnnotations
+            exitHttpAnnotationsEither =
+              fmap httpAnnotations $
+                (AesonTypes.parseEither
+                 Aeson.parseJSON
+                 exitSpanDataAeson :: Either String SpanData)
           putStrLn $ "ENTRY " ++ show entrySpan
           putStrLn $ "EXIT " ++ show exitSpan
           putStrLn $ "RESPONSE " ++ show responseBody
-          assertAllIO $ assertions
+          if isLeft entryHttpAnnotationsEither then do
+            let
+              Left msg = entryHttpAnnotationsEither
+            failIO $ "Could not parse annotations of HTTP entry span: " ++ msg
+          else if isLeft exitHttpAnnotationsEither then do
+            let
+              Left msg = exitHttpAnnotationsEither
+            failIO $ "Could not parse annotations of HTTP entry span: " ++ msg
+          else do
+            let
+              Right entryHttpAnnotations = entryHttpAnnotationsEither
+              Right exitHttpAnnotations = exitHttpAnnotationsEither
+              (assertions, _) =
+                (spanAssertions
+                  testCaseDefinition
+                  testContext
+                  expectedEntryUrl
+                  entrySpan
+                  entryHttpAnnotations
+                  exitSpan
+                  exitHttpAnnotations
+                  from
+                )
+            assertAllIO $ assertions
 
 
 spanAssertions ::
@@ -625,18 +720,32 @@ spanAssertions ::
   -> TestContext
   -> String
   -> Span
+  -> HttpAnnotations
   -> Span
+  -> HttpAnnotations
   -> Maybe From
   -> TestContext
 spanAssertions
   testCaseDefinition
   testContext
-  route
+  expectedEntryUrl
   entrySpan
+  entryHttpAnnotations
   exitSpan
+  exitHttpAnnotations
   from =
   addAssertions
-    (fixedSpanAssertions route entrySpan exitSpan from)
+    (fixedSpanAssertions
+        entrySpan
+        exitSpan
+        from
+    ++
+    httpAnnotationAssertions
+        testCaseDefinition
+        expectedEntryUrl
+        entryHttpAnnotations
+        exitHttpAnnotations
+    )
     (spanAssertionsFromTestCaseDefinition
         testCaseDefinition
         testContext
@@ -646,47 +755,65 @@ spanAssertions
 
 
 fixedSpanAssertions ::
-  String
-  -> Span
+  Span
   -> Span
   -> Maybe From
   -> [Assertion]
-fixedSpanAssertions route entrySpan exitSpan from =
+fixedSpanAssertions
+  entrySpan
+  exitSpan
+  from =
   [ assertBool "entry timestamp" $ TraceRequest.ts entrySpan > 0
   , assertBool "entry duration" $ TraceRequest.d entrySpan > 0
   , assertEqual "entry kind" 1 (TraceRequest.k entrySpan)
   , assertEqual "entry error count" 0 (TraceRequest.ec entrySpan)
   , assertEqual "entry from" from $ TraceRequest.f entrySpan
-  , assertEqual "entry data"
-    ( Aeson.object
-      [ "http" .= (Aeson.object
-          [ "method" .= ("GET" :: String)
-          , "host"   .= ("127.0.0.1:1207" :: String)
-          , "url"    .= ("/" ++ route)
-          , "params" .= ("some=query&parameters=1" :: String)
-          , "status" .= (200 :: Int)
-          ]
-        )
-      ]
-    )
-    (TraceRequest.spanData entrySpan)
   , assertBool "exit timestamp" $ TraceRequest.ts exitSpan > 0
   , assertBool "exit duration" $ TraceRequest.d exitSpan > 0
   , assertEqual "exit kind" 2 (TraceRequest.k exitSpan)
   , assertEqual "exit error count" 0 (TraceRequest.ec exitSpan)
   , assertEqual "exit from" from $ TraceRequest.f exitSpan
-  , assertEqual "exit data"
-    ( Aeson.object
-      [ "http" .= (Aeson.object
-          [ "method" .= ("GET" :: String)
-          , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
-          , "params" .= ("some=query&parameters=2&pass=<redacted>" :: String)
-          , "status" .= (200 :: Int)
-          ]
-        )
-      ]
-    )
-    (TraceRequest.spanData exitSpan)
+  ]
+
+
+httpAnnotationAssertions ::
+  SpecTestCase
+  -> String
+  -> HttpAnnotations
+  -> HttpAnnotations
+  -> [Assertion]
+httpAnnotationAssertions
+  testCaseDefinition
+  expectedEntryUrl
+  entryHttpAnnotations
+  exitHttpAnnotations =
+  [ assertEqual "entry http method"
+      (Just "GET" :: Maybe String)
+      (method entryHttpAnnotations)
+  , assertEqual "entry http host"
+      (Just "127.0.0.1:1207" :: Maybe String)
+      (host entryHttpAnnotations)
+  , assertEqual "entry http url"
+      (Just ("/" ++ expectedEntryUrl) :: Maybe String)
+      (url entryHttpAnnotations)
+  , assertEqual "entry http params"
+      (entrySpanParams testCaseDefinition)
+      (params entryHttpAnnotations)
+  , assertEqual "entry http status"
+      (Just 200 :: Maybe Int)
+      (status entryHttpAnnotations)
+  , assertEqual "exit http method"
+      (Just "GET" :: Maybe String)
+      (method exitHttpAnnotations)
+  , assertEqual "exit http url"
+      (Just "http://127.0.0.1:1208/echo" :: Maybe String)
+      (url exitHttpAnnotations)
+  , assertEqual "exit http params"
+      (exitSpanParams testCaseDefinition)
+      (params exitHttpAnnotations)
+  , assertEqual "exit http status"
+      (Just 200 :: Maybe Int)
+      (status exitHttpAnnotations)
   ]
 
 
@@ -703,9 +830,15 @@ spanAssertionsFromTestCaseDefinition
   exitSpan =
   let
     testContextAfterEntrySpanChecks =
-      verifyEntrySpan testCaseDefinition testContext entrySpan
+      verifyEntrySpan
+        testCaseDefinition
+        testContext
+        entrySpan
   in
-  verifyExitSpan testCaseDefinition testContextAfterEntrySpanChecks exitSpan
+  verifyExitSpan
+    testCaseDefinition
+    testContextAfterEntrySpanChecks
+    exitSpan
 
 
 verifyEntrySpan ::

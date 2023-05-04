@@ -113,7 +113,7 @@ shouldSuppressWithBracketApi =
 shouldRedactDefaultSecrets :: String -> IO Test
 shouldRedactDefaultSecrets pid =
   applyLabel "shouldRedactDefaultSecrets" $
-    runTest
+    runHttpTest
       pid
       "http/bracket/api?query-param=value&api-key=1234&MYPASSWORD=abc&another-query-param=zzz1&secret=yes"
       []
@@ -121,6 +121,21 @@ shouldRedactDefaultSecrets pid =
         [ rootEntryAsserts
         , filterDefaultSecretsAsserts
         ])
+      (\exitSpan ->
+        [ assertEqual "exit data"
+          ( Aeson.object
+            [ "http" .= (Aeson.object
+                [ "method" .= ("GET" :: String)
+                , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
+                , "params" .= ("query-param=value&api-key=<redacted>&MYPASSWORD=<redacted>&another-query-param=zzz1&secret=<redacted>" :: String)
+                , "status" .= (200 :: Int)
+                ]
+              )
+            ]
+          )
+          (TraceRequest.spanData exitSpan)
+        ]
+      )
 
 
 shouldCreateRootEntryWithLowLevelApi :: String -> IO Test
@@ -197,7 +212,7 @@ runBracketTest pid headers extraAssertsForEntrySpan =
 
 runLowLevelTest :: String -> [Header] -> (Span -> [Assertion]) -> IO Test
 runLowLevelTest pid headers extraAssertsForEntrySpan =
-  runTest pid "http/low/level/api?some=query&parameters=2" headers extraAssertsForEntrySpan
+  runTest pid "http/low/level/api?some=query&parameters=1" headers extraAssertsForEntrySpan
 
 
 runTest :: String -> String -> [Header] -> (Span -> [Assertion]) -> IO Test
@@ -213,7 +228,7 @@ runTest pid urlPath headers extraAssertsForEntrySpan =
           [ "http" .= (Aeson.object
               [ "method" .= ("GET" :: String)
               , "url"    .= ("http://127.0.0.1:1208/echo" :: String)
-              , "params" .= ("some=query&parameters=2&pass=<redacted>" :: String)
+              , "params" .= ("some=query&parameters=1" :: String)
               , "status" .= (200 :: Int)
               ]
             )
@@ -412,7 +427,7 @@ lowLevelAsserts entrySpan =
           [ "method" .= ("GET" :: String)
           , "host"   .= ("127.0.0.1:1207" :: String)
           , "url"    .= ("/http/low/level/api" :: String)
-          , "params" .= ("some=query&parameters=2" :: String)
+          , "params" .= ("some=query&parameters=1" :: String)
           , "status" .= (200 :: Int)
           ]
         )

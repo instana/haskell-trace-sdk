@@ -38,6 +38,10 @@ appLogger :: String
 appLogger = "WaiWarpApp"
 
 
+downstreamBaseUrl :: String
+downstreamBaseUrl = "http://127.0.0.1:1208/echo"
+
+
 application :: InstanaContext -> HTTP.Manager -> CPid -> Wai.Application
 application instana httpManager pid request respond = do
   let
@@ -333,9 +337,11 @@ httpBracketApi ::
 httpBracketApi instana httpManager requestIn respond = do
   response <- do
     InstanaSDK.withHttpEntry instana requestIn $ do
+      let
+        query = BS.unpack $ Wai.rawQueryString requestIn
+        downstreamUrl = downstreamBaseUrl ++ query
       downstreamRequest <-
-        HTTP.parseUrlThrow $
-          "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+        HTTP.parseUrlThrow downstreamUrl
       downstreamResponse <- InstanaSDK.withHttpExit
         instana
         (addDowntreamRequestHeaders downstreamRequest)
@@ -362,9 +368,11 @@ httpLowLevelApi ::
   -> IO Wai.ResponseReceived
 httpLowLevelApi instana httpManager requestIn respond = do
   InstanaSDK.startHttpEntry instana requestIn
+  let
+    query = BS.unpack $ Wai.rawQueryString requestIn
+    downstreamUrl = downstreamBaseUrl ++ query
   downstreamRequest <-
-    HTTP.parseUrlThrow $
-      "http://127.0.0.1:1208/echo?some=query&parameters=2&pass=secret"
+    HTTP.parseUrlThrow downstreamUrl
   downstreamRequest' <-
     InstanaSDK.startHttpExit instana $
       addDowntreamRequestHeaders downstreamRequest
