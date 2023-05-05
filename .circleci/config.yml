@@ -15,7 +15,7 @@ workflows:
 jobs:
   build:
     docker:
-      - image: fpco/stack-build:lts
+      - image: fpco/stack-build:lts-19
         auth:
           username: instanahaskelltracesdk
           password: $DOCKERHUB_PASSWORD
