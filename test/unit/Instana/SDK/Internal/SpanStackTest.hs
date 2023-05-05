@@ -429,6 +429,7 @@ dummyW3cTraceContext =
     , parentId = "span-id"
     , flags    = Flags
       { sampled = False
+      , randomTraceId = False
       }
     }
   , traceState = TraceState

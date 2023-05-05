@@ -53,11 +53,17 @@ allTests =
         "shouldDecodeInvalidFlagsContentToNothing"
         shouldDecodeInvalidFlagsContentToNothing
     , TestLabel
-        "shouldDecodeValidTraceParent"
-        shouldDecodeValidTraceParent
+        "shouldDecodeValidTraceParentWithoutRandomTraceId"
+        shouldDecodeValidTraceParentWithoutRandomTraceId
     , TestLabel
-        "shouldDecodeUnsampledTraceParent"
-        shouldDecodeUnsampledTraceParent
+        "shouldDecodeValidTraceParentWithRandomTraceId"
+        shouldDecodeValidTraceParentWithRandomTraceId
+    , TestLabel
+        "shouldDecodeUnsampledTraceParentWithoutRandomTraceId"
+        shouldDecodeUnsampledTraceParentWithoutRandomTraceId
+    , TestLabel
+        "shouldDecodeUnsampledTraceParentWithRandomTraceId"
+        shouldDecodeUnsampledTraceParentWithRandomTraceId
     , TestLabel
         "shouldDecodeKnownPartsFromHigherVersionTraceParent"
         shouldDecodeKnownPartsFromHigherVersionTraceParent
@@ -107,6 +113,9 @@ allTests =
         "shouldInherit"
         shouldInherit
     , TestLabel
+        "shouldInheritUnsetRandomTraceIdFlag"
+        shouldInheritUnsetRandomTraceIdFlag
+    , TestLabel
         "shouldInheritForSuppressed"
         shouldInheritForSuppressed
     , TestLabel
@@ -116,8 +125,17 @@ allTests =
         "shouldCreateExitForSuppressed"
         shouldCreateExitForSuppressed
     , TestLabel
-        "shouldEncodeToHeaders"
-        shouldEncodeToHeaders
+        "shouldEncodeToHeadersSampledWithRandomTraceId"
+        shouldEncodeToHeadersSampledWithRandomTraceId
+    , TestLabel
+        "shouldEncodeToHeadersUnsampledWithRandomTraceId"
+        shouldEncodeToHeadersUnsampledWithRandomTraceId
+    , TestLabel
+        "shouldEncodeToHeadersSampledWithoutRandomTraceId"
+        shouldEncodeToHeadersSampledWithoutRandomTraceId
+    , TestLabel
+        "shouldEncodeToHeadersUnsampledWithoutRandomTraceId"
+        shouldEncodeToHeadersUnsampledWithoutRandomTraceId
     , TestLabel
         "shouldPadShortIds"
         shouldPadShortIds
@@ -190,15 +208,15 @@ shouldDecodeInvalidFlagsContentToNothing =
     "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-XX"
 
 
-shouldDecodeValidTraceParent :: Test
-shouldDecodeValidTraceParent =
+shouldDecodeValidTraceParentWithoutRandomTraceId :: Test
+shouldDecodeValidTraceParentWithoutRandomTraceId =
   let
     actual =
       W3CTraceContext.decode
         "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-01"
         Nothing
     expected =
-      sampledWithoutTraceState
+      sampledNoRandomTraceIdWithoutTraceState
         "1234567890abcdeffedcba0987654321"
         "24680bdf13579abc"
   in
@@ -206,15 +224,47 @@ shouldDecodeValidTraceParent =
     assertEqual "W3C Trace Context" expected actual
 
 
-shouldDecodeUnsampledTraceParent :: Test
-shouldDecodeUnsampledTraceParent =
+shouldDecodeValidTraceParentWithRandomTraceId :: Test
+shouldDecodeValidTraceParentWithRandomTraceId =
+  let
+    actual =
+      W3CTraceContext.decode
+        "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-03"
+        Nothing
+    expected =
+      sampledWithRandomTraceIdWithoutTraceState
+        "1234567890abcdeffedcba0987654321"
+        "24680bdf13579abc"
+  in
+  TestCase $ do
+    assertEqual "W3C Trace Context" expected actual
+
+
+shouldDecodeUnsampledTraceParentWithoutRandomTraceId :: Test
+shouldDecodeUnsampledTraceParentWithoutRandomTraceId =
   let
     actual =
       W3CTraceContext.decode
         "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-00"
         Nothing
     expected =
-      unsampledWithoutTraceState
+      unsampledNoRandomTraceIdWithoutTraceState
+        "1234567890abcdeffedcba0987654321"
+        "24680bdf13579abc"
+  in
+  TestCase $ do
+    assertEqual "W3C Trace Context" expected actual
+
+
+shouldDecodeUnsampledTraceParentWithRandomTraceId :: Test
+shouldDecodeUnsampledTraceParentWithRandomTraceId =
+  let
+    actual =
+      W3CTraceContext.decode
+        "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-02"
+        Nothing
+    expected =
+      unsampledWithRandomTraceIdWithoutTraceState
         "1234567890abcdeffedcba0987654321"
         "24680bdf13579abc"
   in
@@ -230,7 +280,7 @@ shouldDecodeKnownPartsFromHigherVersionTraceParent =
         "01-1234567890abcdeffedcba0987654321-24680bdf13579abc-01-beep-boop"
         Nothing
     expected =
-      sampledWithoutTraceState
+      sampledNoRandomTraceIdWithoutTraceState
         "1234567890abcdeffedcba0987654321"
         "24680bdf13579abc"
   in
@@ -548,6 +598,7 @@ shouldInherit =
           , parentId = "234123567890abcd"
           , flags    = Flags
             { sampled = True
+            , randomTraceId = True
             }
           }
         , traceState = TraceState
@@ -562,6 +613,33 @@ shouldInherit =
   in
   TestCase $ do
     assertEqual "W3C Trace Context" expected actual
+
+
+shouldInheritUnsetRandomTraceIdFlag :: Test
+shouldInheritUnsetRandomTraceIdFlag =
+  let
+    initialW3cCtx = withoutRandomTraceId defaultW3cCtx
+
+    actualW3CTraceContext =
+      W3CTraceContext.inheritFrom
+        initialW3cCtx
+        "5a6b7c8d9ef13402"
+        "234123567890abcd"
+    actualTraceParent = W3CTraceContext.traceParent actualW3CTraceContext
+
+    expectedTraceParent =
+       TraceParent
+       { version  = 0
+       , traceId  = "1234567890abcdeffedcba0987654321"
+       , parentId = "234123567890abcd"
+       , flags    = Flags
+         { sampled = True
+         , randomTraceId = False
+         }
+       }
+  in
+  TestCase $ do
+    assertEqual "traceparent" expectedTraceParent actualTraceParent
 
 
 shouldInheritForSuppressed :: Test
@@ -591,6 +669,7 @@ shouldInheritForSuppressed =
           , parentId = "234123567890abcd"
           , flags    = Flags
             { sampled = False
+            , randomTraceId = True
             }
           }
         , traceState = TraceState
@@ -620,6 +699,7 @@ shouldCreateExitSpanContextFromIds =
           , parentId = "345fcb9140c8a6b9"
           , flags    = Flags
             { sampled = True
+            , randomTraceId = True
             }
           }
         , traceState = TraceState
@@ -652,6 +732,7 @@ shouldCreateExitForSuppressed =
           , parentId = "345fcb9140c8a6b9"
           , flags    = Flags
             { sampled = False
+            , randomTraceId = True
             }
           }
         , traceState = TraceState
@@ -665,8 +746,8 @@ shouldCreateExitForSuppressed =
     assertEqual "W3C Trace Context" expected actual
 
 
-shouldEncodeToHeaders :: Test
-shouldEncodeToHeaders =
+shouldEncodeToHeadersSampledWithRandomTraceId :: Test
+shouldEncodeToHeadersSampledWithRandomTraceId =
   let
     actual =
       W3CTraceContext.toHeaders $
@@ -682,10 +763,54 @@ shouldEncodeToHeaders =
 
     expected =
       [ ( "traceparent"
-        , "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-01"
+        , "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-03"
         )
       , ( "tracestate"
         , "in=fa2375d711a4ca0f;02468acefdb97531,congo=ucfJifl5GOE,rojo=00f067aa0ba902b7"
+        )
+      ]
+  in
+  TestCase $ do
+    assertEqual "W3C Trace Context Headers" expected actual
+
+
+shouldEncodeToHeadersUnsampledWithRandomTraceId :: Test
+shouldEncodeToHeadersUnsampledWithRandomTraceId =
+  let
+    actual = W3CTraceContext.toHeaders $ unsampled defaultW3cCtx
+    expected =
+      [ ( "traceparent"
+        , "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-02"
+        )
+      ]
+  in
+  TestCase $ do
+    assertEqual "W3C Trace Context Headers" expected actual
+
+
+shouldEncodeToHeadersSampledWithoutRandomTraceId :: Test
+shouldEncodeToHeadersSampledWithoutRandomTraceId =
+  let
+    actual = W3CTraceContext.toHeaders $ withoutRandomTraceId defaultW3cCtx
+    expected =
+      [ ( "traceparent"
+        , "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-01"
+        )
+      ]
+  in
+  TestCase $ do
+    assertEqual "W3C Trace Context Headers" expected actual
+
+
+shouldEncodeToHeadersUnsampledWithoutRandomTraceId :: Test
+shouldEncodeToHeadersUnsampledWithoutRandomTraceId =
+  let
+    actual = W3CTraceContext.toHeaders $
+      unsampled $
+        withoutRandomTraceId defaultW3cCtx
+    expected =
+      [ ( "traceparent"
+        , "00-1234567890abcdeffedcba0987654321-24680bdf13579abc-00"
         )
       ]
   in
@@ -697,7 +822,7 @@ shouldPadShortIds :: Test
 shouldPadShortIds =
   let
     Just w3cCtx =
-      (sampledWithoutTraceState
+      (sampledNoRandomTraceIdWithoutTraceState
         "1234"
         "5678")
     actual =
@@ -729,7 +854,7 @@ shouldLimitLongIds :: Test
 shouldLimitLongIds =
   let
     Just w3cCtx =
-      (sampledWithoutTraceState
+      (sampledNoRandomTraceIdWithoutTraceState
         "fedcba9876543210abcdef0123456789fffff"
         "112233445566778899")
     actual =
@@ -775,8 +900,8 @@ shouldDecodeInheritAndEncode =
     assertEqual "W3C Trace Context Headers" expected actual
 
 
-sampledWithoutTraceState :: String -> String -> Maybe W3CTraceContext
-sampledWithoutTraceState tId pId =
+sampledWithRandomTraceIdWithoutTraceState :: String -> String -> Maybe W3CTraceContext
+sampledWithRandomTraceIdWithoutTraceState tId pId =
   Just $
     W3CTraceContext
       { traceParent = TraceParent
@@ -785,6 +910,7 @@ sampledWithoutTraceState tId pId =
         , parentId = Id.fromString pId
         , flags    = Flags
           { sampled = True
+          , randomTraceId = True
           }
         }
       , traceState = TraceState
@@ -795,20 +921,55 @@ sampledWithoutTraceState tId pId =
       }
 
 
-unsampledWithoutTraceState :: String -> String -> Maybe W3CTraceContext
-unsampledWithoutTraceState tId pId =
-  unsampled $ sampledWithoutTraceState tId pId
+sampledNoRandomTraceIdWithoutTraceState :: String -> String -> Maybe W3CTraceContext
+sampledNoRandomTraceIdWithoutTraceState tId pId =
+  withoutRandomTraceIdM $ sampledWithRandomTraceIdWithoutTraceState tId pId
 
 
-unsampled :: Maybe W3CTraceContext -> Maybe W3CTraceContext
-unsampled mW3cCtx =
+unsampledWithRandomTraceIdWithoutTraceState :: String -> String -> Maybe W3CTraceContext
+unsampledWithRandomTraceIdWithoutTraceState tId pId =
+  unsampledM $ sampledWithRandomTraceIdWithoutTraceState tId pId
+
+
+unsampledNoRandomTraceIdWithoutTraceState :: String -> String -> Maybe W3CTraceContext
+unsampledNoRandomTraceIdWithoutTraceState tId pId =
+  unsampledM $ sampledNoRandomTraceIdWithoutTraceState tId pId
+
+
+unsampledM :: Maybe W3CTraceContext -> Maybe W3CTraceContext
+unsampledM mW3cCtx =
   let
     Just w3cCtx = mW3cCtx
+  in
+  Just $ unsampled w3cCtx
+
+
+unsampled :: W3CTraceContext -> W3CTraceContext
+unsampled w3cCtx =
+  let
     tp = traceParent w3cCtx
     fl = flags tp
     unsampledTp = tp { flags = fl { sampled = False } }
   in
-  Just $ w3cCtx { traceParent = unsampledTp }
+  w3cCtx { traceParent = unsampledTp }
+
+
+withoutRandomTraceIdM :: Maybe W3CTraceContext -> Maybe W3CTraceContext
+withoutRandomTraceIdM mW3cCtx =
+  let
+    Just w3cCtx = mW3cCtx
+  in
+  Just $ withoutRandomTraceId w3cCtx
+
+
+withoutRandomTraceId :: W3CTraceContext -> W3CTraceContext
+withoutRandomTraceId w3cCtx =
+  let
+    tp = traceParent w3cCtx
+    fl = flags tp
+    noRandomTraceIdTp = tp { flags = fl { randomTraceId = False } }
+  in
+  w3cCtx { traceParent = noRandomTraceIdTp }
 
 
 parseAndExtractTraceState :: Maybe String -> TraceState
@@ -847,6 +1008,15 @@ defaultTraceParent =
     , parentId = "24680bdf13579abc"
     , flags    = Flags
       { sampled = True
+      , randomTraceId = True
       }
+    }
+
+
+defaultW3cCtx :: W3CTraceContext
+defaultW3cCtx =
+  W3CTraceContext
+    { traceParent = defaultTraceParent
+    , traceState = W3CTraceContext.emptyTraceState
     }
 
