@@ -13,6 +13,7 @@ module Instana.SDK.Internal.W3CTraceContext
     , W3CTraceContext(..)
     , createExitContextForSuppressed
     , decode
+    , emptyTraceState
     , exitSpanContextFromIds
     , inheritFrom
     , inheritFromForSuppressed
@@ -57,7 +58,8 @@ data TraceParent = TraceParent
 -- |A representation of the flags part of the W3C trace context header
 -- traceparent.
 data Flags = Flags
-  { sampled  :: Bool
+  { sampled       :: Bool
+  , randomTraceId :: Bool
   } deriving (Eq, Generic, Show)
 
 
@@ -136,12 +138,12 @@ decodeTraceParentComponents components =
         flagsReadResult = readHex $ T.unpack $ rawFlags
         flgs :: Maybe Integer
         flgs = Maybe.listToMaybe . map fst $ flagsReadResult
-        smpld :: Bool
-        smpld = case flgs of
+        (smpld, rndmTrcId) = case flgs of
           Just fl ->
-            Bits.testBit fl 0
+            (Bits.testBit fl 0, Bits.testBit fl 1)
           Nothing ->
-            False
+            (False, False)
+
       in
       Just $ TraceParent
         { version  = 0
@@ -149,6 +151,7 @@ decodeTraceParentComponents components =
         , parentId = pId
         , flags    = Flags
           { sampled = smpld
+          , randomTraceId = rndmTrcId
           }
         }
     _ ->
@@ -336,6 +339,7 @@ inheritFrom parentW3cTraceContext exitSpanTraceId exitSpanSpanId =
     , parentId = exitSpanSpanId
     , flags    = Flags
       { sampled = True
+      , randomTraceId = randomTraceId $ flags parentTp
       }
     }
   , traceState = TraceState
@@ -376,6 +380,7 @@ inheritFromForSuppressed parentW3cTraceContext exitSpanSpanId =
     , parentId = exitSpanSpanId
     , flags    = Flags
       { sampled = False
+      , randomTraceId = randomTraceId $ flags parentTp
       }
     }
   , traceState = TraceState
@@ -397,6 +402,10 @@ exitSpanContextFromIds exitSpanTraceId exitSpanSpanId =
     , parentId = exitSpanSpanId
     , flags    = Flags
       { sampled = True
+      -- There was no incoming W3C trace context, so we can assume that we
+      -- either created the trace ID ourselves, or another upstream Instana
+      -- tracer did so. In both cases, the trace ID is random.
+      , randomTraceId = True
       }
     }
   , traceState = TraceState
@@ -428,6 +437,8 @@ createExitContextForSuppressed bogusTraceId bogusParentId =
     , parentId = bogusParentId
     , flags    = Flags
       { sampled = False
+      -- In this case, we have created the trace ID and we create them randomly.
+      , randomTraceId = True
       }
     }
   , traceState = TraceState
@@ -478,8 +489,14 @@ encodeTraceParent tp =
 -- |Encodes the traceparent flag field.
 encodeFlags :: Flags -> BSC8.ByteString
 encodeFlags fl =
-  if sampled fl then "01"
-  else "00"
+  if sampled fl && randomTraceId fl
+    then "03"
+  else if sampled fl
+    then "01"
+  else if randomTraceId fl
+    then "02"
+  else
+    "00"
 
 
 -- |Encodes the tracestate header value.
