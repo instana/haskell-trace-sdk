@@ -20,8 +20,8 @@ import           Data.Either                            (isLeft)
 import           Data.HashMap.Strict                    (HashMap)
 import qualified Data.HashMap.Strict                    as HashMap
 import qualified Data.Map                               as Map
-import           Data.Maybe                             (catMaybes, isNothing,
-                                                         listToMaybe)
+import           Data.Maybe                             (catMaybes, isJust,
+                                                         isNothing, listToMaybe)
 import           Data.Text                              (Text)
 import qualified Data.Text                              as T
 import qualified Data.Vector                            as Vector
@@ -721,7 +721,8 @@ spanAssertions
   exitHttpAnnotations
   from =
   addAssertions
-    (fixedSpanAssertions
+    (basicSpanAssertions
+        testCaseDefinition
         entrySpan
         exitSpan
         from
@@ -740,12 +741,14 @@ spanAssertions
     )
 
 
-fixedSpanAssertions ::
-  Span
+basicSpanAssertions ::
+  SpecTestCase
+  -> Span
   -> Span
   -> Maybe From
   -> [Assertion]
-fixedSpanAssertions
+basicSpanAssertions
+  testCaseDefinition
   entrySpan
   exitSpan
   from =
@@ -760,6 +763,30 @@ fixedSpanAssertions
   , assertEqual "exit error count" 0 (TraceRequest.ec exitSpan)
   , assertEqual "exit from" from $ TraceRequest.f exitSpan
   ]
+  ++
+  (verifyService testCaseDefinition entrySpanService "entry" entrySpan)
+  ++
+  (verifyService testCaseDefinition exitSpanService "exit" exitSpan)
+
+
+verifyService ::
+  SpecTestCase
+  -> (SpecTestCase -> Maybe String)
+  -> String
+  -> Span
+  -> [Assertion]
+verifyService testCaseDefinition expectedServiceAccessor label span_ =
+  let
+    expectedService = expectedServiceAccessor testCaseDefinition
+  in
+  if isJust expectedService
+    then
+      [ assertEqual
+          (label ++ " service")
+          (fmap T.pack expectedService)
+          (TraceRequest.readService span_)
+      ]
+    else []
 
 
 httpAnnotationAssertions ::
