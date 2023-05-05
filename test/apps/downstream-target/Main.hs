@@ -90,6 +90,7 @@ echoHeaders request respond = do
       HTTPTypes.status200
       [ ("Content-Type", "application/json; charset=UTF-8")
       , ("X-Response-Header-On-Exit", "response header on exit value")
+      , ("X-Response-Header-Downstream-To-App", "Value 3")
       ]
       encodedHeaders
 

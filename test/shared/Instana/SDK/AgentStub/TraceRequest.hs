@@ -8,6 +8,7 @@ import           Data.Aeson          (FromJSON, ToJSON, Value (Object), (.:),
                                       (.:?), (.=))
 import qualified Data.Aeson          as Aeson
 import qualified Data.HashMap.Strict as HM
+import           Data.Map            (Map)
 import           Data.Text           (Text)
 import           GHC.Generics
 
@@ -121,6 +122,43 @@ instance ToJSON Span where
     , "data" .= spanData sp
     , "f"    .= f sp
     ]
+
+
+data SpanData = SpanData
+  { httpAnnotations :: HttpAnnotations
+  }
+  deriving (Show)
+
+
+instance FromJSON SpanData where
+  parseJSON = Aeson.withObject "Span Annotations" $
+    \obj ->
+      SpanData
+        <$> obj .: "http"
+
+
+data HttpAnnotations = HttpAnnotations
+  { method :: Maybe String
+  , host   :: Maybe String
+  , url    :: Maybe String
+  , params :: Maybe String
+  -- ("header",Object (fromList [("X-Response-Header-Downstream-To-App",String "Value 3"),("X-Request-Header-App-To-Downstream",String "Value 2")]))]))]),
+  , header :: Maybe (Map String String)
+  , status :: Maybe Int
+  }
+  deriving (Show)
+
+
+instance FromJSON HttpAnnotations where
+  parseJSON = Aeson.withObject "HTTP Annotations" $
+    \obj ->
+      HttpAnnotations
+        <$> obj .:? "method"
+        <*> obj .:? "host"
+        <*> obj .:? "url"
+        <*> obj .:? "params"
+        <*> obj .:? "header"
+        <*> obj .:? "status"
 
 
 readSdkName :: Span -> Maybe Text

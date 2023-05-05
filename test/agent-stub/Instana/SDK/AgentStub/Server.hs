@@ -81,29 +81,19 @@ putDiscovery config startupTime recorders discoveryRequest = do
         translatedDiscoveryRequest =
           discoveryRequest { DiscoveryRequest.pid = show translatedPid }
         tracingConfig =
-          if Config.extraHeadersViaTracingConfig config
+          if length (Config.extraHeadersViaTracingConfig config) > 0
             then
               Just TracingConfig
                 { DiscoveryResponse.extraHttpHeaders =
-                    Just
-                      [ "X-Request-Header-On-Entry"
-                      , "X-Response-Header-On-Entry"
-                      , "X-Request-Header-On-Exit"
-                      , "X-Response-Header-On-Exit"
-                      ]
+                    Just $ Config.extraHeadersViaTracingConfig config
                 }
             else
               Nothing
 
         extraHeadersLegacyConfig =
-          if Config.extraHeadersViaLegacyConfig config
+          if length (Config.extraHeadersViaLegacyConfig config) > 0
             then
-              Just
-                [ "X-Request-Header-On-Entry"
-                , "X-Response-Header-On-Entry"
-                , "X-Request-Header-On-Exit"
-                , "X-Response-Header-On-Exit"
-                ]
+              Just $ Config.extraHeadersViaLegacyConfig config
             else
               Nothing
 

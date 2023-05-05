@@ -39,8 +39,8 @@ data SuiteOptions =
     , simulateConnectionLoss       :: Bool
     , customServiceName            :: Maybe String
     , customSecretsConfig          :: Maybe String
-    , tracingConfigForExtraHeaders :: Bool
-    , legacyConfigForExtraHeaders  :: Bool
+    , tracingConfigForExtraHeaders :: [String]
+    , legacyConfigForExtraHeaders  :: [String]
     , disableW3cTraceCorrelation   :: Bool
     , appsUnderTest                :: [AppUnderTest]
     }
@@ -63,8 +63,8 @@ defaultOptions =
     , simulateConnectionLoss       = False
     , customServiceName            = Nothing
     , customSecretsConfig          = Nothing
-    , tracingConfigForExtraHeaders = False
-    , legacyConfigForExtraHeaders  = False
+    , tracingConfigForExtraHeaders = []
+    , legacyConfigForExtraHeaders  = []
     , disableW3cTraceCorrelation   = False
     , appsUnderTest                = [testServer]
     }
@@ -124,12 +124,26 @@ withCustomSecretsConfig secretsConfig =
 
 withTracingConfigForExtraHeaders :: SuiteOptions
 withTracingConfigForExtraHeaders =
-  defaultOptions { tracingConfigForExtraHeaders = True }
+  defaultOptions {
+    tracingConfigForExtraHeaders =
+      [ "X-Request-Header-On-Entry"
+      , "X-Response-Header-On-Entry"
+      , "X-Request-Header-On-Exit"
+      , "X-Response-Header-On-Exit"
+      ]
+  }
 
 
 withLegacyConfigForExtraHeaders :: SuiteOptions
 withLegacyConfigForExtraHeaders =
-  defaultOptions { legacyConfigForExtraHeaders = True }
+  defaultOptions {
+    legacyConfigForExtraHeaders =
+      [ "X-Request-Header-On-Entry"
+      , "X-Response-Header-On-Entry"
+      , "X-Request-Header-On-Exit"
+      , "X-Response-Header-On-Exit"
+      ]
+  }
 
 
 withW3cTraceCorrelationDisabled :: SuiteOptions

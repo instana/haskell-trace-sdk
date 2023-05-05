@@ -128,9 +128,9 @@ runSuite suite = do
              booleanEnv $ Suite.simulateConnectionLoss options)
         , ("SECRETS_CONFIG", Suite.customSecretsConfig options)
         , ("EXTRA_HEADERS_VIA_TRACING_CONFIG",
-             booleanEnv $ Suite.tracingConfigForExtraHeaders options)
+             stringListEnv $ Suite.tracingConfigForExtraHeaders options)
         , ("EXTRA_HEADERS_VIA_LEGACY_CONFIG",
-             booleanEnv $ Suite.legacyConfigForExtraHeaders options)
+             stringListEnv $ Suite.legacyConfigForExtraHeaders options)
         , ("LOG_LEVEL", Just logLevel)
         ]
         "stack exec instana-haskell-agent-stub"
@@ -320,6 +320,13 @@ buildCommand envVars command =
 booleanEnv :: Bool -> Maybe String
 booleanEnv b =
   if b then Just "true" else Nothing
+
+
+stringListEnv :: [String] -> Maybe String
+stringListEnv strings =
+  if length strings > 0
+    then Just $ T.unpack $ T.intercalate "," (map T.pack strings)
+    else Nothing
 
 
 -- |Environment variable for the log level

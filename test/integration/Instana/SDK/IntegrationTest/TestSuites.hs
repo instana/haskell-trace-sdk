@@ -207,8 +207,15 @@ testSpecComplianceW3cOn specificationComplianceTestCases apiLabel route =
             specificationComplianceTestCases
             Suite.testServer
             route
-      , Suite.options = (Suite.withCustomSecretsConfig "contains-ignore-case:password,secret,token") {
-            Suite.appsUnderTest =
+      , Suite.options = Suite.defaultOptions
+          { Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+          , Suite.tracingConfigForExtraHeaders =
+              [ "X-Request-Header-Test-To-App"
+              , "X-Request-Header-App-To-Downstream"
+              , "X-Response-Header-Downstream-To-App"
+              , "X-Response-Header-App-To-Test"
+              ]
+          ,  Suite.appsUnderTest =
               [ Suite.testServer
               , Suite.downstreamTarget
               ]
@@ -228,8 +235,14 @@ testSpecComplianceW3cOff specificationComplianceTestCases apiLabel route =
             specificationComplianceTestCases
             Suite.testServer
             route
-      , Suite.options = Suite.defaultOptions {
-            Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+      , Suite.options = Suite.defaultOptions
+          { Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+          , Suite.tracingConfigForExtraHeaders =
+              [ "X-Request-Header-Test-To-App"
+              , "X-Request-Header-App-To-Downstream"
+              , "X-Response-Header-Downstream-To-App"
+              , "X-Response-Header-App-To-Test"
+              ]
           , Suite.disableW3cTraceCorrelation = True
           , Suite.appsUnderTest =
               [ Suite.testServer
@@ -268,8 +281,15 @@ testSpecComplianceW3cOnWaiMiddleware specificationComplianceTestCases route =
             specificationComplianceTestCases
             Suite.testServerWithMiddleware
             route
-      , Suite.options = (Suite.withCustomSecretsConfig "contains-ignore-case:password,secret,token") {
-            Suite.appsUnderTest =
+      , Suite.options = Suite.defaultOptions
+          { Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+          , Suite.tracingConfigForExtraHeaders =
+              [ "X-Request-Header-Test-To-App"
+              , "X-Request-Header-App-To-Downstream"
+              , "X-Response-Header-Downstream-To-App"
+              , "X-Response-Header-App-To-Test"
+              ]
+          , Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware
               , Suite.downstreamTarget
               ]
@@ -291,8 +311,14 @@ testSpecComplianceW3cOffWaiMiddleware specificationComplianceTestCases route =
             specificationComplianceTestCases
             Suite.testServerWithMiddleware
             route
-      , Suite.options = Suite.defaultOptions {
-            Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+      , Suite.options = Suite.defaultOptions
+          { Suite.customSecretsConfig = Just "contains-ignore-case:password,secret,token"
+          , Suite.tracingConfigForExtraHeaders =
+              [ "X-Request-Header-Test-To-App"
+              , "X-Request-Header-App-To-Downstream"
+              , "X-Response-Header-Downstream-To-App"
+              , "X-Response-Header-App-To-Test"
+              ]
           , Suite.disableW3cTraceCorrelation = True
           , Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware
