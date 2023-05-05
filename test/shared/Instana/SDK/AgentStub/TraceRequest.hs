@@ -171,6 +171,16 @@ readSdkName span_ =
       _                           -> Nothing
 
 
+readService :: Span -> Maybe Text
+readService span_ =
+  let
+    value = extractProperty ["service"] (spanData span_)
+  in
+    case value of
+      Just (Aeson.String service) -> Just service
+      _                           -> Nothing
+
+
 extractProperty :: [Text] -> Value -> Maybe Value
 extractProperty [] value              = Just value
 extractProperty (key:keys) (Object o) = HM.lookup key o >>= extractProperty keys

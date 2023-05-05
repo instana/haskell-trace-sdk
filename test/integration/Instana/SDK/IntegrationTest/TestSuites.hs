@@ -215,7 +215,8 @@ testSpecComplianceW3cOn specificationComplianceTestCases apiLabel route =
               , "X-Response-Header-Downstream-To-App"
               , "X-Response-Header-App-To-Test"
               ]
-          ,  Suite.appsUnderTest =
+          , Suite.customServiceName = Just "Tracer Test Suite Service"
+          , Suite.appsUnderTest =
               [ Suite.testServer
               , Suite.downstreamTarget
               ]
@@ -243,6 +244,7 @@ testSpecComplianceW3cOff specificationComplianceTestCases apiLabel route =
               , "X-Response-Header-Downstream-To-App"
               , "X-Response-Header-App-To-Test"
               ]
+          , Suite.customServiceName = Just "Tracer Test Suite Service"
           , Suite.disableW3cTraceCorrelation = True
           , Suite.appsUnderTest =
               [ Suite.testServer
@@ -289,6 +291,7 @@ testSpecComplianceW3cOnWaiMiddleware specificationComplianceTestCases route =
               , "X-Response-Header-Downstream-To-App"
               , "X-Response-Header-App-To-Test"
               ]
+          , Suite.customServiceName = Just "Tracer Test Suite Service"
           , Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware
               , Suite.downstreamTarget
@@ -319,6 +322,7 @@ testSpecComplianceW3cOffWaiMiddleware specificationComplianceTestCases route =
               , "X-Response-Header-Downstream-To-App"
               , "X-Response-Header-App-To-Test"
               ]
+          , Suite.customServiceName = Just "Tracer Test Suite Service"
           , Suite.disableW3cTraceCorrelation = True
           , Suite.appsUnderTest =
               [ Suite.testServerWithMiddleware
