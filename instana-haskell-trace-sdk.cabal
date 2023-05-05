@@ -230,6 +230,7 @@ executable instana-haskell-agent-stub
       base >=4.7 && <5
     , aeson
     , aeson-casing
+    , containers
     , hslogger
     , servant
     , servant-server
@@ -275,6 +276,7 @@ test-suite instana-haskell-trace-sdk-integration-tests
     , array
     , bytestring
     , case-insensitive
+    , containers
     , directory
     , exceptions
     , hslogger

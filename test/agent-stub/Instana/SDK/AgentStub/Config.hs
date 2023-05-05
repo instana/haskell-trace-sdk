@@ -8,6 +8,7 @@ module Instana.SDK.AgentStub.Config
 
 import           Data.Maybe                              (fromMaybe)
 import           Data.String                             (fromString)
+import           Data.Text                               (Text)
 import qualified Data.Text                               as T
 import           GHC.Generics
 import           Instana.SDK.AgentStub.DiscoveryResponse (SecretsConfig (SecretsConfig))
@@ -22,8 +23,8 @@ data AgentStubConfig = AgentStubConfig
   { bindHost                     :: Warp.HostPreference
   , bindPort                     :: Int
   , secretsConfig                :: SecretsConfig
-  , extraHeadersViaTracingConfig :: Bool
-  , extraHeadersViaLegacyConfig  :: Bool
+  , extraHeadersViaTracingConfig :: [Text]
+  , extraHeadersViaLegacyConfig  :: [Text]
   , startupDelay                 :: Int
   , simulateConnectionLoss       :: Bool
   , simulatPidTranslation        :: Bool
@@ -48,8 +49,8 @@ readConfig = do
   hostString          <- lookupEnvWithDefault    "HOST" "127.0.0.1"
   port                <- lookupEnvIntWithDefault "PORT" 1302
   secrets             <- parseSecretsConfig
-  extraHeadersTracing <- lookupFlag              "EXTRA_HEADERS_VIA_TRACING_CONFIG"
-  extraHeadersLegacy  <- lookupFlag              "EXTRA_HEADERS_VIA_LEGACY_CONFIG"
+  extraHeadersTracing <- parseExtraHeadersConfig "EXTRA_HEADERS_VIA_TRACING_CONFIG"
+  extraHeadersLegacy  <- parseExtraHeadersConfig "EXTRA_HEADERS_VIA_LEGACY_CONFIG"
   delay               <- lookupEnvIntWithDefault "STARTUP_DELAY" 0
   connectionLoss      <- lookupFlag              "SIMULATE_CONNECTION_LOSS"
   pidTranslation      <- lookupFlag              "SIMULATE_PID_TRANSLATION"
@@ -121,4 +122,14 @@ parseSecretsConfig = do
         }
     Nothing -> do
       return defaultSecretsConfig
+
+
+parseExtraHeadersConfig :: String -> IO [Text]
+parseExtraHeadersConfig key = do
+  maybeExtraHeadersConfigString <- lookupEnv key
+  case maybeExtraHeadersConfigString of
+    Just extraHeadersString -> do
+      return $ T.splitOn "," (T.pack extraHeadersString)
+    Nothing -> do
+      return []
 

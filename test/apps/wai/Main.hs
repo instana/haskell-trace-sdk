@@ -355,6 +355,7 @@ httpBracketApi instana httpManager requestIn respond = do
           HTTPTypes.status200
           [ ("Content-Type", "application/json; charset=UTF-8")
           , ("X-Response-Header-On-Entry", "response header on entry value")
+          , ("X-Response-Header-App-To-Test", "Value 4")
           ]
           (HTTP.responseBody downstreamResponse)
   respond response
@@ -385,6 +386,7 @@ httpLowLevelApi instana httpManager requestIn respond = do
         HTTPTypes.status200
         [ ("Content-Type", "application/json; charset=UTF-8")
         , ("X-Response-Header-On-Entry", "response header on entry value")
+        , ("X-Response-Header-App-To-Test", "Value 4")
         ]
         (HTTP.responseBody downstreamResponse)
   response' <-
@@ -429,7 +431,9 @@ addDowntreamRequestHeaders :: HTTP.Request -> HTTP.Request
 addDowntreamRequestHeaders request =
   request {
     HTTP.requestHeaders =
-      [ ("X-Request-Header-On-Exit", "request header on exit value") ]
+      [ ("X-Request-Header-On-Exit", "request header on exit value")
+      , ("X-Request-Header-App-To-Downstream", "Value 2")
+      ]
   }
 
 

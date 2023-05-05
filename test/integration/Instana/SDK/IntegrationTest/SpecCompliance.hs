@@ -19,13 +19,16 @@ import qualified Data.CaseInsensitive                   as CI
 import           Data.Either                            (isLeft)
 import           Data.HashMap.Strict                    (HashMap)
 import qualified Data.HashMap.Strict                    as HashMap
+import qualified Data.Map                               as Map
 import           Data.Maybe                             (catMaybes, isNothing,
                                                          listToMaybe)
 import           Data.Text                              (Text)
 import qualified Data.Text                              as T
 import qualified Data.Vector                            as Vector
 import           Instana.SDK.AgentStub.TraceRequest     (From (..),
-                                                         InstanaAncestor, Span)
+                                                         HttpAnnotations,
+                                                         InstanaAncestor, Span,
+                                                         SpanData)
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
@@ -181,40 +184,6 @@ instance FromJSON SpecTestCase where
         <*> obj .:? "X-INSTANA-L out"
         <*> obj .:? "traceparent out"
         <*> obj .:? "tracestate out"
-
-
-data SpanData = SpanData
-  { httpAnnotations :: HttpAnnotations
-  }
-  deriving (Show)
-
-
-instance FromJSON SpanData where
-  parseJSON = Aeson.withObject "Span Annotations" $
-    \obj ->
-      SpanData
-        <$> obj .: "http"
-
-
-data HttpAnnotations = HttpAnnotations
-  { method :: Maybe String
-  , host   :: Maybe String
-  , url    :: Maybe String
-  , params :: Maybe String
-  , status :: Maybe Int
-  }
-  deriving (Show)
-
-
-instance FromJSON HttpAnnotations where
-  parseJSON = Aeson.withObject "HTTP Annotations" $
-    \obj ->
-      HttpAnnotations
-        <$> obj .:? "method"
-        <*> obj .:? "host"
-        <*> obj .:? "url"
-        <*> obj .:? "params"
-        <*> obj .:? "status"
 
 
 type ValueForPlaceholder = (Text, Text)
@@ -383,12 +352,14 @@ testCaseDefinitionToTest appUnderTest route pid testCaseDefinition = do
       (show $ index testCaseDefinition) ++ ": " ++
       scenario testCaseDefinition ++ " -> " ++
       whatToDo testCaseDefinition
-    headers = testCaseDefinitionToHeaders testCaseDefinition
+    requestHeaders = testCaseDefinitionToHeaders testCaseDefinition
     routeWithQuery =
        case queryIn testCaseDefinition of
          Just query -> route ++ "?" ++ query
          Nothing    -> route
-  putStrLn $ "Creating test: " ++ label ++ "\nwith headers:\n" ++ show headers
+  putStrLn $
+    "Creating test: " ++ label ++
+    "\nwith requestHeaders:\n" ++ show requestHeaders
   putStrLn $ "TEST CASE: " ++ show testCaseDefinition
   applyLabel label $
     runSpecTestCase
@@ -396,21 +367,36 @@ testCaseDefinitionToTest appUnderTest route pid testCaseDefinition = do
       route
       routeWithQuery
       pid
-      headers
+      requestHeaders
       testCaseDefinition
 
 
 testCaseDefinitionToHeaders :: SpecTestCase -> [Header]
 testCaseDefinitionToHeaders testCaseDefinition =
-  catMaybes $
-    map toHeader
-      [ ("X-INSTANA-T", xInstanaTIn testCaseDefinition)
-      , ("X-INSTANA-S", xInstanaSIn testCaseDefinition)
-      , ("X-INSTANA-L", xInstanaLIn testCaseDefinition)
-      , ("X-INSTANA-SYNTHETIC", xInstanaSyntheticIn testCaseDefinition)
-      , ("traceparent", traceparentIn testCaseDefinition)
-      , ("tracestate", tracestateIn testCaseDefinition)
-      ]
+  let
+    traceCorrelationHeaders =
+      catMaybes $
+        map toHeader
+          [ ("X-INSTANA-T", xInstanaTIn testCaseDefinition)
+          , ("X-INSTANA-S", xInstanaSIn testCaseDefinition)
+          , ("X-INSTANA-L", xInstanaLIn testCaseDefinition)
+          , ("X-INSTANA-SYNTHETIC", xInstanaSyntheticIn testCaseDefinition)
+          , ("traceparent", traceparentIn testCaseDefinition)
+          , ("tracestate", tracestateIn testCaseDefinition)
+          ]
+    extraRequestHeaders :: [Header]
+    extraRequestHeaders =
+      case requestHeadersIn testCaseDefinition of
+        Just requestHeader ->
+          let
+            [name, value] = T.splitOn ":" $ T.pack requestHeader
+            headerName = CI.mk $ BSC8.pack $ T.unpack name
+            headerValue = BSC8.pack $ T.unpack value
+          in
+            [(headerName, headerValue)]
+        Nothing              -> []
+  in
+    traceCorrelationHeaders ++ extraRequestHeaders
   where
     toHeader (_, Nothing)       = Nothing
     toHeader (name, Just value) = Just (name, BSC8.pack value)
@@ -429,7 +415,7 @@ runSpecTestCase
   expectedEntryUrl
   routeWithQuery
   pid
-  headers
+  requestHeaders
   testCaseDefinition = do
   let
     suppressionHeader =
@@ -438,7 +424,7 @@ runSpecTestCase
           (name == (CI.mk (BSC8.pack "X-INSTANA-L"))) &&
           (value == BSC8.pack "0")
         )
-        headers
+        requestHeaders
     suppressed =
       (length suppressionHeader) >= 1
   executeRequestAndVerify
@@ -448,7 +434,7 @@ runSpecTestCase
     routeWithQuery
     pid
     suppressed
-    headers
+    requestHeaders
 
 
 executeRequestAndVerify ::
@@ -467,13 +453,13 @@ executeRequestAndVerify
   routeWithQuery
   pid
   suppressed
-  headers = do
+  requestHeaders = do
   response <-
     HttpHelper.doAppRequest
       appUnderTest
       routeWithQuery
       "GET"
-      headers
+      requestHeaders
   let
     initialTestContext = ([], [])
 
@@ -582,10 +568,10 @@ verifyHttpHeadersOnDownstreamRequest
         testContext
   in
   foldr
-    (\(header, accessor) currentTestContext ->
+    (\(headerName, accessor) currentTestContext ->
       let
         message =
-          "value for downstream HTTP header " ++ (T.unpack header)
+          "value for downstream HTTP header " ++ (T.unpack headerName)
         expectedValueM :: Maybe String
         expectedValueM = accessor testCaseDefinition
       in
@@ -597,14 +583,14 @@ verifyHttpHeadersOnDownstreamRequest
               currentTestContext
               message
               expectedValue
-              (HashMap.lookup header responseBody)
+              (HashMap.lookup headerName responseBody)
           else
             addAssertion
-              (assertEqualInMap message expectedValue header responseBody)
+              (assertEqualInMap message expectedValue headerName responseBody)
               currentTestContext
         Nothing ->
           addAssertion
-            (assertNotInMap message header responseBody)
+            (assertNotInMap message headerName responseBody)
             currentTestContext
     )
     testContextAfterXInstanaLCheck
@@ -674,7 +660,7 @@ verifySpans
             entrySpanDataAeson = (TraceRequest.spanData entrySpan)
             entryHttpAnnotationsEither :: Either String HttpAnnotations
             entryHttpAnnotationsEither =
-              fmap httpAnnotations $
+              fmap TraceRequest.httpAnnotations $
                 (AesonTypes.parseEither
                  Aeson.parseJSON
                  entrySpanDataAeson :: Either String SpanData)
@@ -682,7 +668,7 @@ verifySpans
             exitSpanDataAeson = (TraceRequest.spanData exitSpan)
             exitHttpAnnotationsEither :: Either String HttpAnnotations
             exitHttpAnnotationsEither =
-              fmap httpAnnotations $
+              fmap TraceRequest.httpAnnotations $
                 (AesonTypes.parseEither
                  Aeson.parseJSON
                  exitSpanDataAeson :: Either String SpanData)
@@ -787,34 +773,108 @@ httpAnnotationAssertions
   expectedEntryUrl
   entryHttpAnnotations
   exitHttpAnnotations =
-  [ assertEqual "entry http method"
+  [ -- entry span http annotations
+    assertEqual "entry http method"
       (Just "GET" :: Maybe String)
-      (method entryHttpAnnotations)
+      (TraceRequest.method entryHttpAnnotations)
   , assertEqual "entry http host"
       (Just "127.0.0.1:1207" :: Maybe String)
-      (host entryHttpAnnotations)
+      (TraceRequest.host entryHttpAnnotations)
   , assertEqual "entry http url"
       (Just ("/" ++ expectedEntryUrl) :: Maybe String)
-      (url entryHttpAnnotations)
+      (TraceRequest.url entryHttpAnnotations)
   , assertEqual "entry http params"
       (entrySpanParams testCaseDefinition)
-      (params entryHttpAnnotations)
+      (TraceRequest.params entryHttpAnnotations)
   , assertEqual "entry http status"
       (Just 200 :: Maybe Int)
-      (status entryHttpAnnotations)
+      (TraceRequest.status entryHttpAnnotations)
+
+  -- exit span http annotations
   , assertEqual "exit http method"
       (Just "GET" :: Maybe String)
-      (method exitHttpAnnotations)
+      (TraceRequest.method exitHttpAnnotations)
   , assertEqual "exit http url"
       (Just "http://127.0.0.1:1208/echo" :: Maybe String)
-      (url exitHttpAnnotations)
+      (TraceRequest.url exitHttpAnnotations)
   , assertEqual "exit http params"
       (exitSpanParams testCaseDefinition)
-      (params exitHttpAnnotations)
+      (TraceRequest.params exitHttpAnnotations)
   , assertEqual "exit http status"
       (Just 200 :: Maybe Int)
-      (status exitHttpAnnotations)
+      (TraceRequest.status exitHttpAnnotations)
   ]
+  ++
+  allHeaderAssertions
+    testCaseDefinition
+    entryHttpAnnotations
+    exitHttpAnnotations
+
+
+allHeaderAssertions ::
+  SpecTestCase
+  -> HttpAnnotations
+  -> HttpAnnotations
+  -> [Assertion]
+allHeaderAssertions
+  testCaseDefinition
+  entryHttpAnnotations
+  exitHttpAnnotations =
+  headerAssertions
+    testCaseDefinition
+    entrySpanHeaders
+    "entry"
+    entryHttpAnnotations
+  ++
+  headerAssertions
+    testCaseDefinition
+    exitSpanHeaders
+    "exit"
+    exitHttpAnnotations
+
+
+headerAssertions ::
+  SpecTestCase
+  -> (SpecTestCase -> Maybe String)
+  -> String
+  -> HttpAnnotations
+  -> [Assertion]
+headerAssertions
+  testCaseDefinition
+  expectedHeaderAccessor
+  label
+  httpAnnotations =
+  if isNothing (expectedHeaderAccessor testCaseDefinition)
+    then
+      []
+    else
+      let
+        Just expectedHeaderString = expectedHeaderAccessor testCaseDefinition
+        [expectedHeaderName, expectedHeaderValue] =
+          map T.unpack $
+            map T.strip $
+              T.splitOn ":" $
+                T.pack expectedHeaderString
+        actualHeadersMaybe = TraceRequest.header httpAnnotations
+      in
+        if isNothing actualHeadersMaybe
+          then
+            [ assertBool
+                ("expected " ++ label ++ " http header " ++
+                  expectedHeaderName ++
+                  "but no headers were captured")
+                False
+            ]
+          else
+            let
+              Just actualHeaders = actualHeadersMaybe
+              actualHeaderValue =
+                Map.lookup expectedHeaderName actualHeaders
+            in
+              [ assertEqual (label ++ " http header " ++ expectedHeaderName)
+                (Just expectedHeaderValue)
+                actualHeaderValue
+              ]
 
 
 spanAssertionsFromTestCaseDefinition ::
