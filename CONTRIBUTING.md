@@ -64,7 +64,6 @@ Publishing a New Release
     * `README.md` (installation instructions/extra-deps)
     * `instana-haskell-trace-sdk.cabal`
     * `package.yaml`
-    * `test/integration/Instana/SDK/IntegrationTest/Metrics.hs` (assertion for `sensorVersion`)
 * Update `README.md` with API changes (if any).
 * Commit and push this change with a commit comment like `chore: version a.b.c.d`
 * Wait for the CI build for branch main.

@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## 0.10.0.0
+- Feature: Upgrade support for the W3C trace context specification to level 2.
+
 ## 0.9.0.0
 - Fix format of annotation span.data.http.header - it is now a JSON object instead of an array of arrays.
 - BREAKING: Rename confusingly named `Instana.SDK.addAnnotationAt` to `Instana.SDK.addJsonValueAt`, because it actually takes a JSON value. `Instana.SDK.addAnnotationAt` still exists, but takes an actual `Instana.SDK.Span.SpanData.Annotation` value as its argument now, see below.
@@ -23,7 +26,7 @@
 - Fix: Limit the number of list-members (key-value pairs) to 32 in the W3C trace context `tracestate` header.
 
 ## 0.7.0.0
-- Add support for W3C trace context.
+- Add support for W3C trace context (level 1).
 - Fix: Interprete log levels provided via `INSTANA_LOG_LEVEL` and `INSTANA_LOG_LEVEL_STDOUT` case insensitive.
 
 ## 0.6.2.0
