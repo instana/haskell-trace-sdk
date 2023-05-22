@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## 0.10.1.0
+- Fix: Remove obsolete check for Server header when connecting to the Instana host agent.
+
 ## 0.10.0.0
 - Feature: Upgrade support for the W3C trace context specification to level 2.
 
