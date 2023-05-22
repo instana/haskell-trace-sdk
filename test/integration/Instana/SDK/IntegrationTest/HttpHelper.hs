@@ -41,8 +41,8 @@ retryDelay = 100 * 1000
 --    simultaneously
 -- 2) The agent stub might not yet be up when the Instana SDK in the app under
 --    test starts to look for an agent (which is a perfectly normal situation
---    and should shouldn't not be a problem as the SDK will retry with to find
---    an agent to connect to with fibonacci backoff).
+--    and should shouldn't not be a problem as the SDK will retry to find an
+--    agent to connect to with fibonacci backoff).
 -- 3) When this happens, the first attempt to talk to 127.0.0.1:1302 fails.
 -- 4) Next, the SDK attempts to talk to an agent over the default gateway.
 -- 5) This never happens locally (at least not on MacOS), as there is no

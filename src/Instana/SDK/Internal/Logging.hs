@@ -197,6 +197,7 @@ parseLogLevel logLevelStr =
     "INFO"      -> Just INFO
     "NOTICE"    -> Just NOTICE
     "WARNING"   -> Just WARNING
+    "WARN"      -> Just WARNING
     "ERROR"     -> Just ERROR
     "CRITICAL"  -> Just CRITICAL
     "ALERT"     -> Just ALERT

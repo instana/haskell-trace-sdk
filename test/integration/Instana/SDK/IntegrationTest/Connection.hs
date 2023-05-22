@@ -13,9 +13,9 @@ import           Test.HUnit
 
 import           Instana.SDK.AgentStub.TraceRequest     (From (..), Span)
 import qualified Instana.SDK.AgentStub.TraceRequest     as TraceRequest
-import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import           Instana.SDK.IntegrationTest.HUnitExtra (applyLabel,
                                                          assertAllIO, failIO)
+import qualified Instana.SDK.IntegrationTest.HttpHelper as HttpHelper
 import qualified Instana.SDK.IntegrationTest.Suite      as Suite
 import qualified Instana.SDK.IntegrationTest.TestHelper as TestHelper
 

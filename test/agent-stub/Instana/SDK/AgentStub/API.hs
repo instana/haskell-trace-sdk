@@ -14,7 +14,7 @@ import           Instana.SDK.AgentStub.TraceRequest      (TraceRequest)
 
 type API =
        -- GET /
-       Get '[JSON] (Headers '[Header "Server" String] NoContent)
+       Get '[JSON] NoContent
 
        -- PUT /com.instana.plugin.haskell.discovery
   :<|> "com.instana.plugin.haskell.discovery"

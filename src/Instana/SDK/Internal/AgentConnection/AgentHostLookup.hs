@@ -13,11 +13,10 @@ module Instana.SDK.Internal.AgentConnection.AgentHostLookup
 import qualified Control.Concurrent.STM                           as STM
 import           Control.Exception                                (SomeException,
                                                                    catch)
-import           Data.ByteString.Char8                            (unpack)
 import           Data.Char                                        (isSpace)
 import qualified Data.List                                        as List
 import qualified Network.HTTP.Client                              as HTTP
-import qualified Network.HTTP.Types.Header                        as Header
+import qualified Network.HTTP.Types.Status                        as Status
 import           System.Exit                                      (ExitCode (ExitSuccess))
 import           System.Log.Logger                                (debugM)
 import           System.Process                                   as Process
@@ -114,7 +113,6 @@ tryHost ::
   -> IO (Either String SuccessfullHost)
 tryHost context host port = do
   let
-    expectedServerHeader = "Instana Agent"
     manager = InternalContext.httpManager context
     agentRootUrl = URL.mkHttp host port ""
   debugM instanaLogger $ "Trying to reach agent at " ++ show agentRootUrl
@@ -125,17 +123,14 @@ tryHost context host port = do
     (do
       response <- agentRootAction
       let
-        headers = HTTP.responseHeaders response
-        serverHeaderTuple = List.find (\(h, _) -> h == Header.hServer) headers
-        serverHeaderValue = (unpack . snd) <$> serverHeaderTuple
-      if serverHeaderValue == Just expectedServerHeader
+        httpStatus = Status.statusCode $ HTTP.responseStatus response
+      if httpStatus >= 200 && httpStatus < 300
       then do
         return $ Right (host, port)
       else do
         return $ Left $
           "Host at " ++ show agentRootUrl ++ " did not respond with " ++
-          "expected Server header (" ++ expectedServerHeader ++
-          ") but with: " ++ show serverHeaderValue
+          "expected HTTP status but with: " ++ show httpStatus
     )
     (\e -> do
       let

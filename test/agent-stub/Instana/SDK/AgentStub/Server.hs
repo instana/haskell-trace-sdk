@@ -10,8 +10,7 @@ import           Data.Maybe                              (fromMaybe)
 import           Data.STRef                              (modifySTRef,
                                                           readSTRef)
 import           Data.Time.Clock.POSIX                   (getPOSIXTime)
-import           Servant                                 (Header, Headers,
-                                                          NoContent (NoContent),
+import           Servant                                 (NoContent (NoContent),
                                                           err404, err503,
                                                           (:<|>) (..))
 import qualified Servant
@@ -50,9 +49,9 @@ mainServer config startupTime recorders =
  :<|> StubServer.stubServer recorders
 
 
-getRoot :: Servant.Handler (Headers '[Header "Server" String] NoContent)
+getRoot :: Servant.Handler NoContent
 getRoot =
-  return $ Servant.addHeader "Instana Agent" NoContent
+  return $ NoContent
 
 
 putDiscovery ::
