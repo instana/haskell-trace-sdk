@@ -45,15 +45,15 @@ retryDelay = 100 * 1000
 --    agent to connect to with fibonacci backoff).
 -- 3) When this happens, the first attempt to talk to 127.0.0.1:1302 fails.
 -- 4) Next, the SDK attempts to talk to an agent over the default gateway.
--- 5) This never happens locally (at least not on MacOS), as there is no
---    /sbin/ip executable present
--- 6) On Travis (or more generally on most Linux systems), the SDK actually
---    tries the default gateway because that executable _is_ present. It will
+-- 5) This never happens locally (at least not on MacOS), since the file
+--    /proc/self/net/route does not exist.
+-- 6) On CircleCI (or more generally on most Linux systems), the SDK actually
+--    tries the default gateway because that file _is_ present. It will
 --    also find a default gateway (let's say, for example, 10.20.0.1).
 -- 7) That host is reachable so an HTTP request to 10.20.0.1:1302 is attempted
 --    (1302 is the configured agent port in the integration tests).
 -- 8) If something exists at 10.20.0.1:1302 it never sends a response. Or there
---    is nothing there but somehow the request does not fail immediately.
+--    is nothing there but the request only fails after the connection timeout.
 --    Either way, trying this HTTP request eats up around 5 seconds. Why 5
 --    seconds? 5 seconds is:
 --    a) the timeout the SDK sets itself (see Instana/SDK/SDK.hs, value for

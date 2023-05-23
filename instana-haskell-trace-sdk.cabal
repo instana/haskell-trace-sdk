@@ -47,13 +47,13 @@ library
     , http-client-tls
     , http-types
     , network
-    , process
     , random
     , regex-base
     , regex-compat
     , regex-pcre
     , regex-tdfa
     , retry
+    , safe
     , scientific
     , stm
     , sysinfo
@@ -87,6 +87,7 @@ library
       Instana.SDK.Internal.AgentConnection.AgentReady
       Instana.SDK.Internal.AgentConnection.Announce
       Instana.SDK.Internal.AgentConnection.ConnectLoop
+      Instana.SDK.Internal.AgentConnection.DefaultGatewayIp
       Instana.SDK.Internal.AgentConnection.Json.AnnounceResponse
       Instana.SDK.Internal.AgentConnection.Json.Util
       Instana.SDK.Internal.AgentConnection.Paths
@@ -168,6 +169,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , regex-compat
     , regex-pcre
     , regex-tdfa
+    , safe
     , scientific
     , text
     , unordered-containers
@@ -175,6 +177,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
     , wai
   other-modules:
       -- the actual tests
+      Instana.SDK.Internal.AgentConnection.DefaultGatewayIpTest
       Instana.SDK.Internal.AgentConnection.SchedFileTest
       Instana.SDK.Internal.ConfigTest
       Instana.SDK.Internal.IdTest
@@ -190,6 +193,7 @@ test-suite instana-haskell-trace-sdk-unit-tests
       Instana.SDK.TracingHeadersTest
       -- modules under test
       Instana.SDK.Internal.Config
+      Instana.SDK.Internal.AgentConnection.DefaultGatewayIp
       Instana.SDK.Internal.AgentConnection.SchedFile
       Instana.SDK.Internal.Id
       Instana.SDK.Internal.Logging

@@ -10,26 +10,23 @@ module Instana.SDK.Internal.AgentConnection.AgentHostLookup
     ) where
 
 
-import qualified Control.Concurrent.STM                           as STM
-import           Control.Exception                                (SomeException,
-                                                                   catch)
-import           Data.Char                                        (isSpace)
-import qualified Data.List                                        as List
-import qualified Network.HTTP.Client                              as HTTP
-import qualified Network.HTTP.Types.Status                        as Status
-import           System.Exit                                      (ExitCode (ExitSuccess))
-import           System.Log.Logger                                (debugM)
-import           System.Process                                   as Process
+import qualified Control.Concurrent.STM                                as STM
+import           Control.Exception                                     (SomeException,
+                                                                        catch)
+import qualified Network.HTTP.Client                                   as HTTP
+import qualified Network.HTTP.Types.Status                             as Status
+import           System.Log.Logger                                     (debugM)
 
-import qualified Instana.SDK.Internal.AgentConnection.Announce    as Announce
-import           Instana.SDK.Internal.AgentConnection.ProcessInfo (ProcessInfo)
-import qualified Instana.SDK.Internal.Config                      as InternalConfig
-import           Instana.SDK.Internal.Context                     (ConnectionState (..),
-                                                                   InternalContext)
-import qualified Instana.SDK.Internal.Context                     as InternalContext
-import           Instana.SDK.Internal.Logging                     (instanaLogger)
-import qualified Instana.SDK.Internal.Retry                       as Retry
-import qualified Instana.SDK.Internal.URL                         as URL
+import qualified Instana.SDK.Internal.AgentConnection.Announce         as Announce
+import           Instana.SDK.Internal.AgentConnection.DefaultGatewayIp (extractDefaultGatewayIp)
+import           Instana.SDK.Internal.AgentConnection.ProcessInfo      (ProcessInfo)
+import qualified Instana.SDK.Internal.Config                           as InternalConfig
+import           Instana.SDK.Internal.Context                          (ConnectionState (..),
+                                                                        InternalContext)
+import qualified Instana.SDK.Internal.Context                          as InternalContext
+import           Instana.SDK.Internal.Logging                          (instanaLogger)
+import qualified Instana.SDK.Internal.Retry                            as Retry
+import qualified Instana.SDK.Internal.URL                              as URL
 
 
 type SuccessfullHost = (String, Int)
@@ -143,15 +140,26 @@ tryHost context host port = do
 readDefaultGateway :: IO (Either String String)
 readDefaultGateway = do
   let
-    cmd = "/sbin/ip route | awk '/default/ { print $3 }'"
-    stdIn = ""
-  (exitCode, stdOut, stdErr) <-
-    Process.readCreateProcessWithExitCode (Process.shell cmd) stdIn
-  if exitCode /= ExitSuccess || stdErr /= ""
-  then
-    return $ Left $ "Failed to retrieve default gateway: " ++ stdErr
-  else
-    return $ Right $ trim stdOut
-  where
-    trim = List.dropWhileEnd isSpace . dropWhile isSpace
-
+    routeFilePath = "/proc/self/net/route"
+  catch
+    ( do
+        routeFileContent <- readFile routeFilePath
+        let
+          defaultGatewayIpM = extractDefaultGatewayIp routeFileContent
+        case defaultGatewayIpM of
+          Just defaultGatewayIp -> do
+            debugM instanaLogger $
+              "Determined default gateway IP: " ++ defaultGatewayIp
+            return $ Right defaultGatewayIp
+          Nothing ->
+            return $
+              Left $
+                "Failed to parse default gateway IP from " ++ routeFilePath ++ "."
+    )
+    (\(e :: SomeException) -> do
+      return $
+        Left $
+          "Failed to read " ++ routeFilePath ++
+          " to determine the default gateway IP: " ++
+          show e
+    )
