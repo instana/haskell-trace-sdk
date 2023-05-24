@@ -1,5 +1,8 @@
 # Changelog for instana-haskell-trace-sdk
 
+## 0.10.2.0
+- Remove dependency on sbin and awk in containers.
+
 ## 0.10.1.0
 - Fix: Remove obsolete check for Server header when connecting to the Instana host agent.
 
