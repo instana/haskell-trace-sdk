@@ -1,0 +1,26 @@
+{
+  "name": "needs-release",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/instana/haskell-trace-sdk.git"
+  },
+  "author": "Bastian Krol <bastian.krol@web.de>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/instana/haskell-trace-sdk/issues"
+  },
+  "homepage": "https://github.com/instana/haskell-trace-sdk#readme",
+  "dependencies": {
+    "concat-stream": "^2.0.0",
+    "conventional-changelog-conventionalcommits": "^5.0.0",
+    "conventional-commits-parser": "^3.2.4",
+    "git-raw-commits": "^2.0.11",
+    "yargs": "^17.7.2"
+  }
+}
