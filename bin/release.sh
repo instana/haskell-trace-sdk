@@ -108,23 +108,22 @@ if [[ -z DRY_RUN ]]; then
   git tag v$next_version
   git push
   git push --tags
+else
+  echo This is a release dry run, listing changes but not committing/pushing/tagging.
+  git diff
 fi
 
-echo
-echo Preparing the distributable and uploading to hackage...
 if [[ -z DRY_RUN ]]; then
+  echo
+  echo Preparing the distributable and uploading to hackage...
   stack haddock && stack sdist && stack upload .
-fi
 
-echo
-echo Waiting a minute to make sure the package has become available on hackage...
-if [[ -z DRY_RUN ]]; then
+  echo
+  echo Waiting a minute to make sure the package has become available on hackage...
   sleep 60
-fi
 
-echo
-echo Uploading the documentation...
-if [[ -z DRY_RUN ]]; then
+  echo
+  echo Uploading the documentation...
   bin/build-and-upload-docs.sh
 fi
 
